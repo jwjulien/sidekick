@@ -1,0 +1,21 @@
+# Application state & local data
+data/
+
+# Python environment & cache
+server/.venv/
+server/venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node.js frontend dependencies & build outputs
+client/node_modules/
+client/dist/
+.eslintcache
+
+# Rust / Tauri compiler output
+src-tauri/target/
+
+# OS files
+.DS_Store
+Thumbs.db
