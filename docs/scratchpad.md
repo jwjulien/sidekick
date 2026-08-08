@@ -1,0 +1,61 @@
+- BOM Import
+  - Highlight BOM parts that are missing Part references
+  - BOM Builder
+- Shopping lists - basically a draft order that lets me track stuff that I will actually reorder when placing the next order.
+  - Multiple draft carts should be acceptable
+  - Should support moving items to other draft orders (e.g., splitting a cart from an actual order).
+
+
+## Modes
+- Research mode
+  - Search for parts using sophisticated query matching.
+  - Scan for parts using camera.
+    - What about the barcode scanner?
+  - Scan for parts using NFC.
+  - Barcode scanner
+  - Browse parts by:
+    - Category
+    - Location
+    - Name
+    - Supplier
+    - Project
+- BOM Management: Manage projects, revisions, and BOMs
+  - Upload BOMs and map to database parts
+  - Identify BOM parts that are missing from the system (i.e., they need a supplier source).
+  - Generate build sheets.
+- Inventory Management:
+  - Intake parts.
+    - Add new locations.
+  - Count inventory.
+  - Report shrinkage.
+    - Adds a report documenting who was involved and what happened as well as the losses.
+  - Organize warehouse.
+    - Register new storage locations.
+    - Move storage locations - i.e. the whole unit is being moved.
+    - Move parts to new locations - i.e. the parts (or some of them) are being moved to a different location.
+    - **Delete is not a thing - locations have physical tags so the IDs cannot be reused..**
+  - Perform audit spot checks.
+- Supplier Management - Mostly a placeholder for now:
+  - Edit supplier information.
+  - Add new suppliers
+  - Disable existing suppliers.
+  - **Delete should not be a thing - we don't want to lose linkage for suppliers we no longer use.**
+- Manufacturing:
+  - Generate build sheets.
+  - Locate parts in locations.
+  - Schedule production runs
+  - Manage secure parts:
+    - High value parts might be stored in secure location.
+
+
+## Pie-in the sky
+- Order tracking tied to suppliers and parts to know when more are to arrive.
+- Build management with scheduled buils of project revisions.
+  - Identify bottlenecks where there might be a shortage of parts.
+- Generate a timeline showing iventory of part over time and into the future (for orders/deliveries).
+- Asset tracking
+  - Item inventory
+  - Check out/in
+  - Support multiples of a thing
+  - Lock box storage
+- Location indication system
