@@ -2,10 +2,12 @@ import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from datetime import date, datetime
+import json
 
 from .database import engine, Base, get_db
 from . import models, auth
-from .routers import auth as auth_router, items, locations, categories, uploads
+from .routers import auth as auth_router, items, locations, categories, uploads, suppliers, projects
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -38,6 +40,8 @@ app.include_router(categories.router)
 app.include_router(locations.router)
 app.include_router(items.router)
 app.include_router(uploads.router)
+app.include_router(suppliers.router)
+app.include_router(projects.router)
 
 @app.get("/")
 def read_root():
@@ -52,8 +56,8 @@ def read_root():
 @app.post("/dev/seed", tags=["development"])
 def seed_database(db: Session = Depends(get_db)):
     """
-    Populate the SQLite database with mock categories, hierarchical locations,
-    custom fields, items, and dev users for testing.
+    Reset and seed the SQLite database with electronics parts, storage locations,
+    suppliers, and PCB projects.
     Only executable if DEV_MODE=True.
     """
     if not auth.DEV_MODE:
@@ -63,18 +67,11 @@ def seed_database(db: Session = Depends(get_db)):
         )
         
     try:
-        # Clear existing data in reverse order of foreign keys
-        db.query(models.Transaction).delete()
-        db.query(models.Attachment).delete()
-        db.query(models.CustomFieldValue).delete()
-        db.query(models.CustomField).delete()
-        db.query(models.Item).delete()
-        db.query(models.Location).delete()
-        db.query(models.Category).delete()
-        db.query(models.User).delete()
-        db.commit()
+        # Recreate tables to ensure schema is fully clean and updated
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         
-        # 1. Seed Users (with OIDC sub mapping corresponding to "dev-role" headers)
+        # 1. Seed Users (OIDC mappings corresponding to "dev-role" headers)
         dev_roles = ["admin", "designer", "stocker", "puller", "analyst", "viewer"]
         users_seeded = []
         for role in dev_roles:
@@ -89,109 +86,173 @@ def seed_database(db: Session = Depends(get_db)):
         db.commit()
         admin_user = users_seeded[0]
         
-        # 2. Seed Categories
-        cat_elec = models.Category(name="Electronics", description="Integrated circuits, microcontrollers, passives, and boards.")
-        cat_hard = models.Category(name="Hardware", description="Screws, bolts, brackets, and structural elements.")
-        cat_tool = models.Category(name="Tools", description="Soldering equipment, hand tools, meters, and calipers.")
-        db.add_all([cat_elec, cat_hard, cat_tool])
+        # 2. Seed Categories (hierarchical tree)
+        cat_passives = models.Category(title="Passives", designator="PAS")
+        cat_semis = models.Category(title="Semiconductors", designator="SEM")
+        cat_pcbs = models.Category(title="PCB Assemblies", designator="PCB")
+        db.add_all([cat_passives, cat_semis, cat_pcbs])
         db.commit()
         
-        # 3. Seed Custom Fields definitions
-        cf_mfg = models.CustomField(name="Manufacturer", field_type="text", category_id=cat_elec.id)
-        cf_part = models.CustomField(name="Part Number", field_type="text", category_id=cat_elec.id)
-        cf_volts = models.CustomField(name="Operating Voltage", field_type="text", category_id=cat_elec.id)
-        
-        cf_serial = models.CustomField(name="Serial Number", field_type="text", category_id=cat_tool.id)
-        cf_calib = models.CustomField(name="Calibration Date", field_type="date", category_id=cat_tool.id)
-        
-        db.add_all([cf_mfg, cf_part, cf_volts, cf_serial, cf_calib])
+        cat_resistors = models.Category(title="Resistors", parent_id=cat_passives.id, designator="R")
+        cat_capacitors = models.Category(title="Capacitors", parent_id=cat_passives.id, designator="C")
+        cat_mcus = models.Category(title="Microcontrollers", parent_id=cat_semis.id, designator="U")
+        db.add_all([cat_resistors, cat_capacitors, cat_mcus])
         db.commit()
         
-        # 4. Seed Hierarchical Locations
-        loc_lab = models.Location(name="Engineering Lab", description="Main R&D laboratory space.")
-        loc_wh = models.Location(name="Warehouse A", description="Bulk inventory storage.")
-        db.add_all([loc_lab, loc_wh])
+        # 3. Seed Parts
+        part_res = models.Part(
+            category_id=cat_resistors.id,
+            value="10k Ohm",
+            number="ERJ-6GEYJ103V",
+            package="0805",
+            price=0.01,
+            weight=0.002,
+            threshold=100,
+            notes="Metal film resistor, 1% tolerance, 1/10W.",
+            attributes=json.dumps({"barcode": "74470123456"}).encode("utf-8")
+        )
+        part_cap = models.Part(
+            category_id=cat_capacitors.id,
+            value="100nF",
+            number="GRM21BR71H104KA01L",
+            package="0805",
+            price=0.02,
+            weight=0.003,
+            threshold=150,
+            notes="MLCC ceramic capacitor, 50V, X7R, 10% tolerance.",
+            attributes=json.dumps({"barcode": "85560987654"}).encode("utf-8")
+        )
+        part_mcu = models.Part(
+            category_id=cat_mcus.id,
+            value="STM32F103C8T6",
+            number="STM32F103C8T6",
+            package="LQFP48",
+            price=3.50,
+            weight=0.2,
+            threshold=10,
+            notes="ARM Cortex-M3 MCU, 64KB Flash, 72MHz, 2.0V-3.6V.",
+            attributes=json.dumps({"barcode": "93320112233"}).encode("utf-8")
+        )
+        db.add_all([part_res, part_cap, part_mcu])
         db.commit()
         
-        loc_bench = models.Location(name="Workbench 1", description="Electronics assembly workbench.", parent_id=loc_lab.id)
-        loc_cab = models.Location(name="Cabinet A", description="Component organizer cabinet.", parent_id=loc_wh.id)
-        db.add_all([loc_bench, loc_cab])
+        # 4. Seed Suppliers
+        supplier_digikey = models.Supplier(
+            name="DigiKey",
+            website="https://www.digikey.com",
+            search="https://www.digikey.com/en/products?keywords="
+        )
+        supplier_mouser = models.Supplier(
+            name="Mouser Electronics",
+            website="https://www.mouser.com",
+            search="https://www.mouser.com/c/?q="
+        )
+        db.add_all([supplier_digikey, supplier_mouser])
         db.commit()
         
-        loc_drawer = models.Location(name="Drawer 3", description="Resistors & Capacitors tray.", parent_id=loc_cab.id)
-        db.add(loc_drawer)
+        # 5. Seed Products (distributor catalog entries)
+        prod_res_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_res.id, number="P10K-0805-DK")
+        prod_res_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_res.id, number="603-RC0805JR-0710KL")
+        prod_mcu_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_mcu.id, number="497-6060-ND")
+        prod_mcu_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_mcu.id, number="511-STM32F103C8T6")
+        db.add_all([prod_res_dk, prod_res_ms, prod_mcu_dk, prod_mcu_ms])
         db.commit()
         
-        # 5. Seed Items
-        # Item 1: Resistors (Electronics)
-        item_res = models.Item(
-            name="10k Ohm Resistor 1/4W",
-            description="Metal film resistors, 1% tolerance.",
-            sku="RES-10K-025W",
-            barcode="074470123456",
+        # 6. Seed Storage Locations (hierarchical bins and stock quantities)
+        storage_cabinet = models.Storage(name="Engineering Cabinet A", description="Lab component storage cabinet.")
+        db.add(storage_cabinet)
+        db.commit()
+        
+        storage_drawer1 = models.Storage(name="Drawer 1 - Passives", parent_id=storage_cabinet.id, description="Tray for passive R and C components.")
+        storage_drawer2 = models.Storage(name="Drawer 2 - Chips", parent_id=storage_cabinet.id, description="Tray for active semiconductor components.")
+        db.add_all([storage_drawer1, storage_drawer2])
+        db.commit()
+        
+        storage_slot_res = models.Storage(
+            name="Bin A1 (10k Resistors)",
+            parent_id=storage_drawer1.id,
+            part_id=part_res.id,
             quantity=450,
-            min_quantity_alert=100,
-            category_id=cat_elec.id,
-            location_id=loc_drawer.id
+            description="Slot for 10k 0805 resistors."
         )
-        # Item 2: Soldering Station (Tools)
-        item_solder = models.Item(
-            name="Digital Soldering Station",
-            description="Temperature controlled professional soldering iron.",
-            sku="TLS-SLD-DGT",
-            barcode="085560987654",
-            quantity=3,
-            min_quantity_alert=2,
-            category_id=cat_tool.id,
-            location_id=loc_bench.id
+        storage_slot_cap = models.Storage(
+            name="Bin A2 (100nF Capacitors)",
+            parent_id=storage_drawer1.id,
+            part_id=part_cap.id,
+            quantity=80, # Low stock alert triggers (threshold is 150)
+            description="Slot for 100nF 0805 decoupling capacitors."
         )
-        # Item 3: M3 Screws (Hardware)
-        item_screws = models.Item(
-            name="M3 x 10mm Machine Screws",
-            description="Stainless steel pan head screws.",
-            sku="HRD-M3-10SS",
-            barcode="093320112233",
-            quantity=12,  # Triggering low stock warning!
-            min_quantity_alert=50,
-            category_id=cat_hard.id,
-            location_id=loc_cab.id
+        storage_slot_mcu = models.Storage(
+            name="Bin B1 (STM32 MCUs)",
+            parent_id=storage_drawer2.id,
+            part_id=part_mcu.id,
+            quantity=8, # Low stock alert triggers (threshold is 10)
+            description="Slot for STM32F103 microcontrollers in ESD foam."
         )
-        
-        db.add_all([item_res, item_solder, item_screws])
+        db.add_all([storage_slot_res, storage_slot_cap, storage_slot_mcu])
         db.commit()
         
-        # 6. Seed Custom Field Values
-        val_mfg = models.CustomFieldValue(item_id=item_res.id, custom_field_id=cf_mfg.id, value="Yageo")
-        val_part = models.CustomFieldValue(item_id=item_res.id, custom_field_id=cf_part.id, value="MFR-25FRF52-10K")
+        # 7. Seed Projects & Revisions & materials (BOM lists)
+        proj_sensor = models.Project(
+            title="Wireless Sensor Node PCB",
+            description="Low-power IoT environmental telemetry PCB containing humidity and temperature sensors."
+        )
+        proj_motor = models.Project(
+            title="BLDC Motor Controller Assembly",
+            description="Brushless DC motor speed regulator shield with high power MOSFET stage."
+        )
+        db.add_all([proj_sensor, proj_motor])
+        db.commit()
         
-        val_serial = models.CustomFieldValue(item_id=item_solder.id, custom_field_id=cf_serial.id, value="SLD-88912-A")
-        val_calib = models.CustomFieldValue(item_id=item_solder.id, custom_field_id=cf_calib.id, value="2026-05-12")
+        rev_sensor_v1 = models.Revision(
+            project_id=proj_sensor.id,
+            version="v1.0.0",
+            date=date(2026, 1, 15)
+        )
+        rev_motor_v2 = models.Revision(
+            project_id=proj_motor.id,
+            version="v2.1.0",
+            date=date(2026, 7, 20)
+        )
+        db.add_all([rev_sensor_v1, rev_motor_v2])
+        db.commit()
         
-        db.add_all([val_mfg, val_part, val_serial, val_calib])
+        # BOM lines for Sensor Node
+        bom1 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, designator="R1")
+        bom2 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, designator="R2")
+        bom3 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_cap.id, designator="C1")
+        bom4 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_mcu.id, designator="U1")
         
-        # 7. Seed Transactions history logs
+        # BOM lines for Motor Controller
+        bom5 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, designator="C1")
+        bom6 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, designator="C2")
+        bom7 = models.Material(revision_id=rev_motor_v2.id, part_id=part_mcu.id, designator="U1")
+        db.add_all([bom1, bom2, bom3, bom4, bom5, bom6, bom7])
+        db.commit()
+        
+        # 8. Seed Audit Transaction history logs
         tx_res = models.Transaction(
-            item_id=item_res.id,
+            part_id=part_res.id,
             user_id=admin_user.id,
             action_type="create",
             quantity_change=450,
-            notes="Seeded initial stock load."
+            notes="Seeded initial passives drawer stock."
         )
-        tx_solder = models.Transaction(
-            item_id=item_solder.id,
+        tx_cap = models.Transaction(
+            part_id=part_cap.id,
             user_id=admin_user.id,
             action_type="create",
-            quantity_change=3,
-            notes="Seeded calibration tools."
+            quantity_change=80,
+            notes="Seeded initial capacitors tray load."
         )
-        tx_screws = models.Transaction(
-            item_id=item_screws.id,
+        tx_mcu = models.Transaction(
+            part_id=part_mcu.id,
             user_id=admin_user.id,
             action_type="create",
-            quantity_change=12,
-            notes="Seeded base hardware pack."
+            quantity_change=8,
+            notes="Seeded initial microcontroller foam units."
         )
-        db.add_all([tx_res, tx_solder, tx_screws])
+        db.add_all([tx_res, tx_cap, tx_mcu])
         db.commit()
         
         return {"status": "success", "message": "Database seeded with default mock inventory."}

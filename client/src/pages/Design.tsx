@@ -5,7 +5,6 @@ import {
   MapPin, 
   Plus, 
   Trash2, 
-  LayoutGrid, 
   ChevronRight, 
   ChevronDown,
   Layers
@@ -19,18 +18,16 @@ export default function Design() {
   const [loading, setLoading] = createSignal(true);
 
   // Category Form State
-  const [catName, setCatName] = createSignal("");
-  const [catDesc, setCatDesc] = createSignal("");
+  const [catTitle, setCatTitle] = createSignal("");
+  const [catDesignator, setCatDesignator] = createSignal("");
+  const [catParentId, setCatParentId] = createSignal("");
   
-  // Custom Field Form State
-  const [expandedCatId, setExpandedCatId] = createSignal<number | null>(null);
-  const [fieldName, setFieldName] = createSignal("");
-  const [fieldType, setFieldType] = createSignal("text");
-
-  // Location Form State
+  // Storage Location Form State
   const [locName, setLocName] = createSignal("");
   const [locDesc, setLocDesc] = createSignal("");
   const [locParentId, setLocParentId] = createSignal("");
+  const [locIndex, setLocIndex] = createSignal(0);
+  const [locLabelScheme, setLocLabelScheme] = createSignal("");
 
   const loadData = async () => {
     setLoading(true);
@@ -54,15 +51,20 @@ export default function Design() {
 
   const handleCreateCategory = async (e: Event) => {
     e.preventDefault();
-    if (!catName()) return;
+    if (!catTitle()) return;
     try {
       await apiFetch("/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: catName(), description: catDesc() })
+        body: JSON.stringify({ 
+          title: catTitle(), 
+          designator: catDesignator() || null,
+          parent_id: catParentId() ? parseInt(catParentId()) : null
+        })
       });
-      setCatName("");
-      setCatDesc("");
+      setCatTitle("");
+      setCatDesignator("");
+      setCatParentId("");
       loadData();
       alert("Category created successfully.");
     } catch (err: any) {
@@ -71,62 +73,12 @@ export default function Design() {
   };
 
   const handleDeleteCategory = async (catId: number) => {
-    if (!confirm("Are you sure you want to delete this category? All dynamic custom field definitions will be deleted.")) return;
+    if (!confirm("Are you sure you want to delete this category? Any subcategories or parts attached will have catalog references deleted.")) return;
     try {
       await apiFetch(`/categories/${catId}`, { method: "DELETE" });
-      if (expandedCatId() === catId) setExpandedCatId(null);
       loadData();
     } catch (err: any) {
       alert(err.message || "Failed to delete category.");
-    }
-  };
-
-  const handleToggleExpandCategory = async (catId: number) => {
-    if (expandedCatId() === catId) {
-      setExpandedCatId(null);
-      return;
-    }
-    
-    // Fetch detailed category with custom fields
-    try {
-      const details = await apiFetch(`/categories/${catId}`);
-      // Update that category in list
-      setCategories(categories().map(c => c.id === catId ? details : c));
-      setExpandedCatId(catId);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddCustomField = async (e: Event, catId: number) => {
-    e.preventDefault();
-    if (!fieldName()) return;
-    try {
-      await apiFetch(`/categories/${catId}/fields`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fieldName(), field_type: fieldType() })
-      });
-      setFieldName("");
-      
-      // Reload this expanded category
-      const details = await apiFetch(`/categories/${catId}`);
-      setCategories(categories().map(c => c.id === catId ? details : c));
-      alert("Custom field added successfully.");
-    } catch (err: any) {
-      alert(err.message || "Failed to add custom field.");
-    }
-  };
-
-  const handleDeleteCustomField = async (fieldId: number, catId: number) => {
-    if (!confirm("Are you sure you want to delete this custom field? Existing values for all items in this category will be removed.")) return;
-    try {
-      await apiFetch(`/categories/fields/${fieldId}`, { method: "DELETE" });
-      // Reload expanded category
-      const details = await apiFetch(`/categories/${catId}`);
-      setCategories(categories().map(c => c.id === catId ? details : c));
-    } catch (err: any) {
-      alert(err.message || "Failed to delete field.");
     }
   };
 
@@ -140,21 +92,25 @@ export default function Design() {
         body: JSON.stringify({
           name: locName(),
           description: locDesc(),
-          parent_id: locParentId() ? parseInt(locParentId()) : null
+          parent_id: locParentId() ? parseInt(locParentId()) : null,
+          index: locIndex(),
+          label_scheme: locLabelScheme() || null
         })
       });
       setLocName("");
       setLocDesc("");
       setLocParentId("");
+      setLocIndex(0);
+      setLocLabelScheme("");
       loadData();
-      alert("Location created successfully.");
+      alert("Storage location created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create location.");
+      alert(err.message || "Failed to create storage location.");
     }
   };
 
   const handleDeleteLocation = async (locId: number) => {
-    if (!confirm("Are you sure you want to delete this location? All child locations in the hierarchy will also be deleted!")) return;
+    if (!confirm("Are you sure you want to delete this storage location? All sub-bins and drawers in this hierarchy will also be deleted!")) return;
     try {
       await apiFetch(`/locations/${locId}`, { method: "DELETE" });
       loadData();
@@ -163,7 +119,13 @@ export default function Design() {
     }
   };
 
-  // Helper to build location hierarchy labels for option dropdown
+  // Helper to resolve parents
+  const getParentCategoryName = (parentId: number | null) => {
+    if (!parentId) return "";
+    const parent = categories().find(c => c.id === parentId);
+    return parent ? parent.title : "";
+  };
+
   const getParentLocationName = (parentId: number | null) => {
     if (!parentId) return "";
     const parent = locations().find(l => l.id === parentId);
@@ -176,9 +138,9 @@ export default function Design() {
       <div>
         <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
           <FolderTree class="text-accentCyan" />
-          Inventory Structure Designer
+          Component Structure Designer
         </h2>
-        <p class="text-gray-400 text-sm">Define dynamic categories, attributes, and hierarchical location paths.</p>
+        <p class="text-gray-400 text-sm">Define dynamic component categories, silkscreen designators, and storage drawers.</p>
       </div>
 
       {/* Selector Tabs */}
@@ -191,7 +153,7 @@ export default function Design() {
         >
           <span class="flex items-center gap-2">
             <Tag size={16} />
-            Categories & Custom Attributes
+            Categories & Reference Designators
           </span>
         </button>
         <button
@@ -202,7 +164,7 @@ export default function Design() {
         >
           <span class="flex items-center gap-2">
             <MapPin size={16} />
-            Storage Locations Hierarchy
+            Storage Drawers & Bins Hierarchy
           </span>
         </button>
       </div>
@@ -229,20 +191,34 @@ export default function Design() {
                   <input
                     type="text"
                     required
-                    value={catName()}
-                    onInput={(e) => setCatName(e.target.value)}
-                    placeholder="E.g. Electronics, Tools, Materials"
+                    value={catTitle()}
+                    onInput={(e) => setCatTitle(e.target.value)}
+                    placeholder="E.g. Resistors, Capacitors, Passives"
                     class="glass-input w-full text-xs"
                   />
                 </div>
                 <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Description</label>
-                  <textarea
-                    value={catDesc()}
-                    onInput={(e) => setCatDesc(e.target.value)}
-                    placeholder="Brief description of category items..."
-                    class="glass-input w-full h-20 resize-none"
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Silkscreen Designator Prefix (Optional)</label>
+                  <input
+                    type="text"
+                    value={catDesignator()}
+                    onInput={(e) => setCatDesignator(e.target.value)}
+                    placeholder="E.g. R, C, U, Q"
+                    class="glass-input w-full text-xs font-mono font-bold uppercase"
                   />
+                </div>
+                <div>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Parent Category (Optional)</label>
+                  <select
+                    value={catParentId()}
+                    onChange={(e) => setCatParentId(e.currentTarget.value)}
+                    class="glass-input w-full text-xs"
+                  >
+                    <option value="">No Parent (Top Level)</option>
+                    <For each={categories()}>
+                      {(c) => <option value={c.id}>{c.title}</option>}
+                    </For>
+                  </select>
                 </div>
                 <button type="submit" class="btn-primary w-full py-2.5">
                   Save Category
@@ -250,11 +226,11 @@ export default function Design() {
               </form>
             </div>
 
-            {/* Right 2 Cols: Category Listing & Fields */}
+            {/* Right 2 Cols: Category Listing Indented Tree */}
             <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Tag size={16} class="text-accentCyan" />
-                Categories Configured
+                Category Classifications
               </h3>
               
               <Show when={categories().length === 0}>
@@ -264,115 +240,50 @@ export default function Design() {
               </Show>
 
               <Show when={categories().length > 0}>
-                <div class="space-y-4">
+                <div class="space-y-2 text-xs">
                   <For each={categories()}>
                     {(cat) => {
-                      const isExpanded = expandedCatId() === cat.id;
+                      // Calculate depth
+                      let depth = 0;
+                      let currentParentId = cat.parent_id;
+                      while (currentParentId) {
+                        depth++;
+                        const parent = categories().find(c => c.id === currentParentId);
+                        currentParentId = parent ? parent.parent_id : null;
+                      }
+
                       return (
-                        <div class="glass-card rounded-xl border border-white/5 overflow-hidden">
-                          {/* Accordion header */}
-                          <div 
-                            onClick={() => handleToggleExpandCategory(cat.id)}
-                            class="p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.01] transition-all"
-                          >
+                        <div 
+                          style={{ "margin-left": `${depth * 20}px` }}
+                          class="glass-card p-3.5 rounded-xl border border-white/5 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div class="flex items-center gap-2">
+                            <span class="text-accentCyan shrink-0">
+                              <Tag size={14} class={depth > 0 ? "opacity-60" : ""} />
+                            </span>
                             <div>
-                              <h4 class="font-bold text-white text-sm tracking-wide">{cat.name}</h4>
-                              <p class="text-gray-400 text-xs mt-0.5">{cat.description || "No description."}</p>
-                            </div>
-                            
-                            <div class="flex items-center gap-4">
-                              <span class="bg-white/5 border border-white/5 text-[9px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider text-gray-400">
-                                {cat.custom_fields?.length || 0} fields
-                              </span>
-                              
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteCategory(cat.id);
-                                }}
-                                class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                              
-                              <div class="text-gray-400 shrink-0">
-                                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                              </div>
+                              <span class="font-bold text-white text-sm">{cat.title}</span>
+                              <Show when={cat.designator}>
+                                <span class="bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono ml-2 uppercase">
+                                  Prefix: {cat.designator}
+                                </span>
+                              </Show>
+                              <Show when={cat.parent_id}>
+                                <span class="text-gray-500 text-[10px] block mt-0.5">
+                                  under {getParentCategoryName(cat.parent_id)}
+                                </span>
+                              </Show>
                             </div>
                           </div>
 
-                          {/* Expanded content */}
-                          <Show when={isExpanded}>
-                            <div class="p-4 bg-white/[0.01] border-t border-white/5 text-xs space-y-4">
-                              
-                              {/* Custom Fields List */}
-                              <div class="space-y-2">
-                                <h5 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Defined Attributes</h5>
-                                
-                                <Show when={!cat.custom_fields || cat.custom_fields.length === 0}>
-                                  <p class="text-gray-500 text-[11px] italic">No custom fields defined. Add one below.</p>
-                                </Show>
-
-                                <Show when={cat.custom_fields && cat.custom_fields.length > 0}>
-                                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <For each={cat.custom_fields}>
-                                      {(cf) => (
-                                        <div class="glass-card p-2.5 rounded-lg flex items-center justify-between gap-3 text-xs">
-                                          <div>
-                                            <span class="font-bold text-white">{cf.name}</span>
-                                            <span class="text-[9px] bg-white/5 text-gray-400 px-1 py-0.5 rounded font-mono ml-2 uppercase">
-                                              {cf.field_type}
-                                            </span>
-                                          </div>
-                                          <button
-                                            onClick={() => handleDeleteCustomField(cf.id, cat.id)}
-                                            class="text-gray-600 hover:text-red-400 cursor-pointer"
-                                          >
-                                            <Trash2 size={12} />
-                                          </button>
-                                        </div>
-                                      )}
-                                    </For>
-                                  </div>
-                                </Show>
-                              </div>
-
-                              {/* Form to add custom field */}
-                              <form onSubmit={(e) => handleAddCustomField(e, cat.id)} class="flex flex-col sm:flex-row gap-3 pt-3 border-t border-white/5 items-end">
-                                <div class="flex-1 w-full">
-                                  <label class="block text-[9px] font-semibold text-gray-500 mb-1 uppercase">Field Name</label>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={fieldName()}
-                                    onInput={(e) => setFieldName(e.target.value)}
-                                    placeholder="E.g. Manufacturer, Voltage"
-                                    class="glass-input w-full py-1.5 text-xs"
-                                  />
-                                </div>
-                                <div class="w-full sm:w-40">
-                                  <label class="block text-[9px] font-semibold text-gray-500 mb-1 uppercase">Field Type</label>
-                                  <select
-                                    value={fieldType()}
-                                    onChange={(e) => setFieldType(e.currentTarget.value)}
-                                    class="glass-input w-full py-1.5 text-xs"
-                                  >
-                                    <option value="text">Text / String</option>
-                                    <option value="number">Number</option>
-                                    <option value="date">Date</option>
-                                    <option value="boolean">Checkbox / Boolean</option>
-                                  </select>
-                                </div>
-                                <button type="submit" class="btn-secondary py-1.5 px-4 font-bold flex items-center gap-1">
-                                  <Plus size={12} />
-                                  Add Field
-                                </button>
-                              </form>
-
-                            </div>
-                          </Show>
+                          <button
+                            onClick={() => handleDeleteCategory(cat.id)}
+                            class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                      )
+                      );
                     }}
                   </For>
                 </div>
@@ -380,24 +291,24 @@ export default function Design() {
             </div>
           </Show>
 
-          {/* ----------------- LOCATIONS PANEL ----------------- */}
+          {/* ----------------- LOCATIONS (STORAGE) PANEL ----------------- */}
           <Show when={activeTab() === "locations"}>
-            {/* Left 1 Col: Location creation */}
+            {/* Left 1 Col: Storage creation */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 h-fit">
               <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5">
                 <Plus size={16} class="text-accentCyan" />
-                Add Location
+                Add Storage Slot
               </h3>
               
               <form onSubmit={handleCreateLocation} class="space-y-4 text-xs">
                 <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Location Name</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Bin / Drawer Name</label>
                   <input
                     type="text"
                     required
                     value={locName()}
                     onInput={(e) => setLocName(e.target.value)}
-                    placeholder="E.g. Workbench 1, Bin B"
+                    placeholder="E.g. Drawer 1, Drawer 2 - ICs, Slot A1"
                     class="glass-input w-full text-xs"
                   />
                 </div>
@@ -408,19 +319,42 @@ export default function Design() {
                     type="text"
                     value={locDesc()}
                     onInput={(e) => setLocDesc(e.target.value)}
-                    placeholder="E.g. Cabinet drawer, shelf code..."
+                    placeholder="E.g. top shelf, bin organizer code..."
                     class="glass-input w-full text-xs"
                   />
                 </div>
 
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Grid Index</label>
+                    <input
+                      type="number"
+                      value={locIndex()}
+                      onInput={(e) => setLocIndex(parseInt(e.target.value) || 0)}
+                      class="glass-input w-full text-xs"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Label Scheme</label>
+                    <input
+                      type="text"
+                      value={locLabelScheme()}
+                      onInput={(e) => setLocLabelScheme(e.target.value)}
+                      placeholder="E.g. row-col"
+                      class="glass-input w-full text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Parent Location (Optional)</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Parent Unit (Cabinet / Box)</label>
                   <select
                     value={locParentId()}
                     onChange={(e) => setLocParentId(e.currentTarget.value)}
                     class="glass-input w-full text-xs"
                   >
-                    <option value="">No Parent (Top Level)</option>
+                    <option value="">No Parent (Cabinet Root)</option>
                     <For each={locations()}>
                       {(loc) => (
                         <option value={loc.id}>
@@ -429,34 +363,32 @@ export default function Design() {
                       )}
                     </For>
                   </select>
-                  <p class="text-[9px] text-gray-500 mt-1">Allows building multi-layered location hierarchies.</p>
+                  <p class="text-[9px] text-gray-500 mt-1">Allows building multi-layered bin layouts.</p>
                 </div>
 
                 <button type="submit" class="btn-primary w-full py-2.5">
-                  Save Location
+                  Save Storage Slot
                 </button>
               </form>
             </div>
 
-            {/* Right 2 Cols: Location Listing Indented Tree */}
+            {/* Right 2 Cols: Storage Tree */}
             <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <MapPin size={16} class="text-accentCyan" />
-                Storage Locations Tree
+                Storage Drawers Tree
               </h3>
               
               <Show when={locations().length === 0}>
                 <div class="text-center py-10 text-xs text-gray-500">
-                  No storage locations designed yet. Define one on the left.
+                  No storage slots designed yet. Define one on the left.
                 </div>
               </Show>
 
               <Show when={locations().length > 0}>
                 <div class="space-y-2 text-xs">
-                  {/* Indented listing helper */}
                   <For each={locations()}>
                     {(loc) => {
-                      // Count depth
                       let depth = 0;
                       let currentParentId = loc.parent_id;
                       while (currentParentId) {
@@ -476,7 +408,12 @@ export default function Design() {
                             </span>
                             <div>
                               <span class="font-bold text-white">{loc.name}</span>
-                              <span class="text-gray-400 block text-[10px] mt-0.5">{loc.description || "No description."}</span>
+                              <Show when={loc.label_scheme}>
+                                <span class="bg-white/5 text-[9px] border border-white/5 px-1.5 py-0.5 rounded font-mono ml-2 uppercase text-gray-400">
+                                  Format: {loc.label_scheme}
+                                </span>
+                              </Show>
+                              <span class="text-gray-500 block text-[10px] mt-0.5">{loc.description || "No description."}</span>
                             </div>
                           </div>
 
@@ -487,7 +424,7 @@ export default function Design() {
                             <Trash2 size={14} />
                           </button>
                         </div>
-                      )
+                      );
                     }}
                   </For>
                 </div>

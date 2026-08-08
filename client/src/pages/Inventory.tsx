@@ -178,7 +178,7 @@ export default function Inventory() {
             >
               <option value="">All Categories</option>
               <For each={categories()}>
-                {(cat) => <option value={cat.id}>{cat.name}</option>}
+                {(cat) => <option value={cat.id}>{cat.title}</option>}
               </For>
             </select>
           </div>
@@ -232,7 +232,7 @@ export default function Inventory() {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <For each={items()}>
             {(item) => {
-              const isAlert = item.quantity < item.min_quantity_alert;
+              const isAlert = item.total_quantity < item.threshold;
               return (
                 <div 
                   onClick={() => navigate(`/inventory/item/${item.id}`)}
@@ -243,7 +243,7 @@ export default function Inventory() {
                   <div>
                     <div class="flex justify-between items-start gap-2">
                       <h3 class="font-bold text-white text-base truncate group-hover:text-accentCyan transition-colors">
-                        {item.name}
+                        {item.value}
                       </h3>
                       <Show when={isAlert}>
                         <span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
@@ -252,8 +252,9 @@ export default function Inventory() {
                         </span>
                       </Show>
                     </div>
-                    <p class="text-gray-400 text-xs mt-1.5 line-clamp-2 leading-relaxed">
-                      {item.description || "No description provided."}
+                    <div class="text-[11px] font-mono text-gray-400 mt-1 truncate">{item.number}</div>
+                    <p class="text-gray-500 text-xs mt-1.5 line-clamp-2 leading-relaxed">
+                      {item.notes || "No description provided."}
                     </p>
                   </div>
 
@@ -261,18 +262,18 @@ export default function Inventory() {
                     <div class="space-y-1">
                       <div class="flex items-center gap-1 text-[11px] text-gray-500">
                         <Tag size={12} />
-                        <span class="truncate max-w-[100px]">{item.category?.name || "Uncategorized"}</span>
+                        <span class="truncate max-w-[100px]">{item.category?.title || "Uncategorized"}</span>
                       </div>
                       <div class="flex items-center gap-1 text-[11px] text-gray-500">
                         <MapPin size={12} />
-                        <span class="truncate max-w-[100px]">{item.location?.name || "No location"}</span>
+                        <span class="truncate max-w-[100px]">{item.package || "No package"}</span>
                       </div>
                     </div>
 
                     <div class="text-right">
                       <span class="text-[10px] text-gray-500 uppercase font-semibold">In Stock</span>
                       <div class={`text-lg font-bold ${isAlert ? "text-amber-400" : "text-accentCyan"}`}>
-                        {item.quantity}
+                        {item.total_quantity}
                       </div>
                     </div>
                   </div>
@@ -296,19 +297,19 @@ export default function Inventory() {
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
               <Plus class="text-accentCyan" size={20} />
-              Add Inventory Item
+              Add Component Part
             </h3>
             
             <form onSubmit={handleCreateItem} class="space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Item Name</label>
+                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Component Value / Name</label>
                   <input
                     type="text"
                     required
                     value={newItemName()}
                     onInput={(e) => setNewItemName(e.target.value)}
-                    placeholder="E.g. Soldering Iron Kit"
+                    placeholder="E.g. 10k Ohm, 100nF, STM32F103C8T6"
                     class="glass-input w-full text-sm"
                   />
                 </div>
@@ -376,7 +377,7 @@ export default function Inventory() {
                   >
                     <option value="">Select Category...</option>
                     <For each={categories()}>
-                      {(c) => <option value={c.id}>{c.name}</option>}
+                      {(c) => <option value={c.id}>{c.title}</option>}
                     </For>
                   </select>
                 </div>

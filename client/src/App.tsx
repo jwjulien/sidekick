@@ -15,6 +15,8 @@ import ItemDetails from "./pages/ItemDetails";
 import Scan from "./pages/Scan";
 import Design from "./pages/Design";
 import Settings from "./pages/Settings";
+import Projects from "./pages/Projects";
+import Suppliers from "./pages/Suppliers";
 import Layout from "./components/Layout";
 
 export default function App() {
@@ -85,6 +87,26 @@ export default function App() {
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
                 <Design />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/projects" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <Projects />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/suppliers" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <Suppliers />
               </Layout>
             </Show>
           )} 

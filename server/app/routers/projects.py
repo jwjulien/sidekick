@@ -1,0 +1,162 @@
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from ..database import get_db
+from .. import models, schemas, auth
+
+router = APIRouter(prefix="/projects", tags=["projects"])
+
+@router.get("", response_model=List[schemas.ProjectOut])
+def get_projects(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all projects. Requires Analyst role.
+    """
+    return db.query(models.Project).order_by(models.Project.title).all()
+
+@router.post("", response_model=schemas.ProjectOut, status_code=status.HTTP_201_CREATED)
+def create_project(
+    payload: schemas.ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Create a new project. Requires Designer role.
+    """
+    existing = db.query(models.Project).filter(models.Project.title == payload.title).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project with title '{payload.title}' already exists."
+        )
+    
+    db_project = models.Project(
+        title=payload.title,
+        description=payload.description
+    )
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    return db_project
+
+@router.get("/{project_id}", response_model=schemas.ProjectDetailsOut)
+def get_project_details(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get a project's detailed view (including revisions). Requires Analyst role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return project
+
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Delete a project. Requires Designer role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    db.delete(project)
+    db.commit()
+    return
+
+# --- Revisions ---
+
+@router.post("/revisions", response_model=schemas.RevisionOut, status_code=status.HTTP_201_CREATED)
+def create_revision(
+    payload: schemas.RevisionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Create a new PCB project revision. Requires Designer role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == payload.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+        
+    db_revision = models.Revision(
+        project_id=payload.project_id,
+        version=payload.version,
+        date=payload.date
+    )
+    db.add(db_revision)
+    db.commit()
+    db.refresh(db_revision)
+    return db_revision
+
+@router.delete("/revisions/{revision_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_revision(
+    revision_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Delete a revision. Requires Designer role.
+    """
+    revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revision not found.")
+    db.delete(revision)
+    db.commit()
+    return
+
+# --- Bill of Materials (BOM) Links ---
+
+@router.post("/materials", response_model=schemas.MaterialOut, status_code=status.HTTP_201_CREATED)
+def add_material_to_revision(
+    payload: schemas.MaterialCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Add a component part (BOM line) with its reference designator to a specific revision.
+    Requires Designer role.
+    """
+    # Verify revision
+    revision = db.query(models.Revision).filter(models.Revision.id == payload.revision_id).first()
+    if not revision:
+        raise HTTPException(status_code=404, detail="Project revision not found.")
+        
+    # Verify part
+    part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+        
+    db_material = models.Material(
+        revision_id=payload.revision_id,
+        part_id=payload.part_id,
+        designator=payload.designator
+    )
+    db.add(db_material)
+    db.commit()
+    db.refresh(db_material)
+    return db_material
+
+@router.delete("/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_material_from_revision(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Delete a component part (BOM line) from a PCB revision.
+    Requires Designer role.
+    """
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="BOM item not found.")
+    db.delete(material)
+    db.commit()
+    return

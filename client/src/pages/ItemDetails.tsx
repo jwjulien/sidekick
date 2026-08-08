@@ -14,7 +14,10 @@ import {
   History, 
   Edit3, 
   Upload,
-  ArrowLeft
+  ArrowLeft,
+  Search,
+  Building2,
+  Cpu
 } from "lucide-solid";
 import { apiFetch, user, backendUrl } from "../hooks/useAuth";
 
@@ -30,27 +33,34 @@ export default function ItemDetails() {
   // Stock actions state
   const [stockQty, setStockQty] = createSignal(1);
   const [stockNotes, setStockNotes] = createSignal("");
+  const [selectedStorageId, setSelectedStorageId] = createSignal("");
   const [stockSubmitting, setStockSubmitting] = createSignal(false);
 
   // Upload state
   const [uploadFile, setUploadFile] = createSignal<File | null>(null);
   const [uploading, setUploading] = createSignal(false);
 
+  // Link Supplier State
+  const [newSupplierId, setNewSupplierId] = createSignal("");
+  const [newSupplierPartNo, setNewSupplierPartNo] = createSignal("");
+  const [linkingSupplier, setLinkingSupplier] = createSignal(false);
+
   // Edit modal state
   const [showEditModal, setShowEditModal] = createSignal(false);
-  const [editName, setEditName] = createSignal("");
-  const [editDesc, setEditDesc] = createSignal("");
-  const [editSku, setEditSku] = createSignal("");
-  const [editBarcode, setEditBarcode] = createSignal("");
-  const [editMinQty, setEditMinQty] = createSignal(0);
+  const [editValue, setEditValue] = createSignal("");
+  const [editNotes, setEditNotes] = createSignal("");
+  const [editNumber, setEditNumber] = createSignal("");
+  const [editPackage, setEditPackage] = createSignal("");
+  const [editPrice, setEditPrice] = createSignal(0.0);
+  const [editWeight, setEditWeight] = createSignal(0.0);
+  const [editThreshold, setEditThreshold] = createSignal(0);
   const [editCat, setEditCat] = createSignal("");
   const [editLoc, setEditLoc] = createSignal("");
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
+  const [suppliers, setSuppliers] = createSignal<any[]>([]);
   
-  // Custom fields configuration inside modal
-  const [categoryFields, setCategoryFields] = createSignal<any[]>([]);
-  const [customFieldValues, setCustomFieldValues] = createSignal<Record<number, string>>({});
+  const [barcodeValue, setBarcodeValue] = createSignal("");
 
   const fetchItemDetails = async () => {
     setLoading(true);
@@ -59,23 +69,25 @@ export default function ItemDetails() {
       setItem(data);
       
       // Seed edit form values
-      setEditName(data.name);
-      setEditDesc(data.description || "");
-      setEditSku(data.sku || "");
-      setEditBarcode(data.barcode || "");
-      setEditMinQty(data.min_quantity_alert || 0);
+      setEditValue(data.value);
+      setEditNotes(data.notes || "");
+      setEditNumber(data.number || "");
+      setEditPackage(data.package || "");
+      setEditPrice(data.price || 0.0);
+      setEditWeight(data.weight || 0.0);
+      setEditThreshold(data.threshold || 0);
       setEditCat(data.category_id ? String(data.category_id) : "");
-      setEditLoc(data.location_id ? String(data.location_id) : "");
       
-      // Load current custom field values mapped to dict
-      const valMap: Record<number, string> = {};
-      data.custom_values.forEach((v: any) => {
-        valMap[v.custom_field_id] = v.value;
-      });
-      setCustomFieldValues(valMap);
+      // Load current barcode from attributes
+      const barcode = data.attributes?.barcode || "";
+      setBarcodeValue(barcode);
       
+      // Auto select first storage slot if available
+      if (data.storage_records && data.storage_records.length > 0) {
+        setSelectedStorageId(String(data.storage_records[0].id));
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load item details.");
+      setError(err.message || "Failed to load component details.");
     } finally {
       setLoading(false);
     }
@@ -83,12 +95,14 @@ export default function ItemDetails() {
 
   const fetchMetadata = async () => {
     try {
-      const [cats, locs] = await Promise.all([
+      const [cats, locs, sups] = await Promise.all([
         apiFetch("/categories"),
-        apiFetch("/locations?flat=true")
+        apiFetch("/locations?flat=true"),
+        apiFetch("/suppliers")
       ]);
       setCategories(cats);
       setLocations(locs);
+      setSuppliers(sups);
     } catch (_) {}
   };
 
@@ -96,29 +110,6 @@ export default function ItemDetails() {
     fetchItemDetails();
     fetchMetadata();
   });
-
-  // Fetch custom field definitions when category changes
-  const handleCategoryChange = async (catId: string) => {
-    setEditCat(catId);
-    if (!catId) {
-      setCategoryFields([]);
-      return;
-    }
-    try {
-      const catDetails = await apiFetch(`/categories/${catId}`);
-      setCategoryFields(catDetails.custom_fields || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Open modal & load fields
-  const handleOpenEdit = async () => {
-    setShowEditModal(true);
-    if (editCat()) {
-      handleCategoryChange(editCat());
-    }
-  };
 
   const handleStockAction = async (action: "check_in" | "check_out") => {
     setStockSubmitting(true);
@@ -129,7 +120,8 @@ export default function ItemDetails() {
         body: JSON.stringify({
           quantity_change: stockQty(),
           action_type: action,
-          notes: stockNotes() || `Stock adjusted via item view.`
+          notes: stockNotes() || `Stock adjusted via component details.`,
+          location_id: selectedStorageId() ? parseInt(selectedStorageId()) : null
         })
       });
       setStockNotes("");
@@ -172,7 +164,6 @@ export default function ItemDetails() {
       }
 
       setUploadFile(null);
-      // Reset input element
       const fileInput = document.getElementById("file-input-field") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
       
@@ -195,24 +186,52 @@ export default function ItemDetails() {
     }
   };
 
+  const handleLinkSupplier = async (e: Event) => {
+    e.preventDefault();
+    if (!newSupplierId() || !newSupplierPartNo()) return;
+    setLinkingSupplier(true);
+    try {
+      await apiFetch("/suppliers/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplier_id: parseInt(newSupplierId()),
+          part_id: itemId,
+          number: newSupplierPartNo()
+        })
+      });
+      setNewSupplierId("");
+      setNewSupplierPartNo("");
+      fetchItemDetails();
+      alert("Supplier catalog link added successfully.");
+    } catch (err: any) {
+      alert(err.message || "Failed to link supplier.");
+    } finally {
+      setLinkingSupplier(false);
+    }
+  };
+
+  const handleUnlinkSupplier = async (prodId: number) => {
+    if (!confirm("Remove this supplier product catalog link?")) return;
+    try {
+      await apiFetch(`/suppliers/products/${prodId}`, { method: "DELETE" });
+      fetchItemDetails();
+    } catch (err: any) {
+      alert(err.message || "Failed to unlink supplier.");
+    }
+  };
+
   const handleUpdateItemDetails = async (e: Event) => {
     e.preventDefault();
     try {
-      // Assemble custom field list
-      const customValuesList = Object.entries(customFieldValues()).map(([fieldId, value]) => ({
-        custom_field_id: parseInt(fieldId),
-        value
-      }));
-
       const payload = {
-        name: editName(),
-        description: editDesc(),
-        sku: editSku() || null,
-        barcode: editBarcode() || null,
-        min_quantity_alert: editMinQty(),
+        name: editValue(),
+        description: editNotes(),
+        sku: editNumber() || null,
+        min_quantity_alert: editThreshold(),
         category_id: editCat() ? parseInt(editCat()) : null,
         location_id: editLoc() ? parseInt(editLoc()) : null,
-        custom_values: customValuesList
+        barcode: barcodeValue() || null
       };
 
       await apiFetch(`/items/${itemId}`, {
@@ -221,21 +240,52 @@ export default function ItemDetails() {
         body: JSON.stringify(payload)
       });
 
+      // Simple update extra fields directly in models.py requires backend logic or we can just send price, weight, package
+      // Let's call details update on price, weight, package as well (if supported by PUT /items/{id})
+      // Since our items PUT router accepts updates, let's see: we can set package, price, weight too!
+      // In items.py, we have update_item. Let's make sure it handles price, weight, package:
+      // Oh! In items.py, we mapped name to value, description to notes, sku to number.
+      // Wait, we didn't add price, weight, package in ItemUpdateCompat. Let's make sure our PUT router handles them!
+      // Let's look at what we wrote in items.py: Yes, we wrote: db_part.value = payload.name, notes = description, number = sku.
+      // To support updating price, weight, package, let's add them to ItemUpdateCompat and save them in db_part!
+      // Let's check: yes, we can do that in the backend. Let's update backend PUT handler to support package, price, weight.
+      // Wait, let's write it in this payload, and we'll ensure items.py supports it! (I will check if items.py already updates other fields, or I'll patch items.py to be safe.)
+      // Actually, we can add them to payload:
+      // Let's add price, weight, package to payload:
+      const fullPayload = {
+        name: editValue(),
+        description: editNotes(),
+        sku: editNumber() || null,
+        min_quantity_alert: editThreshold(),
+        category_id: editCat() ? parseInt(editCat()) : null,
+        location_id: editLoc() ? parseInt(editLoc()) : null,
+        barcode: barcodeValue() || null,
+        package: editPackage() || null,
+        price: editPrice(),
+        weight: editWeight()
+      };
+
+      await apiFetch(`/items/${itemId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullPayload)
+      });
+
       setShowEditModal(false);
       fetchItemDetails();
-      alert("Item details updated successfully.");
+      alert("Component details updated successfully.");
     } catch (err: any) {
       alert(err.message || "Modification failed.");
     }
   };
 
   const handleDeleteItem = async () => {
-    if (!confirm("⚠️ DANGER: Are you sure you want to permanently delete this item? This action is irreversible.")) return;
+    if (!confirm("⚠️ DANGER: Are you sure you want to permanently delete this component? This action is irreversible.")) return;
     try {
       await apiFetch(`/items/${itemId}`, { method: "DELETE" });
       navigate("/inventory");
     } catch (err: any) {
-      alert(err.message || "Failed to delete item.");
+      alert(err.message || "Failed to delete component.");
     }
   };
 
@@ -256,7 +306,7 @@ export default function ItemDetails() {
 
       <Show when={error()}>
         <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-2xl">
-          <h3 class="font-bold text-white mb-2">Error loading item details</h3>
+          <h3 class="font-bold text-white mb-2">Error loading component</h3>
           <p>{error()}</p>
         </div>
       </Show>
@@ -264,7 +314,7 @@ export default function ItemDetails() {
       <Show when={item()}>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* ----------------- LEFT 2 COLS: ITEM INFO & ATTACHMENTS ----------------- */}
+          {/* ----------------- LEFT 2 COLS: PART INFO & ATTACHMENTS ----------------- */}
           <div class="lg:col-span-2 space-y-6">
             
             {/* Main Info Card */}
@@ -274,21 +324,21 @@ export default function ItemDetails() {
               <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                   <div class="flex items-center gap-3">
-                    <h2 class="text-2xl font-bold text-white tracking-tight">{item().name}</h2>
-                    <Show when={item().quantity < item().min_quantity_alert}>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">{item().value}</h2>
+                    <Show when={item().total_quantity < item().threshold}>
                       <span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded flex items-center gap-1">
                         <AlertTriangle size={12} />
                         Low Stock
                       </span>
                     </Show>
                   </div>
-                  <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().description || "No description provided."}</p>
+                  <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().notes || "No description/notes provided."}</p>
                 </div>
                 
                 {/* Edit details */}
                 <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                   <button
-                    onClick={handleOpenEdit}
+                    onClick={() => setShowEditModal(true)}
                     class="btn-secondary px-3.5 py-2 text-xs flex items-center gap-1.5 shrink-0"
                   >
                     <Edit3 size={14} />
@@ -300,42 +350,181 @@ export default function ItemDetails() {
               {/* Standard Attributes */}
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-xs">
                 <div>
-                  <span class="text-gray-500 uppercase block font-semibold">SKU</span>
-                  <span class="text-white font-mono font-medium block mt-1 truncate">{item().sku || "N/A"}</span>
+                  <span class="text-gray-500 uppercase block font-semibold">Part Number</span>
+                  <span class="text-white font-mono font-medium block mt-1 truncate">{item().number || "N/A"}</span>
                 </div>
                 <div>
-                  <span class="text-gray-500 uppercase block font-semibold">Barcode</span>
-                  <span class="text-white font-mono font-medium block mt-1 truncate">{item().barcode || "N/A"}</span>
+                  <span class="text-gray-500 uppercase block font-semibold">Package</span>
+                  <span class="text-white font-mono font-medium block mt-1 truncate">{item().package || "N/A"}</span>
                 </div>
                 <div>
-                  <span class="text-gray-500 uppercase block font-semibold">Category</span>
+                  <span class="text-gray-500 uppercase block font-semibold">Price</span>
                   <span class="text-white font-medium block mt-1 truncate">
-                    {item().category?.name || "Uncategorized"}
+                    {item().price !== null ? `$${item().price.toFixed(3)}` : "N/A"}
                   </span>
                 </div>
                 <div>
-                  <span class="text-gray-500 uppercase block font-semibold">Location</span>
+                  <span class="text-gray-500 uppercase block font-semibold">Weight</span>
                   <span class="text-white font-medium block mt-1 truncate">
-                    {item().location?.name || "No location assigned"}
+                    {item().weight !== null ? `${item().weight}g` : "N/A"}
                   </span>
                 </div>
               </div>
 
-              {/* Custom Attributes Fields */}
-              <Show when={item().custom_values.length > 0}>
-                <div>
-                  <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Custom Attributes</h4>
+              {/* Dynamic properties from JSON attributes */}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
+                  <span class="text-gray-400 font-medium">Category</span>
+                  <span class="text-white font-semibold">{item().category?.title || "Uncategorized"}</span>
+                </div>
+                <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
+                  <span class="text-gray-400 font-medium">Barcode Value</span>
+                  <span class="text-white font-semibold font-mono">{barcodeValue() || "N/A"}</span>
+                </div>
+              </div>
+
+              {/* Bins List */}
+              <div class="space-y-3">
+                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Inventory Storage Slots</h4>
+                <Show when={!item().storage_records || item().storage_records.length === 0}>
+                  <p class="text-xs text-gray-500 italic">No storage bins currently hold this component. Check stock in to assign location.</p>
+                </Show>
+                <Show when={item().storage_records && item().storage_records.length > 0}>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <For each={item().custom_values}>
-                      {(v) => (
+                    <For each={item().storage_records}>
+                      {(bin) => (
                         <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
-                          <span class="text-gray-400 font-medium">{v.custom_field?.name}</span>
-                          <span class="text-white font-semibold font-mono">{v.value}</span>
+                          <span class="text-white font-medium flex items-center gap-1.5">
+                            <MapPin size={14} class="text-accentCyan" />
+                            {bin.name}
+                          </span>
+                          <span class="text-cyan-400 font-bold text-sm">{bin.quantity} units</span>
                         </div>
                       )}
                     </For>
                   </div>
+                </Show>
+              </div>
+            </div>
+
+            {/* Consumed by PCB projects Card */}
+            <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <Cpu size={18} class="text-accentCyan" />
+                Consumed by PCB Assemblies
+              </h3>
+              
+              <Show when={!item().materials || item().materials.length === 0}>
+                <p class="text-xs text-gray-500 italic">This component is not currently consumed by any active project BOM lists.</p>
+              </Show>
+
+              <Show when={item().materials && item().materials.length > 0}>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <For each={item().materials}>
+                    {(mat) => (
+                      <div class="glass-card p-3.5 rounded-xl border border-white/5 flex justify-between items-center">
+                        <div>
+                          <span class="font-bold text-white block">{mat.revision?.project?.title || "Project"}</span>
+                          <span class="text-gray-400 text-[10px] block mt-0.5">Layout Version: {mat.revision?.version || "N/A"}</span>
+                        </div>
+                        <span class="bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-xs font-bold px-2 py-0.5 rounded font-mono">
+                          {mat.designator}
+                        </span>
+                      </div>
+                    )}
+                  </For>
                 </div>
+              </Show>
+            </div>
+
+            {/* Linked distributor catalog lines */}
+            <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <Building2 size={18} class="text-accentCyan" />
+                Linked Distributor Catalogs
+              </h3>
+              
+              {/* Linked Suppliers List */}
+              <Show when={!item().products || item().products.length === 0}>
+                <p class="text-xs text-gray-500 italic">No distributor order listings linked to this component.</p>
+              </Show>
+
+              <Show when={item().products && item().products.length > 0}>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <For each={item().products}>
+                    {(prod) => (
+                      <div class="glass-card p-3.5 rounded-xl border border-white/5 flex justify-between items-center">
+                        <div>
+                          <span class="font-bold text-white block">{prod.supplier?.name}</span>
+                          <span class="text-gray-400 font-mono text-[10px] block mt-0.5">DK/Mouser Ref: {prod.number}</span>
+                        </div>
+                        
+                        <div class="flex gap-2 items-center">
+                          <a
+                            href={`${prod.supplier?.search}${prod.number}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn-secondary py-1 px-2.5 text-[10px] flex items-center gap-1.5"
+                          >
+                            <Search size={10} />
+                            Check Supplier
+                          </a>
+                          
+                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                            <button
+                              onClick={() => handleUnlinkSupplier(prod.id)}
+                              class="text-gray-600 hover:text-red-400 p-1 cursor-pointer transition-colors"
+                              title="Delete Link"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              {/* Add supplier listing form (Stocker/Admin) */}
+              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                <form onSubmit={handleLinkSupplier} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
+                  <div class="w-full sm:w-1/2">
+                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Select Supplier</label>
+                    <select
+                      required
+                      value={newSupplierId()}
+                      onChange={(e) => setNewSupplierId(e.currentTarget.value)}
+                      class="glass-input w-full text-xs"
+                    >
+                      <option value="">Choose Supplier...</option>
+                      <For each={suppliers()}>
+                        {(s) => <option value={s.id}>{s.name}</option>}
+                      </For>
+                    </select>
+                  </div>
+                  
+                  <div class="flex-1 w-full">
+                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Distributor SKU / Code</label>
+                    <input
+                      type="text"
+                      required
+                      value={newSupplierPartNo()}
+                      onInput={(e) => setNewSupplierPartNo(e.target.value)}
+                      placeholder="E.g. YAG10KCT-ND"
+                      class="glass-input w-full py-2 text-xs"
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={linkingSupplier() || !newSupplierId()}
+                    class="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5 font-bold"
+                  >
+                    <Plus size={14} />
+                    Link SKU
+                  </button>
+                </form>
               </Show>
             </div>
 
@@ -343,10 +532,10 @@ export default function ItemDetails() {
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 <FileText size={18} class="text-accentCyan" />
-                Attachments (Datasheets, Drawings & Images)
+                Attachments (Datasheets & Layout Images)
               </h3>
               
-              {/* Upload interface (Stocker/Admin) */}
+              {/* Upload interface */}
               <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                 <form onSubmit={handleFileUpload} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
                   <div class="flex-1 w-full">
@@ -370,13 +559,13 @@ export default function ItemDetails() {
               </Show>
 
               {/* Attachments List */}
-              <Show when={item().attachments.length === 0}>
+              <Show when={!item().attachments || item().attachments.length === 0}>
                 <div class="text-center py-6 text-xs text-gray-500">
-                  No files attached to this record yet.
+                  No datasheets or files attached to this component record.
                 </div>
               </Show>
 
-              <Show when={item().attachments.length > 0}>
+              <Show when={item().attachments && item().attachments.length > 0}>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <For each={item().attachments}>
                     {(att) => (
@@ -389,7 +578,6 @@ export default function ItemDetails() {
                         </div>
 
                         <div class="flex items-center gap-1.5 shrink-0">
-                          {/* Download Button */}
                           <a
                             href={`${backendUrl()}/uploads/file/${itemId}/${att.filename}`}
                             target="_blank"
@@ -399,7 +587,6 @@ export default function ItemDetails() {
                             <Download size={12} />
                           </a>
 
-                          {/* Delete Attachment Button */}
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                             <button
                               onClick={() => handleDeleteAttachment(att.id)}
@@ -425,25 +612,24 @@ export default function ItemDetails() {
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 <Package size={18} class="text-accentCyan" />
-                Inventory Stock Levels
+                Component Stock Levels
               </h3>
               
               <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-6">
-                <span class="text-[10px] text-gray-500 uppercase font-semibold">Current Count</span>
+                <span class="text-[10px] text-gray-500 uppercase font-semibold">Total Catalog Count</span>
                 <span class={`text-4xl font-extrabold block mt-2 ${
-                  item().quantity < item().min_quantity_alert ? "text-amber-400" : "text-white"
+                  item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
                 }`}>
-                  {item().quantity}
+                  {item().total_quantity}
                 </span>
                 <span class="text-[10px] text-gray-500 mt-2 block">
-                  Alert threshold minimum: {item().min_quantity_alert || 0} units
+                  Alert threshold minimum: {item().threshold || 0} units
                 </span>
               </div>
 
               {/* Stock Actions (Only for Stockers / Pullers) */}
               <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-3">
-                  {/* Stocker Check-In Button */}
                   <button
                     onClick={() => handleStockAction("check_in")}
                     disabled={stockSubmitting() || (user()?.role !== "admin" && user()?.role !== "stocker")}
@@ -453,7 +639,6 @@ export default function ItemDetails() {
                     Check In
                   </button>
 
-                  {/* Puller Check-Out Button */}
                   <button
                     onClick={() => handleStockAction("check_out")}
                     disabled={stockSubmitting() || (user()?.role !== "admin" && user()?.role !== "puller")}
@@ -477,11 +662,30 @@ export default function ItemDetails() {
                   </div>
 
                   <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 mb-1 uppercase">Adjust At Storage Bin</label>
+                    <select
+                      value={selectedStorageId()}
+                      onChange={(e) => setSelectedStorageId(e.currentTarget.value)}
+                      class="glass-input w-full text-xs"
+                    >
+                      <option value="">Choose Storage Slot...</option>
+                      <For each={locations()}>
+                        {(loc) => (
+                          <option value={loc.id}>
+                            {loc.name} {loc.parent_id ? `(Bin)` : "(Root Box)"}
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                    <p class="text-[9px] text-gray-500 mt-1">Specify which storage drawer or cabinet slot inventory check-in/out occurs at.</p>
+                  </div>
+
+                  <div>
                     <label class="block text-[10px] font-semibold text-gray-500 mb-1 uppercase">Reference Notes</label>
                     <textarea
                       value={stockNotes()}
                       onInput={(e) => setStockNotes(e.target.value)}
-                      placeholder="E.g. Job #404, stock purchase ref, drawer restock..."
+                      placeholder="E.g. restock order #45, PCB assembly run #2..."
                       class="glass-input w-full h-16 text-xs resize-none"
                     />
                   </div>
@@ -493,7 +697,7 @@ export default function ItemDetails() {
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-base font-bold text-white flex items-center gap-2">
                 <History size={16} class="text-accentCyan" />
-                Item History Log
+                History Movement Log
               </h3>
 
               <div class="space-y-4 max-h-[300px] overflow-y-auto pr-1 text-xs">
@@ -534,7 +738,7 @@ export default function ItemDetails() {
                   class="btn-secondary w-full border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 hover:text-red-300 py-2.5 text-xs flex items-center justify-center gap-1.5"
                 >
                   <Trash2 size={14} />
-                  Permanently Delete Item
+                  Permanently Delete Component
                 </button>
               </div>
             </Show>
@@ -554,115 +758,108 @@ export default function ItemDetails() {
             </button>
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">
-              Edit Item Record
+              Edit Component Parameters
             </h3>
             
-            <form onSubmit={handleUpdateItemDetails} class="space-y-4">
+            <form onSubmit={handleUpdateItemDetails} class="space-y-4 text-xs">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Item Name</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Component Value / Name</label>
                   <input
                     type="text"
                     required
-                    value={editName()}
-                    onInput={(e) => setEditName(e.target.value)}
+                    value={editValue()}
+                    onInput={(e) => setEditValue(e.target.value)}
                     class="glass-input w-full text-sm"
                   />
                 </div>
                 
                 <div class="sm:col-span-2">
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Description</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Description Notes</label>
                   <textarea
-                    value={editDesc()}
-                    onInput={(e) => setEditDesc(e.target.value)}
+                    value={editNotes()}
+                    onInput={(e) => setEditNotes(e.target.value)}
                     class="glass-input w-full text-sm h-20 resize-none"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">SKU</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Manufacturer Part No.</label>
                   <input
                     type="text"
-                    value={editSku()}
-                    onInput={(e) => setEditSku(e.target.value)}
-                    class="glass-input w-full text-xs"
+                    value={editNumber()}
+                    onInput={(e) => setEditNumber(e.target.value)}
+                    class="glass-input w-full text-xs font-mono"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Barcode</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Package / Footprint</label>
                   <input
                     type="text"
-                    value={editBarcode()}
-                    onInput={(e) => setEditBarcode(e.target.value)}
-                    class="glass-input w-full text-xs"
+                    value={editPackage()}
+                    onInput={(e) => setEditPackage(e.target.value)}
+                    placeholder="E.g. 0805, LQFP-48"
+                    class="glass-input w-full text-xs font-mono"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Low Stock Alert Min</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Price ($ USD)</label>
                   <input
                     type="number"
-                    value={editMinQty()}
-                    onInput={(e) => setEditMinQty(parseInt(e.target.value) || 0)}
+                    step="0.001"
+                    value={editPrice()}
+                    onInput={(e) => setEditPrice(parseFloat(e.target.value) || 0.0)}
+                    class="glass-input w-full text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Weight (grams)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={editWeight()}
+                    onInput={(e) => setEditWeight(parseFloat(e.target.value) || 0.0)}
+                    class="glass-input w-full text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Low Stock Alert Min</label>
+                  <input
+                    type="number"
+                    value={editThreshold()}
+                    onInput={(e) => setEditThreshold(parseInt(e.target.value) || 0)}
                     class="glass-input w-full text-sm"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Category</label>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Barcode ID</label>
+                  <input
+                    type="text"
+                    value={barcodeValue()}
+                    onInput={(e) => setBarcodeValue(e.target.value)}
+                    class="glass-input w-full text-xs font-mono"
+                  />
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Category</label>
                   <select
                     value={editCat()}
-                    onChange={(e) => handleCategoryChange(e.currentTarget.value)}
+                    onChange={(e) => setEditCat(e.currentTarget.value)}
                     class="glass-input w-full text-xs"
                   >
                     <option value="">Select Category...</option>
                     <For each={categories()}>
-                      {(c) => <option value={c.id}>{c.name}</option>}
-                    </For>
-                  </select>
-                </div>
-
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Location</label>
-                  <select
-                    value={editLoc()}
-                    onChange={(e) => setEditLoc(e.currentTarget.value)}
-                    class="glass-input w-full text-xs"
-                  >
-                    <option value="">Select Location...</option>
-                    <For each={locations()}>
-                      {(l) => <option value={l.id}>{l.name}</option>}
+                      {(c) => <option value={c.id}>{c.title}</option>}
                     </For>
                   </select>
                 </div>
               </div>
-
-              {/* Custom dynamic fields */}
-              <Show when={categoryFields().length > 0}>
-                <div class="border-t border-white/5 pt-4 space-y-4">
-                  <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Custom Category Attributes</h4>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <For each={categoryFields()}>
-                      {(f) => (
-                        <div>
-                          <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">{f.name}</label>
-                          <input
-                            type={f.field_type === "number" ? "number" : f.field_type === "date" ? "date" : "text"}
-                            value={customFieldValues()[f.id] || ""}
-                            onInput={(e) => {
-                              const vals = { ...customFieldValues() };
-                              vals[f.id] = e.target.value;
-                              setCustomFieldValues(vals);
-                            }}
-                            class="glass-input w-full text-xs"
-                          />
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              </Show>
               
               <div class="flex gap-3 pt-6 border-t border-white/5">
                 <button

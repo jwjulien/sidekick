@@ -11,7 +11,9 @@ import {
   X, 
   Bell,
   User,
-  ShieldCheck
+  ShieldCheck,
+  FolderGit2,
+  Building2
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 
@@ -48,10 +50,11 @@ export default function Layout(props: LayoutProps) {
 
   const navItems = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
-    { name: "Inventory", path: "/inventory", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "Parts Catalog", path: "/inventory", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
+    { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },
-    { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] },
-    { name: "Settings", path: "/settings", icon: Settings, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] }
+    { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] }
   ];
 
   // Helper check

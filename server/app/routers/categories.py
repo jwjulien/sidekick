@@ -12,27 +12,39 @@ def get_categories(
     current_user: models.User = Depends(auth.require_analyst)
 ):
     """
-    Get list of all categories. Accessible by any authenticated user.
+    Get list of all categories. Accessible by any authenticated user with Analyst or above.
     """
-    return db.query(models.Category).all()
+    return db.query(models.Category).order_by(models.Category.title).all()
 
 @router.post("", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED)
 def create_category(
-    category: schemas.CategoryCreate,
+    payload: schemas.CategoryCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):
     """
     Create a new category. Designers and Admins only.
     """
-    existing = db.query(models.Category).filter(models.Category.name == category.name).first()
+    existing = db.query(models.Category).filter(models.Category.title == payload.title).first()
     if existing:
         raise HTTPException(
             status_code=400,
-            detail=f"Category with name '{category.name}' already exists."
+            detail=f"Category with title '{payload.title}' already exists."
         )
     
-    db_category = models.Category(name=category.name, description=category.description)
+    if payload.parent_id:
+        parent = db.query(models.Category).filter(models.Category.id == payload.parent_id).first()
+        if not parent:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Parent category with ID {payload.parent_id} does not exist."
+            )
+            
+    db_category = models.Category(
+        title=payload.title,
+        parent_id=payload.parent_id,
+        designator=payload.designator
+    )
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
@@ -45,7 +57,7 @@ def get_category_details(
     current_user: models.User = Depends(auth.require_analyst)
 ):
     """
-    Get a single category with its defined custom fields.
+    Get a single category with its child categories.
     """
     category = db.query(models.Category).filter(models.Category.id == category_id).first()
     if not category:
@@ -65,50 +77,5 @@ def delete_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found.")
     db.delete(category)
-    db.commit()
-    return
-
-# ---------------- Custom Fields Scoped to Category ----------------
-
-@router.post("/{category_id}/fields", response_model=schemas.CustomFieldOut, status_code=status.HTTP_201_CREATED)
-def add_custom_field(
-    category_id: int,
-    field: schemas.CustomFieldCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_designer)
-):
-    """
-    Add a custom property field description to a category (e.g. Expiration Date, Serial No).
-    """
-    category = db.query(models.Category).filter(models.Category.id == category_id).first()
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found.")
-        
-    db_field = models.CustomField(
-        name=field.name,
-        field_type=field.field_type.lower(),
-        category_id=category_id
-    )
-    if db_field.field_type not in ("text", "number", "date", "boolean"):
-        raise HTTPException(status_code=400, detail="Invalid custom field type. Choose: text, number, date, boolean.")
-        
-    db.add(db_field)
-    db.commit()
-    db.refresh(db_field)
-    return db_field
-
-@router.delete("/fields/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_custom_field(
-    field_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_designer)
-):
-    """
-    Remove a custom property definition. Designers and Admins only.
-    """
-    field = db.query(models.CustomField).filter(models.CustomField.id == field_id).first()
-    if not field:
-        raise HTTPException(status_code=404, detail="Custom field definition not found.")
-    db.delete(field)
     db.commit()
     return

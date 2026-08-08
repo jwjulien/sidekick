@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, date
+from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, ConfigDict
 
 # ----------------- User Schemas -----------------
@@ -19,82 +19,201 @@ class UserOut(UserBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-# ----------------- Custom Field Schemas -----------------
-class CustomFieldBase(BaseModel):
-    name: str
-    field_type: str  # text, number, date, boolean
-    category_id: Optional[int] = None
-
-class CustomFieldCreate(CustomFieldBase):
-    pass
-
-class CustomFieldOut(CustomFieldBase):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-# ----------------- Custom Field Value Schemas -----------------
-class CustomFieldValueBase(BaseModel):
-    custom_field_id: int
-    value: str
-
-class CustomFieldValueCreate(CustomFieldValueBase):
-    pass
-
-class CustomFieldValueOut(CustomFieldValueBase):
-    id: int
-    custom_field: CustomFieldOut
-
-    model_config = ConfigDict(from_attributes=True)
-
 # ----------------- Category Schemas -----------------
 class CategoryBase(BaseModel):
-    name: str
-    description: Optional[str] = None
+    title: str
+    parent_id: Optional[int] = None
+    designator: Optional[str] = None
 
 class CategoryCreate(CategoryBase):
     pass
 
 class CategoryOut(CategoryBase):
     id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-class CategoryDetailsOut(CategoryOut):
-    custom_fields: List[CustomFieldOut] = []
+# ----------------- Part Schemas -----------------
+class PartBase(BaseModel):
+    category_id: int
+    value: str
+    number: str
+    package: Optional[str] = None
+    price: Optional[float] = None
+    weight: Optional[float] = None
+    threshold: int = 0
+    notes: str = ""
+
+class PartCreate(PartBase):
+    attributes: Optional[Dict[str, Any]] = {}
+
+class PartUpdate(BaseModel):
+    category_id: Optional[int] = None
+    value: Optional[str] = None
+    number: Optional[str] = None
+    package: Optional[str] = None
+    price: Optional[float] = None
+    weight: Optional[float] = None
+    threshold: Optional[int] = None
+    notes: Optional[str] = None
+    attributes: Optional[Dict[str, Any]] = None
+
+class PartOut(PartBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    total_quantity: int = 0
+    category: Optional[CategoryOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# ----------------- Location Schemas -----------------
-class LocationBase(BaseModel):
+# ----------------- Supplier Schemas -----------------
+class SupplierBase(BaseModel):
     name: str
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    website: str
+    search: str
 
-class LocationCreate(LocationBase):
+class SupplierCreate(SupplierBase):
     pass
 
-class LocationOut(LocationBase):
+class SupplierOut(SupplierBase):
     id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+
+# ----------------- Product (Supplier Link) Schemas -----------------
+class ProductBase(BaseModel):
+    supplier_id: int
+    part_id: int
+    number: str
+
+class ProductCreate(ProductBase):
+    pass
+
+class ProductOut(ProductBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    supplier: Optional[SupplierOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-class LocationDetailsOut(LocationOut):
-    children: List["LocationDetailsOut"] = []
+# ----------------- Project Schemas -----------------
+class ProjectBase(BaseModel):
+    title: str
+    description: str
+
+class ProjectCreate(ProjectBase):
+    pass
+
+class ProjectOut(ProjectBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# ----------------- Attachment Schemas -----------------
-class AttachmentBase(BaseModel):
+# ----------------- Revision Schemas -----------------
+class RevisionBase(BaseModel):
+    project_id: int
+    version: str
+    date: date
+
+class RevisionCreate(RevisionBase):
+    pass
+
+class RevisionOut(RevisionBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    project: Optional[ProjectOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+# ----------------- Material (BOM Line) Schemas -----------------
+class MaterialBase(BaseModel):
+    revision_id: int
+    part_id: int
+    designator: str
+
+class MaterialCreate(MaterialBase):
+    pass
+
+class MaterialOut(MaterialBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    part: Optional[PartOut] = None
+    revision: Optional[RevisionOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class RevisionDetailsOut(RevisionOut):
+    materials: List[MaterialOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProjectDetailsOut(ProjectOut):
+    revisions: List[RevisionDetailsOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+# ----------------- Storage (Locations) Schemas -----------------
+class StorageBase(BaseModel):
+    parent_id: Optional[int] = None
+    name: str
+    index: int = 0
+    dimensions: Optional[Any] = None
+    span: Optional[Any] = None
+    label_scheme: Optional[str] = None
+    part_id: Optional[int] = None
+    quantity: int = 0
+    description: Optional[str] = None
+
+class StorageCreate(StorageBase):
+    pass
+
+class StorageOut(StorageBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    part: Optional[PartOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class StorageDetailsOut(StorageOut):
+    children: List["StorageDetailsOut"] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+# ----------------- Image Schemas -----------------
+class ImageOut(BaseModel):
+    id: int
+    caption: str
+    part_id: int
+    created_on: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+# ----------------- Document Schemas -----------------
+class DocumentOut(BaseModel):
+    id: int
+    label: str
     filename: str
-    file_type: str  # image, document
+    part_id: int
+    created_on: datetime
 
-class AttachmentOut(AttachmentBase):
+    model_config = ConfigDict(from_attributes=True)
+
+# ----------------- Attachment Compatibility Schemas -----------------
+class AttachmentOut(BaseModel):
     id: int
-    item_id: int
-    file_path: str
-    uploaded_at: datetime
-    uploaded_by_id: Optional[int] = None
+    filename: str
+    file_type: str  # "image" or "document"
+    part_id: int
+    created_on: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -106,55 +225,31 @@ class TransactionBase(BaseModel):
 
 class TransactionOut(TransactionBase):
     id: int
-    item_id: int
+    part_id: int
     user_id: Optional[int] = None
     created_at: datetime
     user: Optional[UserBase] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# ----------------- Item Schemas -----------------
-class ItemBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    sku: Optional[str] = None
-    barcode: Optional[str] = None
-    quantity: int = 0
-    min_quantity_alert: Optional[int] = 0
-    category_id: Optional[int] = None
-    location_id: Optional[int] = None
-
-class ItemCreate(ItemBase):
-    custom_values: List[CustomFieldValueCreate] = []
-
-class ItemUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    sku: Optional[str] = None
-    barcode: Optional[str] = None
-    quantity: Optional[int] = None
-    min_quantity_alert: Optional[int] = None
-    category_id: Optional[int] = None
-    location_id: Optional[int] = None
-    custom_values: Optional[List[CustomFieldValueCreate]] = None
-
-class ItemStockUpdate(BaseModel):
-    quantity_change: int
-    action_type: str  # check_in, check_out
-    notes: Optional[str] = None
-
-class ItemOut(ItemBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    category: Optional[CategoryOut] = None
-    location: Optional[LocationOut] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-class ItemDetailsOut(ItemOut):
-    custom_values: List[CustomFieldValueOut] = []
-    attachments: List[AttachmentOut] = []
+# ----------------- Part Details Schemas -----------------
+class PartDetailsOut(PartOut):
+    attributes: Dict[str, Any] = {}
+    storage_records: List[StorageOut] = []
+    products: List[ProductOut] = []
+    materials: List[MaterialOut] = []
+    images: List[ImageOut] = []
+    documents: List[DocumentOut] = []
     transactions: List[TransactionOut] = []
+    attachments: List[AttachmentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+# Self reference resolution for hierarchical category and storage
+CategoryDetailsOut = CategoryOut
+class CategoryDetailsOut(CategoryOut):
+    children: List["CategoryDetailsOut"] = []
+    parts: List[PartOut] = []
+
+CategoryDetailsOut.model_rebuild()
+StorageDetailsOut.model_rebuild()
