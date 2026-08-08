@@ -88,7 +88,19 @@ class Project(Base):
     title = Column(String(40), nullable=False)
     description = Column(Text, nullable=False)
 
-    revisions = relationship("Revision", back_populates="project", cascade="all, delete-orphan")
+    assemblies = relationship("Assembly", back_populates="project", cascade="all, delete-orphan")
+
+class Assembly(Base):
+    __tablename__ = "assemblies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
+    modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False)
+
+    project = relationship("Project", back_populates="assemblies")
+    revisions = relationship("Revision", back_populates="assembly", cascade="all, delete-orphan")
 
 class Revision(Base):
     __tablename__ = "revisions"
@@ -96,11 +108,11 @@ class Revision(Base):
     id = Column(Integer, primary_key=True, index=True)
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
     modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    assembly_id = Column(Integer, ForeignKey("assemblies.id", ondelete="CASCADE"), nullable=False)
     version = Column(String(32), nullable=False)
     date = Column(Date, nullable=False)
 
-    project = relationship("Project", back_populates="revisions")
+    assembly = relationship("Assembly", back_populates="revisions")
     materials = relationship("Material", back_populates="revision", cascade="all, delete-orphan")
 
 class Material(Base):

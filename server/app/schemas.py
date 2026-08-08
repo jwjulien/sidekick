@@ -115,9 +115,25 @@ class ProjectOut(ProjectBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+# ----------------- Assembly Schemas -----------------
+class AssemblyBase(BaseModel):
+    project_id: int
+    name: str
+
+class AssemblyCreate(AssemblyBase):
+    pass
+
+class AssemblyOut(AssemblyBase):
+    id: int
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    project: Optional[ProjectOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 # ----------------- Revision Schemas -----------------
 class RevisionBase(BaseModel):
-    project_id: int
+    assembly_id: int
     version: str
     date: date
 
@@ -128,7 +144,7 @@ class RevisionOut(RevisionBase):
     id: int
     created_on: datetime
     modified_on: Optional[datetime] = None
-    project: Optional[ProjectOut] = None
+    assembly: Optional[AssemblyOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -155,8 +171,13 @@ class RevisionDetailsOut(RevisionOut):
 
     model_config = ConfigDict(from_attributes=True)
 
-class ProjectDetailsOut(ProjectOut):
+class AssemblyDetailsOut(AssemblyOut):
     revisions: List[RevisionDetailsOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProjectDetailsOut(ProjectOut):
+    assemblies: List[AssemblyDetailsOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -71,6 +71,46 @@ def delete_project(
     db.commit()
     return
 
+# --- Assemblies ---
+
+@router.post("/assemblies", response_model=schemas.AssemblyOut, status_code=status.HTTP_201_CREATED)
+def create_assembly(
+    payload: schemas.AssemblyCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Create a new assembly. Requires Designer role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == payload.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+        
+    db_assembly = models.Assembly(
+        project_id=payload.project_id,
+        name=payload.name
+    )
+    db.add(db_assembly)
+    db.commit()
+    db.refresh(db_assembly)
+    return db_assembly
+
+@router.delete("/assemblies/{assembly_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_assembly(
+    assembly_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Delete an assembly. Requires Designer role.
+    """
+    assembly = db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
+    if not assembly:
+        raise HTTPException(status_code=404, detail="Assembly not found.")
+    db.delete(assembly)
+    db.commit()
+    return
+
 # --- Revisions ---
 
 @router.post("/revisions", response_model=schemas.RevisionOut, status_code=status.HTTP_201_CREATED)
@@ -80,14 +120,14 @@ def create_revision(
     current_user: models.User = Depends(auth.require_designer)
 ):
     """
-    Create a new PCB project revision. Requires Designer role.
+    Create a new PCB assembly revision. Requires Designer role.
     """
-    project = db.query(models.Project).filter(models.Project.id == payload.project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found.")
+    assembly = db.query(models.Assembly).filter(models.Assembly.id == payload.assembly_id).first()
+    if not assembly:
+        raise HTTPException(status_code=404, detail="Assembly not found.")
         
     db_revision = models.Revision(
-        project_id=payload.project_id,
+        assembly_id=payload.assembly_id,
         version=payload.version,
         date=payload.date
     )
