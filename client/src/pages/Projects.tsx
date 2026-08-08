@@ -32,17 +32,20 @@ export default function Projects() {
   
   const [loading, setLoading] = createSignal(true);
 
-  // Add Project Modal
+  // Add/Edit Project Modal
   const [showProjModal, setShowProjModal] = createSignal(false);
+  const [editProjId, setEditProjId] = createSignal<number | null>(null);
   const [projTitle, setProjTitle] = createSignal("");
   const [projDesc, setProjDesc] = createSignal("");
 
-  // Add Assembly Modal
+  // Add/Edit Assembly Modal
   const [showAssemModal, setShowAssemModal] = createSignal(false);
+  const [editAssemId, setEditAssemId] = createSignal<number | null>(null);
   const [assemName, setAssemName] = createSignal("");
 
-  // Add Revision Modal
+  // Add/Edit Revision Modal
   const [showRevModal, setShowRevModal] = createSignal(false);
+  const [editRevId, setEditRevId] = createSignal<number | null>(null);
   const [revVersion, setRevVersion] = createSignal("");
   const [revDate, setRevDate] = createSignal("");
 
@@ -122,31 +125,52 @@ export default function Projects() {
     }
   };
 
-  const handleCreateProject = async (e: Event) => {
+  const handleSaveProject = async (e: Event) => {
     e.preventDefault();
     if (!projTitle()) return;
     
     setSubmitting(true);
     try {
-      const newProj = await apiFetch("/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: projTitle(), description: projDesc() })
-      });
+      if (editProjId()) {
+        await apiFetch(`/projects/${editProjId()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: projTitle(), description: projDesc() })
+        });
+        toast.success("Project updated successfully.");
+      } else {
+        const newProj = await apiFetch("/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: projTitle(), description: projDesc() })
+        });
+        setSelectedProjectId(newProj.id);
+        toast.success("Project created successfully.");
+      }
       
+      setEditProjId(null);
       setProjTitle("");
       setProjDesc("");
       setShowProjModal(false);
       
       // Refresh and select
       await loadInitialData();
-      handleSelectProject(newProj.id);
-      toast.success("Project created successfully.");
+      if (selectedProjectId()) {
+        handleSelectProject(selectedProjectId()!);
+      }
     } catch (err: any) {
-      toast.error(err.message || "Failed to create project.");
+      toast.error(err.message || "Failed to save project.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditProjectClick = () => {
+    if (!selectedProject()) return;
+    setEditProjId(selectedProject().id);
+    setProjTitle(selectedProject().title);
+    setProjDesc(selectedProject().description);
+    setShowProjModal(true);
   };
 
   const handleDeleteProject = async (id: number) => {
@@ -171,7 +195,7 @@ export default function Projects() {
     }
   };
 
-  const handleCreateAssembly = async (e: Event) => {
+  const handleSaveAssembly = async (e: Event) => {
     e.preventDefault();
     const projId = selectedProjectId();
     if (!projId || !assemName()) return;
@@ -183,23 +207,42 @@ export default function Projects() {
         name: assemName()
       };
       
-      const newAssem = await apiFetch("/projects/assemblies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      let targetAssemId = editAssemId();
+      if (targetAssemId) {
+        await apiFetch(`/projects/assemblies/${targetAssemId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: assemName() })
+        });
+        toast.success("Assembly updated successfully.");
+      } else {
+        const newAssem = await apiFetch("/projects/assemblies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        targetAssemId = newAssem.id;
+        toast.success("Assembly created successfully.");
+      }
       
+      setEditAssemId(null);
       setAssemName("");
       setShowAssemModal(false);
       
-      // Refresh project detailed view and auto-select new assembly
-      await handleSelectProject(projId, newAssem.id);
-      toast.success("Assembly created successfully.");
+      // Refresh project detailed view and auto-select assembly
+      await handleSelectProject(projId, targetAssemId!);
     } catch (err: any) {
-      toast.error(err.message || "Failed to create assembly.");
+      toast.error(err.message || "Failed to save assembly.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditAssemblyClick = () => {
+    if (!selectedAssembly()) return;
+    setEditAssemId(selectedAssembly().id);
+    setAssemName(selectedAssembly().name);
+    setShowAssemModal(true);
   };
 
   const handleDeleteAssembly = async (assemId: number) => {
@@ -218,7 +261,7 @@ export default function Projects() {
     }
   };
 
-  const handleCreateRevision = async (e: Event) => {
+  const handleSaveRevision = async (e: Event) => {
     e.preventDefault();
     const assemId = selectedAssemblyId();
     if (!assemId || !revVersion() || !revDate()) return;
@@ -231,24 +274,42 @@ export default function Projects() {
         date: revDate()
       };
       
-      const newRev = await apiFetch("/projects/revisions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      if (editRevId()) {
+        await apiFetch(`/projects/revisions/${editRevId()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version: revVersion(), date: revDate() })
+        });
+        toast.success("Revision updated successfully.");
+      } else {
+        await apiFetch("/projects/revisions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        toast.success("Revision created successfully.");
+      }
       
+      setEditRevId(null);
       setRevVersion("");
       setRevDate("");
       setShowRevModal(false);
       
       // Refresh project detailed view and re-select assembly
       await handleSelectProject(selectedProjectId()!, assemId);
-      toast.success("Revision created successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to create revision.");
+      toast.error(err.message || "Failed to save revision.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditRevisionClick = () => {
+    if (!selectedRevision()) return;
+    setEditRevId(selectedRevision().id);
+    setRevVersion(selectedRevision().version);
+    setRevDate(selectedRevision().date);
+    setShowRevModal(true);
   };
 
   const handleDeleteRevision = async (revId: number) => {
@@ -346,7 +407,12 @@ export default function Projects() {
               <h3 class="text-sm font-bold text-white uppercase tracking-wider">PCB Projects</h3>
               <Show when={user()?.role === "admin" || user()?.role === "designer"}>
                 <button
-                  onClick={() => setShowProjModal(true)}
+                  onClick={() => {
+                    setEditProjId(null);
+                    setProjTitle("");
+                    setProjDesc("");
+                    setShowProjModal(true);
+                  }}
                   class="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 font-semibold"
                 >
                   <Plus size={14} />
@@ -403,13 +469,22 @@ export default function Projects() {
                     <p class="text-gray-400 text-xs mt-2 leading-relaxed">{selectedProject().description}</p>
                   </div>
                   <Show when={user()?.role === "admin" || user()?.role === "designer"}>
-                    <button
-                      onClick={() => handleDeleteProject(selectedProject().id)}
-                      class="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors shrink-0"
-                      title="Delete Project"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={handleEditProjectClick}
+                        class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                        title="Edit Project"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProject(selectedProject().id)}
+                        class="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
+                        title="Delete Project"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </Show>
                 </div>
 
@@ -423,7 +498,11 @@ export default function Projects() {
                     
                     <Show when={user()?.role === "admin" || user()?.role === "designer"}>
                       <button
-                        onClick={() => setShowAssemModal(true)}
+                        onClick={() => {
+                          setEditAssemId(null);
+                          setAssemName("");
+                          setShowAssemModal(true);
+                        }}
                         class="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                       >
                         <Plus size={12} />
@@ -472,7 +551,19 @@ export default function Projects() {
                       <div class="flex items-center gap-2">
                         <Show when={user()?.role === "admin" || user()?.role === "designer"}>
                           <button
-                            onClick={() => setShowRevModal(true)}
+                            onClick={handleEditAssemblyClick}
+                            class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors text-xs"
+                            title="Edit Assembly"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditRevId(null);
+                              setRevVersion("");
+                              setRevDate("");
+                              setShowRevModal(true);
+                            }}
                             class="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
                           >
                             <Plus size={12} />
@@ -527,8 +618,16 @@ export default function Projects() {
                             </div>
                           </div>
 
-                          <div class="flex gap-2">
+                          <div class="flex gap-2 items-center">
                             <Show when={user()?.role === "admin" || user()?.role === "designer"}>
+                              <button
+                                onClick={handleEditRevisionClick}
+                                class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors text-xs mr-2"
+                                title="Edit Revision"
+                              >
+                                Edit
+                              </button>
+                              
                               <button
                                 onClick={() => setShowMatModal(true)}
                                 class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
@@ -637,10 +736,10 @@ export default function Projects() {
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
               <FolderGit2 class="text-accentCyan" size={20} />
-              New PCB Project
+              {editProjId() ? "Edit Project" : "New PCB Project"}
             </h3>
             
-            <form onSubmit={handleCreateProject} class="space-y-4">
+            <form onSubmit={handleSaveProject} class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Project Title</label>
                 <input
@@ -698,10 +797,10 @@ export default function Projects() {
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
               <Boxes class="text-accentCyan" size={20} />
-              New Assembly
+              {editAssemId() ? "Edit Assembly" : "New Assembly"}
             </h3>
             
-            <form onSubmit={handleCreateAssembly} class="space-y-4">
+            <form onSubmit={handleSaveAssembly} class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Assembly Name</label>
                 <input
@@ -748,10 +847,10 @@ export default function Projects() {
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
               <Layers class="text-accentCyan" size={20} />
-              Add Layout Version
+              {editRevId() ? "Edit Revision" : "Add Layout Version"}
             </h3>
             
-            <form onSubmit={handleCreateRevision} class="space-y-4">
+            <form onSubmit={handleSaveRevision} class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Version Code</label>
                 <input

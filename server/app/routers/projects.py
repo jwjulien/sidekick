@@ -55,6 +55,34 @@ def get_project_details(
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
 
+@router.put("/{project_id}", response_model=schemas.ProjectOut)
+def update_project(
+    project_id: int,
+    payload: schemas.ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update a project's details. Requires Designer role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+        
+    if payload.title is not None:
+        # Check if title already exists
+        existing = db.query(models.Project).filter(models.Project.title == payload.title, models.Project.id != project_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Project with title '{payload.title}' already exists.")
+        project.title = payload.title
+        
+    if payload.description is not None:
+        project.description = payload.description
+        
+    db.commit()
+    db.refresh(project)
+    return project
+
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: int,
@@ -67,6 +95,10 @@ def delete_project(
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
+        
+    if db.query(models.Assembly).filter(models.Assembly.project_id == project_id).first():
+        raise HTTPException(status_code=400, detail="Cannot delete a project that has assemblies. Delete the assemblies first.")
+        
     db.delete(project)
     db.commit()
     return
@@ -95,6 +127,27 @@ def create_assembly(
     db.refresh(db_assembly)
     return db_assembly
 
+@router.put("/assemblies/{assembly_id}", response_model=schemas.AssemblyOut)
+def update_assembly(
+    assembly_id: int,
+    payload: schemas.AssemblyUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update an assembly's details. Requires Designer role.
+    """
+    assembly = db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
+    if not assembly:
+        raise HTTPException(status_code=404, detail="Assembly not found.")
+        
+    if payload.name is not None:
+        assembly.name = payload.name
+        
+    db.commit()
+    db.refresh(assembly)
+    return assembly
+
 @router.delete("/assemblies/{assembly_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_assembly(
     assembly_id: int,
@@ -107,6 +160,10 @@ def delete_assembly(
     assembly = db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
     if not assembly:
         raise HTTPException(status_code=404, detail="Assembly not found.")
+        
+    if db.query(models.Revision).filter(models.Revision.assembly_id == assembly_id).first():
+        raise HTTPException(status_code=400, detail="Cannot delete an assembly that has revisions. Delete the revisions first.")
+        
     db.delete(assembly)
     db.commit()
     return
@@ -136,6 +193,30 @@ def create_revision(
     db.refresh(db_revision)
     return db_revision
 
+@router.put("/revisions/{revision_id}", response_model=schemas.RevisionOut)
+def update_revision(
+    revision_id: int,
+    payload: schemas.RevisionUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update a revision's details. Requires Designer role.
+    """
+    revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revision not found.")
+        
+    if payload.version is not None:
+        revision.version = payload.version
+        
+    if payload.date is not None:
+        revision.date = payload.date
+        
+    db.commit()
+    db.refresh(revision)
+    return revision
+
 @router.delete("/revisions/{revision_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_revision(
     revision_id: int,
@@ -148,6 +229,10 @@ def delete_revision(
     revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
     if not revision:
         raise HTTPException(status_code=404, detail="Revision not found.")
+        
+    if db.query(models.Material).filter(models.Material.revision_id == revision_id).first():
+        raise HTTPException(status_code=400, detail="Cannot delete a revision that has BOM materials attached. Delete the materials first.")
+        
     db.delete(revision)
     db.commit()
     return

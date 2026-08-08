@@ -113,6 +113,10 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     pass
 
+class ProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
 class ProjectOut(ProjectBase):
     id: int
     created_on: datetime
@@ -127,6 +131,9 @@ class AssemblyBase(BaseModel):
 
 class AssemblyCreate(AssemblyBase):
     pass
+
+class AssemblyUpdate(BaseModel):
+    name: Optional[str] = None
 
 class AssemblyOut(AssemblyBase):
     id: int
@@ -144,6 +151,10 @@ class RevisionBase(BaseModel):
 
 class RevisionCreate(RevisionBase):
     pass
+
+class RevisionUpdate(BaseModel):
+    version: Optional[str] = None
+    date: Optional[date] = None
 
 class RevisionOut(RevisionBase):
     id: int

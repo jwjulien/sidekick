@@ -1,6 +1,6 @@
 ---
 title: Core Projects
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows
@@ -31,7 +31,7 @@ This feature establishes the high-level "Projects" entity. In the BOM Shelter ar
     * `POST /api/projects` - Creates a new project.
     * `PUT /api/projects/{id}` - Updates a project's title or description.
     * `DELETE /api/projects/{id}` - Removes a project. *(Note: Must eventually handle cascade deletions for attached revisions/materials).*
-* **Database Schema (SQLite / Peewee):** * Model: `Project`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Project`
     * Columns: `id` (PK), `created_on`, `modified_on`, `title` (VARCHAR 40), `description` (TEXT).
 
 ## 4. Out of Scope
@@ -41,8 +41,8 @@ This feature establishes the high-level "Projects" entity. In the BOM Shelter ar
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Project` Peewee model.
-- [ ] Build FastAPI CRUD routes (`GET`, `POST`, `PUT`, `DELETE`).
-- [ ] Create SolidJS UI grid/list component.
-- [ ] Create SolidJS form for creating/editing projects.
-- [ ] Wire frontend to backend API.
+- [x] Define `Project` SQLAlchemy model.
+- [x] Build FastAPI CRUD routes (`GET`, `POST`, `PUT`, `DELETE`).
+- [x] Create SolidJS UI grid/list component.
+- [x] Create SolidJS form for creating/editing projects.
+- [x] Wire frontend to backend API.
