@@ -17,6 +17,7 @@ export default function Suppliers() {
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [showAddModal, setShowAddModal] = createSignal(false);
+  const [editSupId, setEditSupId] = createSignal<number | null>(null);
   
   // Form state
   const [name, setName] = createSignal("");
@@ -40,7 +41,7 @@ export default function Suppliers() {
     fetchSuppliers();
   });
 
-  const handleCreateSupplier = async (e: Event) => {
+  const handleSaveSupplier = async (e: Event) => {
     e.preventDefault();
     if (!name() || !website()) {
       toast.error("Name and website are required.");
@@ -55,23 +56,41 @@ export default function Suppliers() {
         search: searchUrl() || `${website().replace(/\/$/, "")}/?q=`
       };
       
-      await apiFetch("/suppliers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      if (editSupId()) {
+        await apiFetch(`/suppliers/${editSupId()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        toast.success("Supplier updated successfully.");
+      } else {
+        await apiFetch("/suppliers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        toast.success("Supplier created successfully.");
+      }
 
+      setEditSupId(null);
       setName("");
       setWebsite("");
       setSearchUrl("");
       setShowAddModal(false);
       fetchSuppliers();
-      toast.success("Supplier created successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to create supplier.");
+      toast.error(err.message || "Failed to save supplier.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditSupplierClick = (supplier: any) => {
+    setEditSupId(supplier.id);
+    setName(supplier.name);
+    setWebsite(supplier.website);
+    setSearchUrl(supplier.search);
+    setShowAddModal(true);
   };
 
   const handleDeleteSupplier = async (id: number) => {
@@ -106,7 +125,13 @@ export default function Suppliers() {
         {/* Create Button */}
         <Show when={user()?.role === "admin" || user()?.role === "designer"}>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setEditSupId(null);
+              setName("");
+              setWebsite("");
+              setSearchUrl("");
+              setShowAddModal(true);
+            }}
             class="btn-primary flex items-center justify-center gap-2"
           >
             <Plus size={18} />
@@ -146,13 +171,22 @@ export default function Suppliers() {
                     </h3>
                     
                     <Show when={user()?.role === "admin" || user()?.role === "designer"}>
-                      <button
-                        onClick={() => handleDeleteSupplier(supplier.id)}
-                        class="absolute right-4 top-4 p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
-                        title="Delete Supplier"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div class="absolute right-4 top-4 flex gap-1">
+                        <button
+                          onClick={() => handleEditSupplierClick(supplier)}
+                          class="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                          title="Edit Supplier"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSupplier(supplier.id)}
+                          class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
+                          title="Delete Supplier"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </Show>
                   </div>
                   
@@ -209,10 +243,10 @@ export default function Suppliers() {
             
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
               <Building2 class="text-accentCyan" size={20} />
-              Register Supplier
+              {editSupId() ? "Edit Supplier" : "Register Supplier"}
             </h3>
             
-            <form onSubmit={handleCreateSupplier} class="space-y-4">
+            <form onSubmit={handleSaveSupplier} class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Supplier Name</label>
                 <input

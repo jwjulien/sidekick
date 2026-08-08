@@ -42,6 +42,37 @@ def create_supplier(
     db.refresh(db_supplier)
     return db_supplier
 
+@router.put("/{supplier_id}", response_model=schemas.SupplierOut)
+def update_supplier(
+    supplier_id: int,
+    payload: schemas.SupplierUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update a supplier's details. Requires Designer role.
+    """
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found.")
+        
+    if payload.name is not None:
+        # Check if name already exists
+        existing = db.query(models.Supplier).filter(models.Supplier.name == payload.name, models.Supplier.id != supplier_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Supplier with name '{payload.name}' already exists.")
+        supplier.name = payload.name
+        
+    if payload.website is not None:
+        supplier.website = payload.website
+        
+    if payload.search is not None:
+        supplier.search = payload.search
+        
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
 @router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_supplier(
     supplier_id: int,
@@ -54,6 +85,10 @@ def delete_supplier(
     supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found.")
+        
+    if db.query(models.Product).filter(models.Product.supplier_id == supplier_id).first():
+        raise HTTPException(status_code=400, detail="Cannot delete a supplier that has linked component products. Unlink the products first.")
+        
     db.delete(supplier)
     db.commit()
     return

@@ -1,6 +1,6 @@
 ---
 title: Core Suppliers
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows
@@ -40,8 +40,8 @@ This feature establishes the foundational `Suppliers` entity. It allows users to
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Supplier` Peewee model.
-- [ ] Build FastAPI CRUD routes (`GET`, `POST`, `PUT`, `DELETE`).
-- [ ] Create SolidJS UI list/card component.
-- [ ] Create SolidJS form for creating/editing suppliers with URL validation.
-- [ ] Wire frontend to backend API.
+- [x] Define `Supplier` SQLAlchemy model.
+- [x] Build FastAPI CRUD routes (`GET`, `POST`, `PUT`, `DELETE`).
+- [x] Create SolidJS UI list/card component.
+- [x] Create SolidJS form for creating/editing suppliers with URL validation.
+- [x] Wire frontend to backend API.

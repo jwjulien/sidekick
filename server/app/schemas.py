@@ -83,6 +83,11 @@ class SupplierBase(BaseModel):
 class SupplierCreate(SupplierBase):
     pass
 
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    website: Optional[str] = None
+    search: Optional[str] = None
+
 class SupplierOut(SupplierBase):
     id: int
     created_on: datetime
