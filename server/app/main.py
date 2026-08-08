@@ -7,7 +7,7 @@ import json
 
 from .database import engine, Base, get_db
 from . import models, auth
-from .routers import auth as auth_router, items, locations, categories, uploads, suppliers, projects
+from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -38,7 +38,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(categories.router)
 app.include_router(locations.router)
-app.include_router(items.router)
+app.include_router(parts.router)
 app.include_router(uploads.router)
 app.include_router(suppliers.router)
 app.include_router(projects.router)
@@ -109,7 +109,7 @@ def seed_database(db: Session = Depends(get_db)):
             weight=0.002,
             threshold=100,
             notes="Metal film resistor, 1% tolerance, 1/10W.",
-            attributes=json.dumps({"barcode": "74470123456"}).encode("utf-8")
+            attributes={"barcode": "74470123456", "Tolerance": "1%", "Power": "0.1W"}
         )
         part_cap = models.Part(
             category_id=cat_capacitors.id,
@@ -120,7 +120,7 @@ def seed_database(db: Session = Depends(get_db)):
             weight=0.003,
             threshold=150,
             notes="MLCC ceramic capacitor, 50V, X7R, 10% tolerance.",
-            attributes=json.dumps({"barcode": "85560987654"}).encode("utf-8")
+            attributes={"barcode": "85560987654", "Voltage": "50V", "Dielectric": "X7R"}
         )
         part_mcu = models.Part(
             category_id=cat_mcus.id,
@@ -131,7 +131,7 @@ def seed_database(db: Session = Depends(get_db)):
             weight=0.2,
             threshold=10,
             notes="ARM Cortex-M3 MCU, 64KB Flash, 72MHz, 2.0V-3.6V.",
-            attributes=json.dumps({"barcode": "93320112233"}).encode("utf-8")
+            attributes={"barcode": "93320112233", "Architecture": "ARM Cortex-M3"}
         )
         db.add_all([part_res, part_cap, part_mcu])
         db.commit()

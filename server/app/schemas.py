@@ -65,6 +65,12 @@ class PartUpdate(BaseModel):
     notes: Optional[str] = None
     attributes: Optional[Dict[str, Any]] = None
 
+class PartStockUpdate(BaseModel):
+    quantity_change: int
+    action_type: str
+    notes: Optional[str] = None
+    location_id: Optional[int] = None
+
 class PartOut(PartBase):
     id: int
     created_on: datetime

@@ -17,10 +17,12 @@ import {
   ArrowLeft,
   Search,
   Building2,
-  Cpu
+  Cpu,
+  X
 } from "lucide-solid";
 import { apiFetch, user, backendUrl } from "../hooks/useAuth";
-
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 export default function ItemDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -60,13 +62,18 @@ export default function ItemDetails() {
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
+
+  const attributesEntries = () => {
+    if (!item() || !item().attributes) return [];
+    return Object.entries(item().attributes);
+  };
   
-  const [barcodeValue, setBarcodeValue] = createSignal("");
+  
 
   const fetchItemDetails = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/items/${itemId}`);
+      const data = await apiFetch(`/parts/${itemId}`);
       setItem(data);
       
       // Seed edit form values
@@ -79,9 +86,7 @@ export default function ItemDetails() {
       setEditThreshold(data.threshold || 0);
       setEditCat(data.category_id ? String(data.category_id) : "");
       
-      // Load current barcode from attributes
-      const barcode = data.attributes?.barcode || "";
-      setBarcodeValue(barcode);
+      
       
       // Auto select first storage slot if available
       if (data.storage_records && data.storage_records.length > 0) {
@@ -115,7 +120,7 @@ export default function ItemDetails() {
   const handleStockAction = async (action: "check_in" | "check_out") => {
     setStockSubmitting(true);
     try {
-      await apiFetch(`/items/${itemId}/stock`, {
+      await apiFetch(`/parts/${itemId}/stock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -238,55 +243,25 @@ export default function ItemDetails() {
     e.preventDefault();
     try {
       const payload = {
-        name: editValue(),
-        description: editNotes(),
-        sku: editNumber() || null,
-        min_quantity_alert: editThreshold(),
+        value: editValue(),
+        notes: editNotes(),
+        number: editNumber() || null,
+        threshold: editThreshold(),
         category_id: editCat() ? parseInt(editCat()) : null,
-        location_id: editLoc() ? parseInt(editLoc()) : null,
-        barcode: barcodeValue() || null
-      };
-
-      await apiFetch(`/items/${itemId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      // Simple update extra fields directly in models.py requires backend logic or we can just send price, weight, package
-      // Let's call details update on price, weight, package as well (if supported by PUT /items/{id})
-      // Since our items PUT router accepts updates, let's see: we can set package, price, weight too!
-      // In items.py, we have update_item. Let's make sure it handles price, weight, package:
-      // Oh! In items.py, we mapped name to value, description to notes, sku to number.
-      // Wait, we didn't add price, weight, package in ItemUpdateCompat. Let's make sure our PUT router handles them!
-      // Let's look at what we wrote in items.py: Yes, we wrote: db_part.value = payload.name, notes = description, number = sku.
-      // To support updating price, weight, package, let's add them to ItemUpdateCompat and save them in db_part!
-      // Let's check: yes, we can do that in the backend. Let's update backend PUT handler to support package, price, weight.
-      // Wait, let's write it in this payload, and we'll ensure items.py supports it! (I will check if items.py already updates other fields, or I'll patch items.py to be safe.)
-      // Actually, we can add them to payload:
-      // Let's add price, weight, package to payload:
-      const fullPayload = {
-        name: editValue(),
-        description: editNotes(),
-        sku: editNumber() || null,
-        min_quantity_alert: editThreshold(),
-        category_id: editCat() ? parseInt(editCat()) : null,
-        location_id: editLoc() ? parseInt(editLoc()) : null,
-        barcode: barcodeValue() || null,
         package: editPackage() || null,
         price: editPrice(),
         weight: editWeight()
       };
 
-      await apiFetch(`/items/${itemId}`, {
+      await apiFetch(`/parts/${itemId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fullPayload)
+        body: JSON.stringify(payload)
       });
 
       setShowEditModal(false);
       fetchItemDetails();
-      toast.success("Component details updated successfully.");
+      toast.success("Component updated successfully.");
     } catch (err: any) {
       toast.error(err.message || "Modification failed.");
     }
@@ -301,7 +276,7 @@ export default function ItemDetails() {
     });
     if (!isConfirmed) return;
     try {
-      await apiFetch(`/items/${itemId}`, { method: "DELETE" });
+      await apiFetch(`/parts/${itemId}`, { method: "DELETE" });
       navigate("/inventory");
     } catch (err: any) {
       toast.error(err.message || "Failed to delete component.");
@@ -391,14 +366,21 @@ export default function ItemDetails() {
               </div>
 
               {/* Dynamic properties from JSON attributes */}
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
-                  <span class="text-gray-400 font-medium">Category</span>
-                  <span class="text-white font-semibold">{item().category?.title || "Uncategorized"}</span>
-                </div>
-                <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
-                  <span class="text-gray-400 font-medium">Barcode Value</span>
-                  <span class="text-white font-semibold font-mono">{barcodeValue() || "N/A"}</span>
+              <div class="space-y-3 pt-2">
+                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Attributes</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
+                    <span class="text-gray-400 font-medium">Category</span>
+                    <span class="text-white font-semibold">{item().category?.title || "Uncategorized"}</span>
+                  </div>
+                  <For each={attributesEntries()}>
+                    {([key, value]) => (
+                      <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
+                        <span class="text-gray-400 font-medium truncate max-w-[120px]">{key}</span>
+                        <span class="text-white font-semibold truncate max-w-[120px]">{value as string}</span>
+                      </div>
+                    )}
+                  </For>
                 </div>
               </div>
 
@@ -855,15 +837,7 @@ export default function ItemDetails() {
                   />
                 </div>
 
-                <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Barcode ID</label>
-                  <input
-                    type="text"
-                    value={barcodeValue()}
-                    onInput={(e) => setBarcodeValue(e.target.value)}
-                    class="glass-input w-full text-xs font-mono"
-                  />
-                </div>
+  
 
                 <div class="sm:col-span-2">
                   <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Category</label>

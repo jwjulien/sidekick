@@ -10,8 +10,8 @@ import {
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
-import Inventory from "./pages/Inventory";
-import ItemDetails from "./pages/ItemDetails";
+import Parts from "./pages/Parts";
+import PartDetails from "./pages/PartDetails";
 import Scan from "./pages/Scan";
 import Design from "./pages/Design";
 import Settings from "./pages/Settings";
@@ -55,21 +55,21 @@ export default function App() {
           )} 
         />
         <Route 
-          path="/inventory" 
+          path="/parts" 
           component={() => (
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
-                <Inventory />
+                <Parts />
               </Layout>
             </Show>
           )} 
         />
         <Route 
-          path="/inventory/item/:id" 
+          path="/parts/:id" 
           component={() => (
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
-                <ItemDetails />
+                <PartDetails />
               </Layout>
             </Show>
           )} 

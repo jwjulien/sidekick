@@ -30,7 +30,7 @@ export default function Layout(props: LayoutProps) {
   // Poll for low stock alerts periodically to show notifications
   const checkLowStock = async () => {
     try {
-      const items = await apiFetch("/items?low_stock=true");
+      const items = await apiFetch("/parts?low_stock=true");
       setLowStockCount(items.length);
     } catch (_) {}
   };
@@ -50,7 +50,7 @@ export default function Layout(props: LayoutProps) {
 
   const navItems = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
-    { name: "Parts Catalog", path: "/inventory", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "Parts Catalog", path: "/parts", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },

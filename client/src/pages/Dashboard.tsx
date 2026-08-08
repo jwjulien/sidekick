@@ -39,11 +39,11 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const [items, categories, locations, alerts, txs] = await Promise.all([
-        apiFetch("/items"),
+        apiFetch("/parts"),
         apiFetch("/categories"),
         apiFetch("/locations?flat=true"),
-        apiFetch("/items?low_stock=true"),
-        apiFetch("/items/transactions?limit=8")
+        apiFetch("/parts?low_stock=true"),
+        apiFetch("/parts/transactions?limit=8")
       ]);
       
       setStats({

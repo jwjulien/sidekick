@@ -1,6 +1,6 @@
 ---
 title: Core Parts
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -34,7 +34,7 @@ This feature represents the absolute center of the Sidekick architecture. It def
     * `POST /api/parts` - Creates a new part, serializing the incoming JSON attributes into bytes for the SQLite BLOB.
     * `PUT /api/parts/{id}` - Updates a part's details.
     * `DELETE /api/parts/{id}` - Removes a part.
-* **Database Schema (SQLite / Peewee):** * Model: `Part`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Part`
     * Columns: `id` (PK), `created_on`, `modified_on`, `category_id` (FK to Categories), `value` (VARCHAR 50), `number` (VARCHAR 50), `package` (VARCHAR 20), `price` (REAL), `weight` (REAL), `threshold` (INTEGER), `notes` (TEXT), `attributes` (BLOB storing serialized JSON).
 
 ## 4. Out of Scope
@@ -46,10 +46,10 @@ This feature represents the absolute center of the Sidekick architecture. It def
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Part` Peewee model with `category_id` foreign key.
-- [ ] Build FastAPI CRUD routes with JSON-to-BLOB serialization logic for `attributes`.
-- [ ] Upgrade the `GET /api/parts` route to handle SQLite JSON extraction queries for dynamic filtering.
-- [ ] Create SolidJS UI grid/list component for viewing parts.
-- [ ] Build SolidJS Advanced Filter UI to construct dynamic API queries.
-- [ ] Create SolidJS form for creating/editing parts with dynamic Key/Value builder.
-- [ ] Wire frontend to backend API.
+- [x] Define `Part` SQLAlchemy model with `category_id` foreign key.
+- [x] Build FastAPI CRUD routes with JSON-to-BLOB serialization logic for `attributes`.
+- [x] Upgrade the `GET /api/parts` route to handle SQLite JSON extraction queries for dynamic filtering.
+- [x] Create SolidJS UI grid/list component for viewing parts.
+- [x] Build SolidJS Advanced Filter UI to construct dynamic API queries.
+- [x] Create SolidJS form for creating/editing parts with dynamic Key/Value builder.
+- [x] Wire frontend to backend API.

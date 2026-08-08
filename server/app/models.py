@@ -2,7 +2,6 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, LargeBinary, Date, JSON
 from sqlalchemy.orm import relationship
 from .database import Base
-
 class User(Base):
     __tablename__ = "users"
 
@@ -43,8 +42,9 @@ class Part(Base):
     price = Column(Float, nullable=True)
     weight = Column(Float, nullable=True)
     threshold = Column(Integer, default=0, nullable=False)
+    threshold = Column(Integer, default=0, nullable=False)
     notes = Column(Text, default="", nullable=False)
-    attributes = Column(LargeBinary, default=b"{}", nullable=False)
+    attributes = Column(JSON, default=dict, nullable=False)
 
     category = relationship("Category", back_populates="parts")
     storage_records = relationship("Storage", back_populates="part")
