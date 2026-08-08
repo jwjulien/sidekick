@@ -29,8 +29,8 @@ This feature establishes the foundational, hierarchical taxonomy for all parts i
     * `POST /api/categories` - Creates a new category.
     * `PUT /api/categories/{id}` - Updates a category (e.g., reparenting it).
     * `DELETE /api/categories/{id}` - Removes a category (must handle logic for what happens to orphaned children/parts).
-* [cite_start]**Database Schema (SQLite / Peewee):** * Model: `Category` 
-    * [cite_start]Columns: `id` (PK), `created_on`, `modified_on`, `title` (VARCHAR 50), `designator` (VARCHAR 10), and `parent_id` (FK referencing `Category.id`).
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Category` 
+    * Columns: `id` (PK), `created_on`, `modified_on`, `title` (VARCHAR 50), `designator` (VARCHAR 10), and `parent_id` (FK referencing `Category.id`).
 
 ## 4. Out of Scope
 * Drag-and-drop reorganization of the tree (re-parenting will be handled strictly via standard form dropdowns for now).
@@ -39,7 +39,7 @@ This feature establishes the foundational, hierarchical taxonomy for all parts i
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Category` Peewee model with self-referential foreign key.
+- [ ] Define `Category` SQLAlchemy model with self-referential foreign key.
 - [ ] Build FastAPI CRUD routes.
 - [ ] Create SolidJS recursive tree UI component.
 - [ ] Create SolidJS form for creating/editing categories.

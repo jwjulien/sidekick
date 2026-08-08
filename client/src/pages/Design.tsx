@@ -13,6 +13,74 @@ import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 
+const CategoryNode = (props: {
+  category: any;
+  allCategories: any[];
+  depth: number;
+  onDelete: (id: number) => void;
+  onEdit: (cat: any) => void;
+}) => {
+  const [expanded, setExpanded] = createSignal(false);
+  const children = () => props.allCategories.filter(c => c.parent_id === props.category.id);
+  const hasChildren = () => children().length > 0;
+
+  return (
+    <div class="space-y-2">
+      <div 
+        style={{ "margin-left": `${props.depth * 20}px` }}
+        class="glass-card p-3.5 rounded-xl border border-white/5 flex items-center justify-between gap-3 text-xs"
+      >
+        <div class="flex items-center gap-2 cursor-pointer" onClick={() => hasChildren() && setExpanded(!expanded())}>
+          <span class="text-accentCyan shrink-0 w-4 flex justify-center">
+            {hasChildren() ? (
+              expanded() ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+            ) : (
+              <Tag size={14} class={props.depth > 0 ? "opacity-60" : ""} />
+            )}
+          </span>
+          <div>
+            <span class="font-bold text-white text-sm">{props.category.title}</span>
+            <Show when={props.category.designator}>
+              <span class="bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono ml-2 uppercase">
+                Prefix: {props.category.designator}
+              </span>
+            </Show>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button
+            onClick={() => props.onEdit(props.category)}
+            class="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => props.onDelete(props.category.id)}
+            class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      <Show when={expanded()}>
+        <For each={children()}>
+          {(child) => (
+            <CategoryNode 
+              category={child} 
+              allCategories={props.allCategories} 
+              depth={props.depth + 1} 
+              onDelete={props.onDelete}
+              onEdit={props.onEdit}
+            />
+          )}
+        </For>
+      </Show>
+    </div>
+  );
+};
+
 export default function Design() {
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = createSignal<"categories" | "locations">("categories");
@@ -21,6 +89,7 @@ export default function Design() {
   const [loading, setLoading] = createSignal(true);
 
   // Category Form State
+  const [editCatId, setEditCatId] = createSignal<number | null>(null);
   const [catTitle, setCatTitle] = createSignal("");
   const [catDesignator, setCatDesignator] = createSignal("");
   const [catParentId, setCatParentId] = createSignal("");
@@ -52,27 +121,52 @@ export default function Design() {
     loadData();
   });
 
-  const handleCreateCategory = async (e: Event) => {
+  const handleSaveCategory = async (e: Event) => {
     e.preventDefault();
     if (!catTitle()) return;
     try {
-      await apiFetch("/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          title: catTitle(), 
-          designator: catDesignator() || null,
-          parent_id: catParentId() ? parseInt(catParentId()) : null
-        })
-      });
-      setCatTitle("");
-      setCatDesignator("");
-      setCatParentId("");
+      if (editCatId()) {
+        await apiFetch(`/categories/${editCatId()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            title: catTitle(), 
+            designator: catDesignator() || null,
+            parent_id: catParentId() ? parseInt(catParentId()) : null
+          })
+        });
+        toast.success("Category updated successfully.");
+      } else {
+        await apiFetch("/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            title: catTitle(), 
+            designator: catDesignator() || null,
+            parent_id: catParentId() ? parseInt(catParentId()) : null
+          })
+        });
+        toast.success("Category created successfully.");
+      }
+      resetCatForm();
       loadData();
-      toast.success("Category created successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to create category.");
+      toast.error(err.message || "Failed to save category.");
     }
+  };
+
+  const resetCatForm = () => {
+    setEditCatId(null);
+    setCatTitle("");
+    setCatDesignator("");
+    setCatParentId("");
+  };
+
+  const handleEditCategoryClick = (cat: any) => {
+    setEditCatId(cat.id);
+    setCatTitle(cat.title);
+    setCatDesignator(cat.designator || "");
+    setCatParentId(cat.parent_id ? String(cat.parent_id) : "");
   };
 
   const handleDeleteCategory = async (catId: number) => {
@@ -197,10 +291,10 @@ export default function Design() {
             <div class="glass-panel rounded-2xl p-6 border border-white/5 h-fit">
               <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5">
                 <Plus size={16} class="text-accentCyan" />
-                Add Category
+                {editCatId() ? "Edit Category" : "Add Category"}
               </h3>
               
-              <form onSubmit={handleCreateCategory} class="space-y-4 text-xs">
+              <form onSubmit={handleSaveCategory} class="space-y-4 text-xs">
                 <div>
                   <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Category Name</label>
                   <input
@@ -235,9 +329,16 @@ export default function Design() {
                     </For>
                   </select>
                 </div>
-                <button type="submit" class="btn-primary w-full py-2.5">
-                  Save Category
-                </button>
+                <div class="flex gap-2">
+                  <button type="submit" class="btn-primary flex-1 py-2.5">
+                    {editCatId() ? "Update Category" : "Save Category"}
+                  </button>
+                  <Show when={editCatId()}>
+                    <button type="button" onClick={resetCatForm} class="bg-white/10 hover:bg-white/20 text-white flex-1 py-2.5 rounded-lg transition-colors font-bold">
+                      Cancel
+                    </button>
+                  </Show>
+                </div>
               </form>
             </div>
 
@@ -256,50 +357,16 @@ export default function Design() {
 
               <Show when={categories().length > 0}>
                 <div class="space-y-2 text-xs">
-                  <For each={categories()}>
-                    {(cat) => {
-                      // Calculate depth
-                      let depth = 0;
-                      let currentParentId = cat.parent_id;
-                      while (currentParentId) {
-                        depth++;
-                        const parent = categories().find(c => c.id === currentParentId);
-                        currentParentId = parent ? parent.parent_id : null;
-                      }
-
-                      return (
-                        <div 
-                          style={{ "margin-left": `${depth * 20}px` }}
-                          class="glass-card p-3.5 rounded-xl border border-white/5 flex items-center justify-between gap-3 text-xs"
-                        >
-                          <div class="flex items-center gap-2">
-                            <span class="text-accentCyan shrink-0">
-                              <Tag size={14} class={depth > 0 ? "opacity-60" : ""} />
-                            </span>
-                            <div>
-                              <span class="font-bold text-white text-sm">{cat.title}</span>
-                              <Show when={cat.designator}>
-                                <span class="bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono ml-2 uppercase">
-                                  Prefix: {cat.designator}
-                                </span>
-                              </Show>
-                              <Show when={cat.parent_id}>
-                                <span class="text-gray-500 text-[10px] block mt-0.5">
-                                  under {getParentCategoryName(cat.parent_id)}
-                                </span>
-                              </Show>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleDeleteCategory(cat.id)}
-                            class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      );
-                    }}
+                  <For each={categories().filter(c => !c.parent_id)}>
+                    {(cat) => (
+                      <CategoryNode 
+                        category={cat} 
+                        allCategories={categories()} 
+                        depth={0} 
+                        onDelete={handleDeleteCategory}
+                        onEdit={handleEditCategoryClick}
+                      />
+                    )}
                   </For>
                 </div>
               </Show>

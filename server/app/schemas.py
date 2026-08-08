@@ -28,6 +28,11 @@ class CategoryBase(BaseModel):
 class CategoryCreate(CategoryBase):
     pass
 
+class CategoryUpdate(BaseModel):
+    title: Optional[str] = None
+    parent_id: Optional[int] = None
+    designator: Optional[str] = None
+
 class CategoryOut(CategoryBase):
     id: int
     created_on: datetime

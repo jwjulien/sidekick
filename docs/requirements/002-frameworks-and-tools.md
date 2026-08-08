@@ -14,4 +14,4 @@
   * Package Manager: Poetry
   * Framework: FastAPI
   * Database: SQLite
-  * ORM: PeeWee
+  * ORM: SQLAlchemy
