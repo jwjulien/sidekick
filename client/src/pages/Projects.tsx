@@ -13,8 +13,11 @@ import {
   Boxes
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Projects() {
+  const { confirm } = useConfirm();
   const [projects, setProjects] = createSignal<any[]>([]);
   const [parts, setParts] = createSignal<any[]>([]);
   
@@ -138,16 +141,22 @@ export default function Projects() {
       // Refresh and select
       await loadInitialData();
       handleSelectProject(newProj.id);
-      alert("Project created successfully.");
+      toast.success("Project created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create project.");
+      toast.error(err.message || "Failed to create project.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteProject = async (id: number) => {
-    if (!confirm("Are you sure you want to permanently delete this project? All assemblies, revisions and materials records will be lost.")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to permanently delete this project? All assemblies, revisions and materials records will be lost.",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/projects/${id}`, { method: "DELETE" });
       setSelectedProjectId(null);
@@ -158,7 +167,7 @@ export default function Projects() {
       setSelectedRevision(null);
       loadInitialData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete project.");
+      toast.error(err.message || "Failed to delete project.");
     }
   };
 
@@ -185,21 +194,27 @@ export default function Projects() {
       
       // Refresh project detailed view and auto-select new assembly
       await handleSelectProject(projId, newAssem.id);
-      alert("Assembly created successfully.");
+      toast.success("Assembly created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create assembly.");
+      toast.error(err.message || "Failed to create assembly.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteAssembly = async (assemId: number) => {
-    if (!confirm("Are you sure you want to delete this assembly? All revisions and materials records will be lost.")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this assembly? All revisions and materials records will be lost.",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/projects/assemblies/${assemId}`, { method: "DELETE" });
       handleSelectProject(selectedProjectId()!);
     } catch (err: any) {
-      alert(err.message || "Failed to delete assembly.");
+      toast.error(err.message || "Failed to delete assembly.");
     }
   };
 
@@ -228,22 +243,28 @@ export default function Projects() {
       
       // Refresh project detailed view and re-select assembly
       await handleSelectProject(selectedProjectId()!, assemId);
-      alert("Revision created successfully.");
+      toast.success("Revision created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create revision.");
+      toast.error(err.message || "Failed to create revision.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteRevision = async (revId: number) => {
-    if (!confirm("Are you sure you want to delete this revision version?")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this revision version?",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/projects/revisions/${revId}`, { method: "DELETE" });
       const currentAssemId = selectedAssemblyId()!;
       await handleSelectProject(selectedProjectId()!, currentAssemId);
     } catch (err: any) {
-      alert(err.message || "Failed to delete revision.");
+      toast.error(err.message || "Failed to delete revision.");
     }
   };
 
@@ -274,16 +295,22 @@ export default function Projects() {
       const currentAssemId = selectedAssemblyId()!;
       await handleSelectProject(selectedProjectId()!, currentAssemId);
       handleSelectRevision(revId, selectedProject().assemblies.find((a:any) => a.id === currentAssemId));
-      alert("BOM component added successfully.");
+      toast.success("BOM component added successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to add BOM component.");
+      toast.error(err.message || "Failed to add BOM component.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteMaterial = async (matId: number) => {
-    if (!confirm("Remove this component from the Bill of Materials?")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Remove this component from the Bill of Materials?",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/projects/materials/${matId}`, { method: "DELETE" });
       const currentAssemId = selectedAssemblyId()!;
@@ -291,7 +318,7 @@ export default function Projects() {
       await handleSelectProject(selectedProjectId()!, currentAssemId);
       handleSelectRevision(currentRevId, selectedProject().assemblies.find((a:any) => a.id === currentAssemId));
     } catch (err: any) {
-      alert(err.message || "Failed to remove BOM item.");
+      toast.error(err.message || "Failed to remove BOM item.");
     }
   };
 

@@ -22,6 +22,7 @@ import {
 import { apiFetch, user, backendUrl } from "../hooks/useAuth";
 
 export default function ItemDetails() {
+  const { confirm } = useConfirm();
   const params = useParams();
   const navigate = useNavigate();
   const itemId = parseInt(params.id);
@@ -127,9 +128,9 @@ export default function ItemDetails() {
       setStockNotes("");
       setStockQty(1);
       fetchItemDetails();
-      alert("Inventory level adjusted successfully.");
+      toast.success("Inventory level adjusted successfully.");
     } catch (err: any) {
-      alert(err.message || "Transaction adjustment failed.");
+      toast.error(err.message || "Transaction adjustment failed.");
     } finally {
       setStockSubmitting(false);
     }
@@ -168,21 +169,27 @@ export default function ItemDetails() {
       if (fileInput) fileInput.value = "";
       
       fetchItemDetails();
-      alert("Attachment uploaded successfully.");
+      toast.success("Attachment uploaded successfully.");
     } catch (err: any) {
-      alert(err.message || "Upload failed.");
+      toast.error(err.message || "Upload failed.");
     } finally {
       setUploading(false);
     }
   };
 
   const handleDeleteAttachment = async (attachId: number) => {
-    if (!confirm("Are you sure you want to delete this attachment?")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this attachment?",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/uploads/${attachId}`, { method: "DELETE" });
       fetchItemDetails();
     } catch (err: any) {
-      alert(err.message || "Deletion failed.");
+      toast.error(err.message || "Deletion failed.");
     }
   };
 
@@ -203,21 +210,27 @@ export default function ItemDetails() {
       setNewSupplierId("");
       setNewSupplierPartNo("");
       fetchItemDetails();
-      alert("Supplier catalog link added successfully.");
+      toast.success("Supplier catalog link added successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to link supplier.");
+      toast.error(err.message || "Failed to link supplier.");
     } finally {
       setLinkingSupplier(false);
     }
   };
 
   const handleUnlinkSupplier = async (prodId: number) => {
-    if (!confirm("Remove this supplier product catalog link?")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Remove this supplier product catalog link?",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/suppliers/products/${prodId}`, { method: "DELETE" });
       fetchItemDetails();
     } catch (err: any) {
-      alert(err.message || "Failed to unlink supplier.");
+      toast.error(err.message || "Failed to unlink supplier.");
     }
   };
 
@@ -273,19 +286,25 @@ export default function ItemDetails() {
 
       setShowEditModal(false);
       fetchItemDetails();
-      alert("Component details updated successfully.");
+      toast.success("Component details updated successfully.");
     } catch (err: any) {
-      alert(err.message || "Modification failed.");
+      toast.error(err.message || "Modification failed.");
     }
   };
 
   const handleDeleteItem = async () => {
-    if (!confirm("⚠️ DANGER: Are you sure you want to permanently delete this component? This action is irreversible.")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "⚠️ DANGER: Are you sure you want to permanently delete this component? This action is irreversible.",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/items/${itemId}`, { method: "DELETE" });
       navigate("/inventory");
     } catch (err: any) {
-      alert(err.message || "Failed to delete component.");
+      toast.error(err.message || "Failed to delete component.");
     }
   };
 

@@ -9,8 +9,11 @@ import {
   Search
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Suppliers() {
+  const { confirm } = useConfirm();
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [showAddModal, setShowAddModal] = createSignal(false);
@@ -40,7 +43,7 @@ export default function Suppliers() {
   const handleCreateSupplier = async (e: Event) => {
     e.preventDefault();
     if (!name() || !website()) {
-      alert("Name and website are required.");
+      toast.error("Name and website are required.");
       return;
     }
     
@@ -63,21 +66,28 @@ export default function Suppliers() {
       setSearchUrl("");
       setShowAddModal(false);
       fetchSuppliers();
-      alert("Supplier created successfully.");
+      toast.success("Supplier created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create supplier.");
+      toast.error(err.message || "Failed to create supplier.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteSupplier = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this supplier? Any associated product catalog number listings will also be deleted.")) return;
+    const isConfirmed = await confirm({
+      title: "Delete Supplier",
+      message: "Are you sure you want to delete this supplier? Any associated product catalog number listings will also be deleted.",
+      confirmText: "Delete",
+      type: "error"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/suppliers/${id}`, { method: "DELETE" });
       fetchSuppliers();
+      toast.success("Supplier deleted successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to delete supplier.");
+      toast.error(err.message || "Failed to delete supplier.");
     }
   };
 

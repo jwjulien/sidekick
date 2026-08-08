@@ -14,8 +14,11 @@ import {
   RefreshCw
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Dashboard() {
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [stats, setStats] = createSignal({
     totalItems: 0,
@@ -81,7 +84,7 @@ export default function Dashboard() {
       setQuickAction(null);
       fetchDashboardData();
     } catch (err: any) {
-      alert(err.message || "Failed to update stock level.");
+      toast.error(err.message || "Failed to update stock level.");
     }
   };
 

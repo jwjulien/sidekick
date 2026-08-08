@@ -11,8 +11,11 @@ import {
   X
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Inventory() {
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [items, setItems] = createSignal<any[]>([]);
   const [categories, setCategories] = createSignal<any[]>([]);
@@ -81,7 +84,7 @@ export default function Inventory() {
   const handleCreateItem = async (e: Event) => {
     e.preventDefault();
     if (!newItemName()) {
-      alert("Name is required.");
+      toast.error("Name is required.");
       return;
     }
     
@@ -117,8 +120,9 @@ export default function Inventory() {
       
       setShowAddModal(false);
       fetchItems();
+      toast.success("Item created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create item.");
+      toast.error(err.message || "Failed to create item.");
     } finally {
       setSubmitting(false);
     }

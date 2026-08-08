@@ -10,8 +10,11 @@ import {
   Layers
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import toast from "solid-toast";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Design() {
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = createSignal<"categories" | "locations">("categories");
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
@@ -66,19 +69,25 @@ export default function Design() {
       setCatDesignator("");
       setCatParentId("");
       loadData();
-      alert("Category created successfully.");
+      toast.success("Category created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create category.");
+      toast.error(err.message || "Failed to create category.");
     }
   };
 
   const handleDeleteCategory = async (catId: number) => {
-    if (!confirm("Are you sure you want to delete this category? Any subcategories or parts attached will have catalog references deleted.")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this category? Any subcategories or parts attached will have catalog references deleted.",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/categories/${catId}`, { method: "DELETE" });
       loadData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete category.");
+      toast.error(err.message || "Failed to delete category.");
     }
   };
 
@@ -103,19 +112,25 @@ export default function Design() {
       setLocIndex(0);
       setLocLabelScheme("");
       loadData();
-      alert("Storage location created successfully.");
+      toast.success("Storage location created successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to create storage location.");
+      toast.error(err.message || "Failed to create storage location.");
     }
   };
 
   const handleDeleteLocation = async (locId: number) => {
-    if (!confirm("Are you sure you want to delete this storage location? All sub-bins and drawers in this hierarchy will also be deleted!")) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this storage location? All sub-bins and drawers in this hierarchy will also be deleted!",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
     try {
       await apiFetch(`/locations/${locId}`, { method: "DELETE" });
       loadData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete location.");
+      toast.error(err.message || "Failed to delete location.");
     }
   };
 

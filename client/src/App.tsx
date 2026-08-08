@@ -18,6 +18,8 @@ import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
 import Suppliers from "./pages/Suppliers";
 import Layout from "./components/Layout";
+import { Toaster } from "solid-toast";
+import { ConfirmProvider } from "./contexts/ConfirmContext";
 
 export default function App() {
   // Try to authenticate session on startup
@@ -35,6 +37,7 @@ export default function App() {
         </div>
       }
     >
+      <ConfirmProvider>
       <Router>
         {/* Unauthenticated public views */}
         <Route path="/login" component={Login} />
@@ -125,6 +128,8 @@ export default function App() {
         {/* Fallback wildcard router */}
         <Route path="*all" component={() => <Navigate href="/" />} />
       </Router>
+      <Toaster position="bottom-right" />
+    </ConfirmProvider>
     </Show>
   );
 }

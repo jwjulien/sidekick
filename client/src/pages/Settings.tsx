@@ -6,6 +6,7 @@ import {
   oidcClientId, setOidcClientId,
   user, apiFetch
 } from "../hooks/useAuth";
+import toast from "solid-toast";
 import { Server, Settings as SettingsIcon, ShieldCheck, RefreshCw, UserCheck } from "lucide-solid";
 
 export default function Settings() {
@@ -42,7 +43,7 @@ export default function Settings() {
     setIsDevMode(localDevMode());
     setOidcIssuer(localIssuer());
     setOidcClientId(localClientId());
-    alert("Connection configurations saved successfully! Please refresh or re-login if you modified modes.");
+    toast.success("Connection configurations saved successfully! Please refresh or re-login if you modified modes.");
   };
 
   const handleSeedDatabase = async () => {
@@ -67,9 +68,9 @@ export default function Settings() {
         body: JSON.stringify({ role: newRole })
       });
       fetchUsers();
-      alert("User role updated successfully.");
+      toast.success("User role updated successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to update role.");
+      toast.error(err.message || "Failed to update role.");
     }
   };
 
