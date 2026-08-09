@@ -75,3 +75,14 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3b82f6;
 }
+
+/* Fix dropdown option colors for dark mode themes */
+select option {
+  background-color: #14141d;
+  color: #ffffff;
+}
+
+select:focus option {
+  background-color: #14141d;
+  color: #ffffff;
+}

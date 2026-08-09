@@ -1,6 +1,6 @@
 ---
 title: Inventory Storage & Stock
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows

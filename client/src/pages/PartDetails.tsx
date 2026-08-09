@@ -1,29 +1,31 @@
-import { createSignal, onMount, For, Show } from "solid-js";
+import { createSignal, createMemo, onMount, For, Show } from "solid-js";
 import { useParams, useNavigate, A } from "@solidjs/router";
-import { 
-  Package, 
-  Tag, 
-  MapPin, 
-  AlertTriangle, 
-  Plus, 
-  Minus, 
-  FileText, 
-  Image as ImageIcon, 
-  Download, 
-  Trash2, 
-  History, 
-  Edit3, 
+import {
+  Package,
+  Tag,
+  MapPin,
+  AlertTriangle,
+  Plus,
+  Minus,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  Trash2,
+  History,
+  Edit3,
   Upload,
   ArrowLeft,
   Search,
   Building2,
   Cpu,
-  X
+  X,
+  Link2
 } from "lucide-solid";
 import { apiFetch, user, backendUrl } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
-export default function ItemDetails() {
+import StockController from "../components/StockController";
+export default function PartDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
   const navigate = useNavigate();
@@ -33,11 +35,35 @@ export default function ItemDetails() {
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
 
-  // Stock actions state
-  const [stockQty, setStockQty] = createSignal(1);
-  const [stockNotes, setStockNotes] = createSignal("");
-  const [selectedStorageId, setSelectedStorageId] = createSignal("");
-  const [stockSubmitting, setStockSubmitting] = createSignal(false);
+  // Stock panel state
+  // drillTarget: null = list view, number = showing StockController for that storage ID
+  const [drillTarget, setDrillTarget] = createSignal<number | null>(null);
+  // Location link / create state
+  const [showLocationPanel, setShowLocationPanel] = createSignal(false);
+  const [locationPanelMode, setLocationPanelMode] = createSignal<"link" | "create">("link");
+  const [linkLocationId, setLinkLocationId] = createSignal("");
+  const [newLocationName, setNewLocationName] = createSignal("");
+  const [newLocationParentId, setNewLocationParentId] = createSignal("");
+  const [locationSubmitting, setLocationSubmitting] = createSignal(false);
+  // All system locations (for link dropdown)
+  const [allLocations, setAllLocations] = createSignal<any[]>([]);
+
+  // Move Parts Dialog State
+  const [showMoveModal, setShowMoveModal] = createSignal(false);
+  const [moveQuantity, setMoveQuantity] = createSignal(0);
+  const [moveDestMode, setMoveDestMode] = createSignal<"link" | "create">("link");
+  const [moveDestLocationId, setMoveDestLocationId] = createSignal("");
+  const [moveNewLocationName, setMoveNewLocationName] = createSignal("");
+  const [moveNewLocationParentId, setMoveNewLocationParentId] = createSignal("");
+  const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(true);
+  const [moveSourceLocation, setMoveSourceLocation] = createSignal<any>(null);
+  const [moveSubmitting, setMoveSubmitting] = createSignal(false);
+
+  const activeDrillSlot = createMemo(() => {
+    const target = drillTarget();
+    if (target === null || !item()) return null;
+    return item().storage_records?.find((s: any) => s.id === target) || null;
+  });
 
   // Upload state
   const [uploadFile, setUploadFile] = createSignal<File | null>(null);
@@ -63,19 +89,59 @@ export default function ItemDetails() {
   const [locations, setLocations] = createSignal<any[]>([]);
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
 
+  const getLocationHeight = (locId: number, locs: any[]): number => {
+    const children = locs.filter((l: any) => l.parent_id === locId);
+    if (children.length === 0) return 0;
+    const childHeights = children.map((c: any) => getLocationHeight(c.id, locs));
+    return 1 + Math.max(...childHeights);
+  };
+
+  const splitParentIfNeeded = async (parentId: number) => {
+    const parentLoc = allLocations().find((l: any) => l.id === parentId);
+    if (parentLoc && parentLoc.part_id) {
+      // Create child for the original part
+      await apiFetch("/locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${parentLoc.name} - ${parentLoc.part?.value || 'Original'}`,
+          parent_id: parentLoc.id,
+          part_id: parentLoc.part_id,
+          quantity: parentLoc.quantity
+        })
+      });
+      // Clear parent's part association
+      await apiFetch(`/locations/${parentLoc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ part_id: null })
+      });
+      await apiFetch(`/locations/${parentLoc.id}/count`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: 0 })
+      });
+    }
+  };
+
+  const parentLocations = createMemo(() => {
+    const locs = allLocations();
+    return locs.filter((l: any) => getLocationHeight(l.id, locs) <= 1);
+  });
+
   const attributesEntries = () => {
     if (!item() || !item().attributes) return [];
     return Object.entries(item().attributes);
   };
-  
-  
+
+
 
   const fetchItemDetails = async () => {
     setLoading(true);
     try {
       const data = await apiFetch(`/parts/${itemId}`);
       setItem(data);
-      
+
       // Seed edit form values
       setEditValue(data.value);
       setEditNotes(data.notes || "");
@@ -85,13 +151,10 @@ export default function ItemDetails() {
       setEditWeight(data.weight || 0.0);
       setEditThreshold(data.threshold || 0);
       setEditCat(data.category_id ? String(data.category_id) : "");
-      
-      
-      
-      // Auto select first storage slot if available
-      if (data.storage_records && data.storage_records.length > 0) {
-        setSelectedStorageId(String(data.storage_records[0].id));
-      }
+
+
+
+
     } catch (err: any) {
       setError(err.message || "Failed to load component details.");
     } finally {
@@ -108,8 +171,9 @@ export default function ItemDetails() {
       ]);
       setCategories(cats);
       setLocations(locs);
+      setAllLocations(locs);
       setSuppliers(sups);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   onMount(() => {
@@ -117,28 +181,66 @@ export default function ItemDetails() {
     fetchMetadata();
   });
 
-  const handleStockAction = async (action: "check_in" | "check_out") => {
-    setStockSubmitting(true);
+  const handleLinkLocation = async () => {
+    if (!linkLocationId()) return;
+    setLocationSubmitting(true);
     try {
-      await apiFetch(`/parts/${itemId}/stock`, {
+      await apiFetch(`/locations/${linkLocationId()}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ part_id: itemId })
+      });
+      setLinkLocationId("");
+      setShowLocationPanel(false);
+      fetchItemDetails();
+      toast.success("Location linked successfully.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to link location.");
+    } finally {
+      setLocationSubmitting(false);
+    }
+  };
+
+  const handleCreateAndLinkLocation = async () => {
+    if (!newLocationName()) return;
+    setLocationSubmitting(true);
+    try {
+      const parentIdVal = newLocationParentId();
+      if (parentIdVal) {
+        await splitParentIfNeeded(parseInt(parentIdVal));
+      }
+      const created = await apiFetch("/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          quantity_change: stockQty(),
-          action_type: action,
-          notes: stockNotes() || `Stock adjusted via component details.`,
-          location_id: selectedStorageId() ? parseInt(selectedStorageId()) : null
+          name: newLocationName(),
+          parent_id: parentIdVal ? parseInt(parentIdVal) : null,
+          part_id: itemId,
+          quantity: 0
         })
       });
-      setStockNotes("");
-      setStockQty(1);
+      setNewLocationName("");
+      setNewLocationParentId("");
+      setShowLocationPanel(false);
       fetchItemDetails();
-      toast.success("Inventory level adjusted successfully.");
+      toast.success(`Location "${created.name}" created and linked.`);
     } catch (err: any) {
-      toast.error(err.message || "Transaction adjustment failed.");
+      toast.error(err.message || "Failed to create location.");
     } finally {
-      setStockSubmitting(false);
+      setLocationSubmitting(false);
     }
+  };
+
+  // Called by StockController when quantity or last_counted changes
+  const handleStorageChanged = (storageId: number, newQty: number, newLastCounted: string) => {
+    setItem((prev: any) => ({
+      ...prev,
+      total_quantity: (prev.storage_records || []).reduce((sum: number, s: any) =>
+        sum + (s.id === storageId ? newQty : s.quantity), 0),
+      storage_records: (prev.storage_records || []).map((s: any) =>
+        s.id === storageId ? { ...s, quantity: newQty, last_counted: newLastCounted } : s
+      )
+    }));
   };
 
   const handleFileUpload = async (e: Event) => {
@@ -172,7 +274,7 @@ export default function ItemDetails() {
       setUploadFile(null);
       const fileInput = document.getElementById("file-input-field") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
-      
+
       fetchItemDetails();
       toast.success("Attachment uploaded successfully.");
     } catch (err: any) {
@@ -283,10 +385,111 @@ export default function ItemDetails() {
     }
   };
 
+  const handleMoveParts = async (e: Event) => {
+    e.preventDefault();
+    const source = moveSourceLocation();
+    if (!source) return;
+
+    const qtyToMove = moveQuantity();
+    if (qtyToMove <= 0 || qtyToMove > source.quantity) {
+      toast.error("Invalid quantity to move.");
+      return;
+    }
+
+    setMoveSubmitting(true);
+    try {
+      let destId = 0;
+      if (moveDestMode() === "create") {
+        if (!moveNewLocationName()) {
+          toast.error("Please enter a destination location name.");
+          setMoveSubmitting(false);
+          return;
+        }
+        const parentIdVal = moveNewLocationParentId();
+        if (parentIdVal) {
+          await splitParentIfNeeded(parseInt(parentIdVal));
+        }
+        const created = await apiFetch("/locations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: moveNewLocationName(),
+            parent_id: parentIdVal ? parseInt(parentIdVal) : null,
+            part_id: itemId,
+            quantity: 0
+          })
+        });
+        destId = created.id;
+      } else {
+        if (!moveDestLocationId()) {
+          toast.error("Please select a destination location.");
+          setMoveSubmitting(false);
+          return;
+        }
+        destId = parseInt(moveDestLocationId());
+        await apiFetch(`/locations/${destId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ part_id: itemId })
+        });
+      }
+
+      const destDetails = await apiFetch(`/locations/${destId}`);
+      const destCurrentQty = destDetails.quantity || 0;
+
+      await apiFetch(`/locations/${destId}/count`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: destCurrentQty + qtyToMove })
+      });
+
+      const remainingQty = source.quantity - qtyToMove;
+      await apiFetch(`/locations/${source.id}/count`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: remainingQty })
+      });
+
+      if (remainingQty === 0 && deleteSourceAfterMove()) {
+        await apiFetch(`/locations/${source.id}`, { method: "DELETE" });
+      }
+
+      toast.success("Parts moved successfully.");
+      setShowMoveModal(false);
+      setDrillTarget(null);
+      fetchItemDetails();
+      fetchMetadata();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to move parts.");
+    } finally {
+      setMoveSubmitting(false);
+    }
+  };
+
+  const handleDeleteLocation = async (loc: any) => {
+    if (!loc) return;
+    const isConfirmed = await confirm({
+      title: "Confirm Delete Location",
+      message: `Are you sure you want to delete the storage location "${loc.name}" from the database?`,
+      confirmText: "Delete",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
+    try {
+      await apiFetch(`/locations/${loc.id}`, { method: "DELETE" });
+      toast.success(`Location "${loc.name}" deleted.`);
+      setDrillTarget(null);
+      fetchItemDetails();
+      fetchMetadata();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete location.");
+    }
+  };
+
   return (
     <div class="space-y-6">
       {/* Back button */}
-      <button 
+      <button
         onClick={() => navigate("/inventory")}
         class="btn-secondary py-1.5 px-3 flex items-center gap-2 text-xs"
       >
@@ -307,14 +510,14 @@ export default function ItemDetails() {
 
       <Show when={item()}>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* ----------------- LEFT 2 COLS: PART INFO & ATTACHMENTS ----------------- */}
           <div class="lg:col-span-2 space-y-6">
-            
+
             {/* Main Info Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6 relative overflow-hidden">
               <div class="absolute top-0 right-0 w-32 h-32 bg-accentCyan/5 rounded-full blur-2xl -z-10"></div>
-              
+
               <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                   <div class="flex items-center gap-3">
@@ -328,7 +531,7 @@ export default function ItemDetails() {
                   </div>
                   <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().notes || "No description/notes provided."}</p>
                 </div>
-                
+
                 {/* Edit details */}
                 <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                   <button
@@ -414,7 +617,7 @@ export default function ItemDetails() {
                 <Cpu size={18} class="text-accentCyan" />
                 Consumed by PCB Assemblies
               </h3>
-              
+
               <Show when={!item().materials || item().materials.length === 0}>
                 <p class="text-xs text-gray-500 italic">This component is not currently consumed by any active project BOM lists.</p>
               </Show>
@@ -444,7 +647,7 @@ export default function ItemDetails() {
                 <Building2 size={18} class="text-accentCyan" />
                 Linked Distributor Catalogs
               </h3>
-              
+
               {/* Linked Suppliers List */}
               <Show when={!item().products || item().products.length === 0}>
                 <p class="text-xs text-gray-500 italic">No distributor order listings linked to this component.</p>
@@ -459,7 +662,7 @@ export default function ItemDetails() {
                           <span class="font-bold text-white block">{prod.supplier?.name}</span>
                           <span class="text-gray-400 font-mono text-[10px] block mt-0.5">DK/Mouser Ref: {prod.number}</span>
                         </div>
-                        
+
                         <div class="flex gap-2 items-center">
                           <a
                             href={`${prod.supplier?.search}${prod.number}`}
@@ -470,7 +673,7 @@ export default function ItemDetails() {
                             <Search size={10} />
                             Check Supplier
                           </a>
-                          
+
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                             <button
                               onClick={() => handleUnlinkSupplier(prod.id)}
@@ -504,7 +707,7 @@ export default function ItemDetails() {
                       </For>
                     </select>
                   </div>
-                  
+
                   <div class="flex-1 w-full">
                     <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Distributor SKU / Code</label>
                     <input
@@ -516,7 +719,7 @@ export default function ItemDetails() {
                       class="glass-input w-full py-2 text-xs"
                     />
                   </div>
-                  
+
                   <button
                     type="submit"
                     disabled={linkingSupplier() || !newSupplierId()}
@@ -535,7 +738,7 @@ export default function ItemDetails() {
                 <FileText size={18} class="text-accentCyan" />
                 Attachments (Datasheets & Layout Images)
               </h3>
-              
+
               {/* Upload interface */}
               <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                 <form onSubmit={handleFileUpload} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
@@ -608,90 +811,304 @@ export default function ItemDetails() {
 
           {/* ----------------- RIGHT 1 COL: INVENTORY CONTROLS & LOGS ----------------- */}
           <div class="space-y-6">
-            
+
             {/* Inventory Levels Controls */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 <Package size={18} class="text-accentCyan" />
                 Component Stock Levels
               </h3>
-              
-              <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-6">
-                <span class="text-[10px] text-gray-500 uppercase font-semibold">Total Catalog Count</span>
-                <span class={`text-4xl font-extrabold block mt-2 ${
-                  item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
-                }`}>
-                  {item().total_quantity}
-                </span>
-                <span class="text-[10px] text-gray-500 mt-2 block">
-                  Alert threshold minimum: {item().threshold || 0} units
-                </span>
-              </div>
 
-              {/* Stock Actions (Only for Stockers / Pullers) */}
-              <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleStockAction("check_in")}
-                    disabled={stockSubmitting() || (user()?.role !== "admin" && user()?.role !== "stocker")}
-                    class="btn-primary py-3 flex items-center justify-center gap-1.5 font-bold"
-                  >
-                    <Plus size={16} />
-                    Check In
-                  </button>
+              {/* ── Shared: reusable add-location panel ── */}
+              {/* This panel is conditionally shown at the bottom of all 3 states */}
 
-                  <button
-                    onClick={() => handleStockAction("check_out")}
-                    disabled={stockSubmitting() || (user()?.role !== "admin" && user()?.role !== "puller")}
-                    class="btn-accent py-3 flex items-center justify-center gap-1.5 font-bold"
-                  >
-                    <Minus size={16} />
-                    Pull Stock
-                  </button>
-                </div>
-
-                <div class="space-y-3 text-xs">
+              {/* STATE 1: No locations */}
+              <Show when={!item().storage_records || item().storage_records.length === 0}>
+                <div class="text-center py-8 space-y-5">
+                  <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
+                    <MapPin size={22} class="text-gray-500" />
+                  </div>
                   <div>
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1 uppercase">Adjust Quantity By</label>
-                    <input
-                      type="number"
-                      value={stockQty()}
-                      onInput={(e) => setStockQty(Math.max(1, parseInt(e.target.value) || 1))}
-                      class="glass-input w-full text-center font-bold text-base"
-                      min="1"
+                    <p class="text-sm font-semibold text-white">No storage locations</p>
+                    <p class="text-xs text-gray-500 mt-1">Connect this part to a physical location to begin tracking stock.</p>
+                  </div>
+                  <div class="flex gap-2 justify-center">
+                    <button
+                      onClick={() => { setLocationPanelMode("link"); setShowLocationPanel(true); }}
+                      class="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5"
+                    >
+                      <Link2 size={13} />
+                      Link Existing
+                    </button>
+                    <button
+                      onClick={() => { setLocationPanelMode("create"); setShowLocationPanel(true); }}
+                      class="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+                    >
+                      <Plus size={13} />
+                      Create New
+                    </button>
+                  </div>
+                </div>
+              </Show>
+
+              <Show when={item().storage_records && item().storage_records.length === 1}>
+                {() => (
+                  <div class="space-y-5">
+                    {/* Total hero */}
+                    <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+                      <span class="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">Total On-Hand</span>
+                      <span class={`text-5xl font-extrabold block mt-2 ${item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
+                        }`}>
+                        {item().total_quantity}
+                      </span>
+                      <span class="text-[10px] text-gray-500 mt-2 block">Threshold: {item().threshold || 0}</span>
+                    </div>
+
+                    {/* Location label */}
+                    <div class="flex items-center justify-between px-1">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <MapPin size={13} class="text-accentCyan shrink-0" />
+                        <span class="text-xs text-gray-300 font-medium truncate">{item().storage_records[0]?.name}</span>
+                      </div>
+                      <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                        <div class="flex items-center gap-3">
+                          <button
+                            onClick={() => {
+                              const rec = item().storage_records[0];
+                              setMoveSourceLocation(rec);
+                              setMoveQuantity(rec.quantity);
+                              setMoveDestMode("create");
+                              setMoveDestLocationId("");
+                              setMoveNewLocationName("");
+                              setMoveNewLocationParentId("");
+                              setDeleteSourceAfterMove(true);
+                              setShowMoveModal(true);
+                            }}
+                            disabled={item().storage_records[0]?.quantity === 0}
+                            class="text-[10px] font-bold text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                          >
+                            Move Parts
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLocation(item().storage_records[0])}
+                            disabled={item().storage_records[0]?.quantity > 0}
+                            class="text-[10px] font-bold text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                          >
+                            Delete Location
+                          </button>
+                        </div>
+                      </Show>
+                    </div>
+
+                    {/* StockController */}
+                    <StockController
+                      storageId={item().storage_records[0]?.id}
+                      currentQty={item().storage_records[0]?.quantity}
+                      lastCounted={item().storage_records[0]?.last_counted}
+                      onChanged={(qty, ts) => handleStorageChanged(item().storage_records[0]?.id, qty, ts)}
                     />
                   </div>
+                )}
+              </Show>
 
-                  <div>
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1 uppercase">Adjust At Storage Bin</label>
-                    <select
-                      value={selectedStorageId()}
-                      onChange={(e) => setSelectedStorageId(e.currentTarget.value)}
-                      class="glass-input w-full text-xs"
-                    >
-                      <option value="">Choose Storage Slot...</option>
-                      <For each={locations()}>
-                        {(loc) => (
-                          <option value={loc.id}>
-                            {loc.name} {loc.parent_id ? `(Bin)` : "(Root Box)"}
-                          </option>
+              {/* STATE 3: Multiple locations */}
+              <Show when={item().storage_records && item().storage_records.length > 1}>
+                {/* Drill-down: StockController for a specific location */}
+                <Show when={drillTarget() !== null}>
+                  {() => (
+                    <div class="space-y-4">
+                      {/* Header with back arrow */}
+                      <div class="flex items-center gap-2">
+                        <button
+                          onClick={() => setDrillTarget(null)}
+                          class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                        >
+                          <ArrowLeft size={15} />
+                        </button>
+                        <div class="flex items-center justify-between w-full min-w-0">
+                          <div class="flex items-center gap-2 min-w-0">
+                            <MapPin size={13} class="text-accentCyan shrink-0" />
+                            <span class="text-sm font-bold text-white truncate">{activeDrillSlot()?.name}</span>
+                          </div>
+                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                            <div class="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  const rec = activeDrillSlot();
+                                  setMoveSourceLocation(rec);
+                                  setMoveQuantity(rec.quantity);
+                                  setMoveDestMode("link");
+                                  setMoveDestLocationId("");
+                                  setMoveNewLocationName("");
+                                  setMoveNewLocationParentId("");
+                                  setDeleteSourceAfterMove(true);
+                                  setShowMoveModal(true);
+                                }}
+                                disabled={activeDrillSlot()?.quantity === 0}
+                                class="text-[10px] font-bold text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                              >
+                                Move Parts
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLocation(activeDrillSlot())}
+                                disabled={activeDrillSlot()?.quantity > 0}
+                                class="text-[10px] font-bold text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                              >
+                                Delete Location
+                              </button>
+                            </div>
+                          </Show>
+                        </div>
+                      </div>
+                      <StockController
+                        storageId={activeDrillSlot()?.id || 0}
+                        currentQty={activeDrillSlot()?.quantity || 0}
+                        lastCounted={activeDrillSlot()?.last_counted}
+                        onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id || 0, qty, ts)}
+                      />
+                    </div>
+                  )}
+                </Show>
+
+                {/* List view */}
+                <Show when={drillTarget() === null}>
+                  <div class="space-y-4">
+                    {/* Total hero */}
+                    <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+                      <span class="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">Total On-Hand</span>
+                      <span class={`text-5xl font-extrabold block mt-2 ${item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
+                        }`}>
+                        {item().total_quantity}
+                      </span>
+                      <span class="text-[10px] text-gray-500 mt-2 block">Threshold: {item().threshold || 0}</span>
+                    </div>
+
+                    {/* Location rows — click to drill in */}
+                    <div class="space-y-1.5">
+                      <h4 class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest px-1">Locations</h4>
+                      <For each={item().storage_records}>
+                        {(slot: any) => (
+                          <button
+                            onClick={() => setDrillTarget(slot.id)}
+                            class="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-xl px-4 py-3 transition-all group"
+                          >
+                            <div class="flex items-center gap-2.5 min-w-0">
+                              <MapPin size={13} class="text-accentCyan shrink-0" />
+                              <span class="text-xs text-white font-medium truncate">{slot.name}</span>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                              <span class={`text-sm font-bold ${slot.quantity === 0 ? "text-gray-600" : "text-accentCyan"}`}>
+                                {slot.quantity}
+                              </span>
+                              <ArrowLeft size={12} class="text-gray-600 group-hover:text-gray-400 rotate-180 transition-colors" />
+                            </div>
+                          </button>
                         )}
                       </For>
-                    </select>
-                    <p class="text-[9px] text-gray-500 mt-1">Specify which storage drawer or cabinet slot inventory check-in/out occurs at.</p>
+                    </div>
                   </div>
+                </Show>
+              </Show>
 
-                  <div>
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1 uppercase">Reference Notes</label>
-                    <textarea
-                      value={stockNotes()}
-                      onInput={(e) => setStockNotes(e.target.value)}
-                      placeholder="E.g. restock order #45, PCB assembly run #2..."
-                      class="glass-input w-full h-16 text-xs resize-none"
-                    />
+              {/* ── Add Location panel — shown in all states except when drilling ── */}
+              <Show when={drillTarget() === null}>
+                <Show when={!showLocationPanel()}>
+                  <Show when={item().storage_records && item().storage_records.length > 0}>
+                    <button
+                      onClick={() => { setLocationPanelMode("link"); setShowLocationPanel(true); }}
+                      class="w-full text-xs text-gray-500 hover:text-accentCyan transition-colors flex items-center justify-center gap-1.5 py-2"
+                    >
+                      <Plus size={12} />
+                      Add Another Location
+                    </button>
+                  </Show>
+                </Show>
+
+                <Show when={showLocationPanel()}>
+                  <div class="border border-white/10 rounded-xl p-4 space-y-3 bg-white/[0.02]">
+                    {/* Tab toggle */}
+                    <div class="flex rounded-lg overflow-hidden border border-white/10 text-xs font-semibold">
+                      <button
+                        onClick={() => setLocationPanelMode("link")}
+                        class={`flex-1 py-1.5 transition-colors ${locationPanelMode() === "link" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
+                      >
+                        Link Existing
+                      </button>
+                      <button
+                        onClick={() => setLocationPanelMode("create")}
+                        class={`flex-1 py-1.5 transition-colors ${locationPanelMode() === "create" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
+                      >
+                        Create New
+                      </button>
+                    </div>
+
+                    {/* Link existing */}
+                    <Show when={locationPanelMode() === "link"}>
+                      <select
+                        value={linkLocationId()}
+                        onChange={(e) => setLinkLocationId(e.currentTarget.value)}
+                        class="glass-input w-full text-xs"
+                      >
+                        <option value="">Select a location...</option>
+                        <For each={allLocations().filter((l: any) => getLocationHeight(l.id, allLocations()) === 0 && (!l.part_id || l.part_id === itemId))}>
+                          {(loc: any) => <option value={loc.id}>{loc.name}</option>}
+                        </For>
+                      </select>
+                      <div class="flex gap-2">
+                        <button
+                          onClick={() => setShowLocationPanel(false)}
+                          class="flex-1 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleLinkLocation}
+                          disabled={locationSubmitting() || !linkLocationId()}
+                          class="flex-1 btn-primary py-1.5 text-xs disabled:opacity-50"
+                        >
+                          {locationSubmitting() ? "Linking..." : "Link"}
+                        </button>
+                      </div>
+                    </Show>
+
+                    {/* Create new */}
+                    <Show when={locationPanelMode() === "create"}>
+                      <input
+                        type="text"
+                        value={newLocationName()}
+                        onInput={(e) => setNewLocationName(e.currentTarget.value)}
+                        placeholder="Location name (e.g. Drawer B3)"
+                        class="glass-input w-full text-xs"
+                      />
+                      <select
+                        value={newLocationParentId()}
+                        onChange={(e) => setNewLocationParentId(e.currentTarget.value)}
+                        class="glass-input w-full text-xs"
+                      >
+                        <option value="">No parent (top-level)</option>
+                        <For each={parentLocations()}>
+                          {(loc: any) => <option value={loc.id}>{loc.name}</option>}
+                        </For>
+                      </select>
+                      <div class="flex gap-2">
+                        <button
+                          onClick={() => setShowLocationPanel(false)}
+                          class="flex-1 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateAndLinkLocation}
+                          disabled={locationSubmitting() || !newLocationName()}
+                          class="flex-1 btn-primary py-1.5 text-xs disabled:opacity-50"
+                        >
+                          {locationSubmitting() ? "Creating..." : "Create & Link"}
+                        </button>
+                      </div>
+                    </Show>
                   </div>
-                </div>
-              </div>
+                </Show>
+              </Show>
             </div>
 
             {/* Audit log trail specific to item */}
@@ -711,13 +1128,12 @@ export default function ItemDetails() {
                         </span>
                         <span class="text-gray-400 font-semibold">{tx.user?.username || "System"}</span>
                       </div>
-                      
+
                       <p class="text-gray-300 text-[11px] leading-normal">{tx.notes || "Stock updated."}</p>
-                      
+
                       <div class="flex justify-between items-center text-[10px]">
-                        <span class={`font-extrabold uppercase ${
-                          tx.quantity_change > 0 ? "text-cyan-400" : tx.quantity_change < 0 ? "text-rose-400" : "text-purple-400"
-                        }`}>
+                        <span class={`font-extrabold uppercase ${tx.quantity_change > 0 ? "text-cyan-400" : tx.quantity_change < 0 ? "text-rose-400" : "text-purple-400"
+                          }`}>
                           {tx.action_type}
                         </span>
                         <span class="font-bold text-white">
@@ -729,7 +1145,7 @@ export default function ItemDetails() {
                 </For>
               </div>
             </div>
-            
+
             {/* Danger Zone */}
             <Show when={user()?.role === "admin"}>
               <div class="glass-panel rounded-2xl p-6 border border-red-500/20 bg-red-500/[0.01] space-y-3">
@@ -751,17 +1167,17 @@ export default function ItemDetails() {
       <Show when={showEditModal()}>
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative my-8">
-            <button 
+            <button
               onClick={() => setShowEditModal(false)}
               class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
             >
               <X size={20} />
             </button>
-            
+
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">
               Edit Component Parameters
             </h3>
-            
+
             <form onSubmit={handleUpdateItemDetails} class="space-y-4 text-xs">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
@@ -774,7 +1190,7 @@ export default function ItemDetails() {
                     class="glass-input w-full text-sm"
                   />
                 </div>
-                
+
                 <div class="sm:col-span-2">
                   <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Description Notes</label>
                   <textarea
@@ -837,7 +1253,7 @@ export default function ItemDetails() {
                   />
                 </div>
 
-  
+
 
                 <div class="sm:col-span-2">
                   <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Category</label>
@@ -853,7 +1269,7 @@ export default function ItemDetails() {
                   </select>
                 </div>
               </div>
-              
+
               <div class="flex gap-3 pt-6 border-t border-white/5">
                 <button
                   type="button"
@@ -867,6 +1283,179 @@ export default function ItemDetails() {
                   class="btn-primary flex-1"
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+
+      {/* ----------------- MOVE PARTS DIALOG MODAL ----------------- */}
+      <Show when={showMoveModal()}>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative my-8">
+            <button
+              onClick={() => setShowMoveModal(false)}
+              class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 class="text-lg font-bold text-white mb-2 uppercase tracking-wider">
+              Move Parts
+            </h3>
+            <p class="text-xs text-gray-400 mb-6">
+              Transfer units of <span class="text-white font-semibold">{item()?.value}</span> from <span class="text-white font-semibold">{moveSourceLocation()?.name}</span> to another storage location.
+            </p>
+
+            <form onSubmit={handleMoveParts} class="space-y-5 text-xs">
+              {/* Quantity Spinbox Selector */}
+              <div>
+                <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Quantity to Move</label>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMoveQuantity(prev => Math.max(1, prev - 1))}
+                    disabled={moveQuantity() <= 1}
+                    class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 flex items-center justify-center text-gray-300 hover:text-white transition-all disabled:opacity-40"
+                  >
+                    <Minus size={16} />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="1"
+                    max={moveSourceLocation()?.quantity || 1}
+                    value={moveQuantity()}
+                    onInput={(e) => {
+                      const val = parseInt(e.currentTarget.value);
+                      if (!isNaN(val)) {
+                        setMoveQuantity(Math.max(1, Math.min(moveSourceLocation()?.quantity || 1, val)));
+                      }
+                    }}
+                    class="glass-input flex-grow text-center text-xl font-bold py-1.5"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setMoveQuantity(prev => Math.min(moveSourceLocation()?.quantity || 1, prev + 1))}
+                    disabled={moveQuantity() >= (moveSourceLocation()?.quantity || 1)}
+                    class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 flex items-center justify-center text-gray-300 hover:text-white transition-all disabled:opacity-40"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                <span class="text-[10px] text-gray-500 mt-1 block text-right">Available: {moveSourceLocation()?.quantity || 0} units</span>
+              </div>
+               {/* Destination Mode Tabs */}
+              <div class="space-y-3">
+                <label class="block font-semibold text-gray-400 uppercase">Destination Location</label>
+                <div class="flex rounded-lg overflow-hidden border border-white/10 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setMoveDestMode("link")}
+                    disabled={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id).length === 0}
+                    class={`flex-1 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${moveDestMode() === "link" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
+                  >
+                    Combine Stock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMoveDestMode("create")}
+                    class={`flex-1 py-1.5 transition-colors ${moveDestMode() === "create" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
+                  >
+                    Create New
+                  </button>
+                </div>
+
+                {/* Combine Stock / Quick Selects */}
+                <Show when={moveDestMode() === "link"}>
+                  <div class="space-y-2">
+                    <Show 
+                      when={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id).length > 0}
+                      fallback={<p class="text-xs text-gray-500 italic">No other locations currently store this part. Use "Create New" to place stock in a new bin.</p>}
+                    >
+                      <div class="grid grid-cols-1 gap-2">
+                        <For each={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id)}>
+                          {(loc: any) => (
+                            <button
+                              type="button"
+                              onClick={() => setMoveDestLocationId(String(loc.id))}
+                              class={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${
+                                moveDestLocationId() === String(loc.id)
+                                  ? "bg-accentCyan/15 border-accentCyan text-white"
+                                  : "bg-white/[0.02] border-white/5 hover:border-white/10 text-gray-300"
+                              }`}
+                            >
+                              <div class="flex items-center gap-2">
+                                <MapPin size={13} class={moveDestLocationId() === String(loc.id) ? "text-accentCyan" : "text-gray-500"} />
+                                <span class="text-xs font-semibold">{loc.name}</span>
+                              </div>
+                              <span class="text-xs font-bold text-cyan-400">{loc.quantity} units</span>
+                            </button>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                </Show>
+
+                {/* Create New */}
+                <Show when={moveDestMode() === "create"}>
+                  <div class="space-y-3">
+                    <input
+                      type="text"
+                      value={moveNewLocationName()}
+                      onInput={(e) => setMoveNewLocationName(e.currentTarget.value)}
+                      placeholder="Location name (e.g. Drawer B3)"
+                      class="glass-input w-full text-xs"
+                      required
+                    />
+                    <select
+                      value={moveNewLocationParentId()}
+                      onChange={(e) => setMoveNewLocationParentId(e.currentTarget.value)}
+                      class="glass-input w-full text-xs"
+                    >
+                      <option value="">No parent (top-level)</option>
+                      <For each={parentLocations()}>
+                        {(loc: any) => <option value={loc.id}>{loc.name}</option>}
+                      </For>
+                    </select>
+                  </div>
+                </Show>
+              </div>
+
+              {/* Conditional Delete Checkbox */}
+              <Show when={moveQuantity() === moveSourceLocation()?.quantity}>
+                <div class="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="delete-source-checkbox"
+                    checked={deleteSourceAfterMove()}
+                    onChange={(e) => setDeleteSourceAfterMove(e.currentTarget.checked)}
+                    class="rounded border-white/10 bg-white/5 text-accentCyan focus:ring-0 focus:ring-offset-0"
+                  />
+                  <label for="delete-source-checkbox" class="text-gray-300 select-none cursor-pointer">
+                    Delete source location from database (no parts remaining)
+                  </label>
+                </div>
+              </Show>
+
+              {/* Actions */}
+              <div class="flex gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowMoveModal(false)}
+                  class="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={moveSubmitting()}
+                  class="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {moveSubmitting() ? "Moving..." : "Confirm Move"}
                 </button>
               </div>
             </form>

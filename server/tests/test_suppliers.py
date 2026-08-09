@@ -36,7 +36,7 @@ def test_delete_supplier_blocked_by_product():
     cat_res = client.post("/categories", json={"title": f"Test Cat {uid}"}, headers=admin_headers)
     cat_id = cat_res.json()["id"]
     
-    part_res = client.post("/parts", json={"category_id": cat_id, "value": "10k", "number": "R-10K", "description": "Resistor"}, headers=admin_headers)
+    part_res = client.post("/parts", json={"category_id": cat_id, "value": "10k", "number": f"R-{uid}"}, headers=admin_headers)
     part_id = part_res.json()["id"]
     
     # Create Product Link

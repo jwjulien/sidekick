@@ -219,6 +219,7 @@ class StorageBase(BaseModel):
     part_id: Optional[int] = None
     quantity: int = 0
     description: Optional[str] = None
+    last_counted: Optional[datetime] = None
 
 class StorageCreate(StorageBase):
     pass

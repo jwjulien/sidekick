@@ -1,5 +1,7 @@
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models, schemas, auth
@@ -75,11 +77,103 @@ def delete_location(
     current_user: models.User = Depends(auth.require_designer)
 ):
     """
-    Delete storage location. Automatically cascades deletion to sub-locations. Designers and Admins only.
+    Delete storage location. If the location has children (sub-locations), it only clears the part linkage
+    (part_id=None, quantity=0, last_counted=None) to preserve the hierarchy. Otherwise, deletes it.
     """
     storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
     if not storage:
         raise HTTPException(status_code=404, detail="Storage location not found.")
-    db.delete(storage)
+    
+    # Check if there are any child locations in the tree hierarchy
+    has_children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).first() is not None
+    if has_children:
+        storage.part_id = None
+        storage.quantity = 0
+        storage.last_counted = None
+    else:
+        db.delete(storage)
+        
     db.commit()
     return
+
+class LocationLinkPayload(BaseModel):
+    part_id: Optional[int] = None
+
+@router.patch("/{location_id}", response_model=schemas.StorageOut)
+def patch_location(
+    location_id: int,
+    payload: LocationLinkPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Partial update for a storage location. Used to assign or unassign a part_id.
+    """
+    storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+
+    if payload.part_id is not None:
+        # Verify the part exists
+        part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
+        if not part:
+            raise HTTPException(status_code=404, detail="Part not found.")
+    storage.part_id = payload.part_id
+    db.commit()
+    db.refresh(storage)
+    return storage
+
+@router.put("/{location_id}/touch", response_model=schemas.StorageOut)
+def touch_location(
+    location_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Confirm count: stamps last_counted = NOW without changing quantity.
+    Implements the low-friction cycle count confirmation from feature 027.
+    """
+    storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+    storage.last_counted = datetime.utcnow()
+    db.commit()
+    db.refresh(storage)
+    return storage
+
+class CountPayload(BaseModel):
+    quantity: int
+
+@router.put("/{location_id}/count", response_model=schemas.StorageOut)
+def count_location(
+    location_id: int,
+    payload: CountPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Set an exact quantity for a storage location and stamp last_counted = NOW.
+    Used by the StockController component for +/- and inline edit adjustments.
+    """
+    storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+    if payload.quantity < 0:
+        raise HTTPException(status_code=400, detail="Quantity cannot be negative.")
+    storage.quantity = payload.quantity
+    storage.last_counted = datetime.utcnow()
+
+    # Write audit transaction for the owning part
+    if storage.part_id:
+        db_tx = models.Transaction(
+            part_id=storage.part_id,
+            user_id=current_user.id,
+            action_type="count",
+            quantity_change=payload.quantity,
+            notes=f"Count confirmed at '{storage.name}'."
+        )
+        db.add(db_tx)
+
+    db.commit()
+    db.refresh(storage)
+    return storage
