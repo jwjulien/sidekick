@@ -13,7 +13,6 @@ import LabelPreviewModal from "../components/LabelPreviewModal";
 
 export default function Storage() {
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = createSignal<"locations">("locations");
   const [locations, setLocations] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   
@@ -101,19 +100,6 @@ export default function Storage() {
           Storage Structure Designer
         </h2>
         <p class="text-gray-400 text-sm">Define storage drawers, cabinets, and bin hierarchy.</p>
-      </div>
-
-      {/* Selector Tabs */}
-      <div class="flex border-b border-white/5 space-x-6 text-sm font-semibold mb-6">
-        <button
-          onClick={() => setActiveTab("locations")}
-          class={`pb-3 border-b-2 px-1 transition-colors cursor-pointer border-accentCyan text-white`}
-        >
-          <span class="flex items-center gap-2">
-            <MapPin size={16} />
-            Storage Drawers & Bins Hierarchy
-          </span>
-        </button>
       </div>
 
       <Show when={loading()}>
