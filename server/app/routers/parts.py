@@ -150,28 +150,73 @@ def get_part(
         raise HTTPException(status_code=404, detail="Part component not found.")
         
     part.total_quantity = sum(s.quantity for s in part.storage_records)
-    
-    # Combine images and documents into a single attachments list for the frontend
-    attachments = []
-    for img in part.images:
-        attachments.append({
-            "id": img.id,
-            "filename": img.caption,
-            "file_type": "image",
-            "part_id": part.id,
-            "created_on": img.created_on
-        })
-    for doc in part.documents:
-        attachments.append({
-            "id": -doc.id, # Negative IDs to distinguish document records from image records
-            "filename": doc.filename,
-            "file_type": "document",
-            "part_id": part.id,
-            "created_on": doc.created_on
-        })
-    part.attachments = attachments
-    
     return part
+
+@router.get("/{part_id}/documents", response_model=List[schemas.DocumentOut])
+def get_part_documents(
+    part_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all documents for a part (excluding heavy BLOB contents).
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+    return part.documents
+
+from fastapi import UploadFile, File, Form
+@router.post("/{part_id}/documents", response_model=schemas.DocumentOut, status_code=status.HTTP_201_CREATED)
+async def upload_part_document(
+    part_id: int,
+    file: UploadFile = File(...),
+    label: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Upload a document datasheet/file directly linked to the Part.
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+    
+    import os
+    safe_filename = os.path.basename(file.filename)
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+        
+    try:
+        file_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not read upload file: {str(e)}"
+        )
+        
+    db_document = models.Document(
+        part_id=part_id,
+        label=label,
+        filename=safe_filename,
+        content=file_bytes
+    )
+    db.add(db_document)
+    
+    # Audit log
+    db_tx = models.Transaction(
+        part_id=part_id,
+        user_id=current_user.id,
+        action_type="edit",
+        quantity_change=0,
+        notes=f"Uploaded document: {label} ({safe_filename})."
+    )
+    db.add(db_tx)
+    db.commit()
+    db.refresh(db_document)
+    
+    return db_document
+
 
 @router.put("/{part_id}", response_model=schemas.PartOut)
 def update_part(

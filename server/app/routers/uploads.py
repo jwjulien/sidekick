@@ -4,18 +4,17 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models, schemas, auth
 
-router = APIRouter(prefix="/uploads", tags=["uploads"])
+router = APIRouter(prefix="", tags=["documents_and_uploads"])
 
-@router.post("/item/{item_id}", response_model=schemas.AttachmentOut, status_code=status.HTTP_201_CREATED)
+@router.post("/uploads/item/{item_id}", response_model=schemas.AttachmentOut, status_code=status.HTTP_201_CREATED)
 async def upload_item_file(
     item_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_stocker)  # Stocker or Admin can upload
+    current_user: models.User = Depends(auth.require_stocker)
 ):
     """
-    Upload an attachment (photo, datasheet, drawings) for an inventory part component.
-    Saves the file directly into the database as a BLOB (Image or Document).
+    Upload an image attachment for an inventory part component.
     """
     part = db.query(models.Part).filter(models.Part.id == item_id).first()
     if not part:
@@ -33,57 +32,33 @@ async def upload_item_file(
             detail=f"Could not read upload file: {str(e)}"
         )
         
-    content_type = file.content_type or ""
-    is_image = content_type.startswith("image/")
+    db_attachment = models.Image(
+        part_id=item_id,
+        caption=safe_filename,
+        content=file_bytes
+    )
+    db.add(db_attachment)
     
-    if is_image:
-        db_attachment = models.Image(
-            part_id=item_id,
-            caption=safe_filename,
-            content=file_bytes
-        )
-        db.add(db_attachment)
-        db.commit()
-        db.refresh(db_attachment)
-        
-        # Unique ID mapping for frontend compatibility
-        attach_id = db_attachment.id
-        file_type = "image"
-    else:
-        db_attachment = models.Document(
-            part_id=item_id,
-            label=safe_filename,
-            filename=safe_filename,
-            content=file_bytes
-        )
-        db.add(db_attachment)
-        db.commit()
-        db.refresh(db_attachment)
-        
-        # Unique ID mapping for frontend compatibility (negative)
-        attach_id = -db_attachment.id
-        file_type = "document"
-        
-    # Also log an edit transaction on the part
     db_tx = models.Transaction(
         part_id=item_id,
         user_id=current_user.id,
         action_type="edit",
         quantity_change=0,
-        notes=f"Uploaded attachment: {safe_filename}."
+        notes=f"Uploaded photo: {safe_filename}."
     )
     db.add(db_tx)
     db.commit()
+    db.refresh(db_attachment)
     
     return schemas.AttachmentOut(
-        id=attach_id,
+        id=db_attachment.id,
         filename=safe_filename,
-        file_type=file_type,
+        file_type="image",
         part_id=item_id,
         created_on=db_attachment.created_on
     )
 
-@router.get("/file/{item_id}/{filename}")
+@router.get("/uploads/file/{item_id}/{filename}")
 def serve_file(
     item_id: int,
     filename: str,
@@ -91,16 +66,13 @@ def serve_file(
     current_user: models.User = Depends(auth.require_analyst)
 ):
     """
-    Serve uploaded documents or images from the database.
-    Requires at least Analyst permissions.
+    Serve uploaded images from the database.
     """
-    # Try images first
     img = db.query(models.Image).filter(
         models.Image.part_id == item_id,
         models.Image.caption == filename
     ).first()
     if img:
-        # Guess media type
         media_type = "image/png"
         if filename.lower().endswith(".jpg") or filename.lower().endswith(".jpeg"):
             media_type = "image/jpeg"
@@ -108,38 +80,63 @@ def serve_file(
             media_type = "image/gif"
         return Response(content=img.content, media_type=media_type)
 
-    # Try documents next
-    doc = db.query(models.Document).filter(
-        models.Document.part_id == item_id,
-        models.Document.filename == filename
-    ).first()
-    if doc:
-        media_type = "application/octet-stream"
-        if filename.lower().endswith(".pdf"):
-            media_type = "application/pdf"
-        return Response(content=doc.content, media_type=media_type)
-
     raise HTTPException(status_code=404, detail="File not found in database.")
 
-@router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/uploads/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
 ):
     """
-    Delete an attachment (image or document) from the database by its mapped ID.
+    Delete an image attachment.
     """
-    if attachment_id > 0:
-        img = db.query(models.Image).filter(models.Image.id == attachment_id).first()
-        if not img:
-            raise HTTPException(status_code=404, detail="Image attachment not found.")
-        db.delete(img)
-    else:
-        doc = db.query(models.Document).filter(models.Document.id == -attachment_id).first()
-        if not doc:
-            raise HTTPException(status_code=404, detail="Document attachment not found.")
-        db.delete(doc)
-        
+    img = db.query(models.Image).filter(models.Image.id == attachment_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image attachment not found.")
+    db.delete(img)
     db.commit()
     return
+
+# --- Clean Document Routes ---
+
+@router.get("/api/documents/{id}/download")
+def download_document(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Returns the actual file BLOB with appropriate content type headers.
+    """
+    doc = db.query(models.Document).filter(models.Document.id == id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+        
+    media_type = "application/octet-stream"
+    if doc.filename.lower().endswith(".pdf"):
+        media_type = "application/pdf"
+        
+    from fastapi.responses import Response
+    return Response(
+        content=doc.content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={doc.filename}"}
+    )
+
+@router.delete("/api/documents/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Removes the document from the database.
+    """
+    doc = db.query(models.Document).filter(models.Document.id == id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    db.delete(doc)
+    db.commit()
+    return
+

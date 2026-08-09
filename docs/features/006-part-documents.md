@@ -1,6 +1,6 @@
 ---
 title: Part Documents
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows

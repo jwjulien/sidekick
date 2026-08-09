@@ -242,6 +242,7 @@ export default function PartDetails() {
       )
     }));
   };
+  const [uploadLabel, setUploadLabel] = createSignal("");
 
   const handleFileUpload = async (e: Event) => {
     e.preventDefault();
@@ -252,8 +253,16 @@ export default function PartDetails() {
     const formData = new FormData();
     formData.append("file", file);
 
+    const isDoc = !file.type.startsWith("image/");
+    if (isDoc) {
+      formData.append("label", uploadLabel() || file.name);
+    }
+
     try {
-      const url = `${backendUrl()}/uploads/item/${itemId}`;
+      const url = isDoc
+        ? `${backendUrl()}/parts/${itemId}/documents`
+        : `${backendUrl()}/uploads/item/${itemId}`;
+        
       const tokenHeader = localStorage.getItem("sidekick_token");
       const headers: Record<string, string> = {};
       if (tokenHeader) {
@@ -272,11 +281,12 @@ export default function PartDetails() {
       }
 
       setUploadFile(null);
+      setUploadLabel("");
       const fileInput = document.getElementById("file-input-field") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
 
       fetchItemDetails();
-      toast.success("Attachment uploaded successfully.");
+      toast.success(isDoc ? "Document uploaded successfully." : "Photo uploaded successfully.");
     } catch (err: any) {
       toast.error(err.message || "Upload failed.");
     } finally {
@@ -284,10 +294,10 @@ export default function PartDetails() {
     }
   };
 
-  const handleDeleteAttachment = async (attachId: number) => {
+  const handleDeleteImage = async (attachId: number) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
-      message: "Are you sure you want to delete this attachment?",
+      message: "Are you sure you want to delete this photo?",
       confirmText: "Proceed",
       type: "warning"
     });
@@ -295,6 +305,24 @@ export default function PartDetails() {
     try {
       await apiFetch(`/uploads/${attachId}`, { method: "DELETE" });
       fetchItemDetails();
+      toast.success("Photo deleted successfully.");
+    } catch (err: any) {
+      toast.error(err.message || "Deletion failed.");
+    }
+  };
+
+  const handleDeleteDocument = async (docId: number) => {
+    const isConfirmed = await confirm({
+      title: "Confirm Action",
+      message: "Are you sure you want to delete this document?",
+      confirmText: "Proceed",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
+    try {
+      await apiFetch(`/api/documents/${docId}`, { method: "DELETE" });
+      fetchItemDetails();
+      toast.success("Document deleted successfully.");
     } catch (err: any) {
       toast.error(err.message || "Deletion failed.");
     }
@@ -732,21 +760,22 @@ export default function PartDetails() {
               </Show>
             </div>
 
-            {/* Document Attachments Card */}
+            {/* Photos & Images Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <FileText size={18} class="text-accentCyan" />
-                Attachments (Datasheets & Layout Images)
+                <ImageIcon size={18} class="text-accentCyan" />
+                Photos & Component Images
               </h3>
 
               {/* Upload interface */}
               <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                 <form onSubmit={handleFileUpload} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
                   <div class="flex-1 w-full">
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Select Attachment File</label>
+                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Upload Image file</label>
                     <input
                       type="file"
                       id="file-input-field"
+                      accept="image/*"
                       onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
                       class="glass-input w-full py-2 px-3 text-xs"
                     />
@@ -757,33 +786,120 @@ export default function PartDetails() {
                     class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
                   >
                     <Upload size={14} />
-                    {uploading() ? "Uploading..." : "Upload File"}
+                    {uploading() ? "Uploading..." : "Upload Image"}
                   </button>
                 </form>
               </Show>
 
-              {/* Attachments List */}
-              <Show when={!item().attachments || item().attachments.length === 0}>
+              {/* Images List */}
+              <Show when={!item().images || item().images.length === 0}>
+                <div class="text-center py-6 text-xs text-gray-500">
+                  No images uploaded for this component.
+                </div>
+              </Show>
+
+              <Show when={item().images && item().images.length > 0}>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <For each={item().images}>
+                    {(img) => (
+                      <div class="glass-card p-3 rounded-xl flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                          <div class="text-accentCyan shrink-0">
+                            <ImageIcon size={18} />
+                          </div>
+                          <span class="font-medium text-white truncate max-w-[150px]">{img.caption}</span>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                          <a
+                            href={`${backendUrl()}/uploads/file/${itemId}/${img.caption}`}
+                            target="_blank"
+                            class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
+                            title="Open Image"
+                          >
+                            <Download size={12} />
+                          </a>
+
+                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                            <button
+                              onClick={() => handleDeleteImage(img.id)}
+                              class="p-1.5 rounded-lg bg-white/5 text-red-400 hover:text-red-300 hover:bg-red-500/5 cursor-pointer"
+                              title="Delete Photo"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
+
+            {/* Document Attachments Card */}
+            <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <FileText size={18} class="text-accentCyan" />
+                Documents & Datasheets
+              </h3>
+
+              {/* Upload interface */}
+              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                <form onSubmit={handleFileUpload} class="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
+                  <div class="w-full">
+                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Select Document (e.g. PDF)</label>
+                    <input
+                      type="file"
+                      id="file-input-field-doc"
+                      accept=".pdf,.doc,.docx,.txt"
+                      onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
+                      class="glass-input w-full py-2 px-3 text-xs"
+                    />
+                  </div>
+                  <div class="flex flex-col sm:flex-row gap-3 items-end w-full">
+                    <div class="flex-1 w-full">
+                      <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Friendly Label Name</label>
+                      <input
+                        type="text"
+                        placeholder="E.g. Texas Instruments Datasheet"
+                        value={uploadLabel()}
+                        onInput={(e) => setUploadLabel(e.target.value)}
+                        class="glass-input w-full py-2 px-3 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={uploading() || !uploadFile()}
+                      class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
+                    >
+                      <Upload size={14} />
+                      {uploading() ? "Uploading..." : "Upload Document"}
+                    </button>
+                  </div>
+                </form>
+              </Show>
+
+              {/* Documents List */}
+              <Show when={!item().documents || item().documents.length === 0}>
                 <div class="text-center py-6 text-xs text-gray-500">
                   No datasheets or files attached to this component record.
                 </div>
               </Show>
 
-              <Show when={item().attachments && item().attachments.length > 0}>
+              <Show when={item().documents && item().documents.length > 0}>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <For each={item().attachments}>
-                    {(att) => (
+                  <For each={item().documents}>
+                    {(doc) => (
                       <div class="glass-card p-3 rounded-xl flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                          <div class="text-accentCyan shrink-0">
-                            {att.file_type === "image" ? <ImageIcon size={18} /> : <FileText size={18} />}
-                          </div>
-                          <span class="font-medium text-white truncate max-w-[150px]">{att.filename}</span>
+                        <div class="flex flex-col min-w-0">
+                          <span class="font-medium text-white truncate max-w-[150px]">{doc.label}</span>
+                          <span class="text-[10px] text-gray-500 truncate max-w-[150px]">{doc.filename}</span>
                         </div>
 
                         <div class="flex items-center gap-1.5 shrink-0">
                           <a
-                            href={`${backendUrl()}/uploads/file/${itemId}/${att.filename}`}
+                            href={`${backendUrl()}/api/documents/${doc.id}/download`}
                             target="_blank"
                             class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
                             title="Download/Open"
@@ -793,7 +909,7 @@ export default function PartDetails() {
 
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                             <button
-                              onClick={() => handleDeleteAttachment(att.id)}
+                              onClick={() => handleDeleteDocument(doc.id)}
                               class="p-1.5 rounded-lg bg-white/5 text-red-400 hover:text-red-300 hover:bg-red-500/5 cursor-pointer"
                               title="Delete File"
                             >
@@ -807,6 +923,7 @@ export default function PartDetails() {
                 </div>
               </Show>
             </div>
+
           </div>
 
           {/* ----------------- RIGHT 1 COL: INVENTORY CONTROLS & LOGS ----------------- */}

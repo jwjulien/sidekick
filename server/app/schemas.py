@@ -294,7 +294,6 @@ class PartDetailsOut(PartOut):
     images: List[ImageOut] = []
     documents: List[DocumentOut] = []
     transactions: List[TransactionOut] = []
-    attachments: List[AttachmentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 
