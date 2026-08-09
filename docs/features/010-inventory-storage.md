@@ -38,9 +38,9 @@ This feature maps the digital inventory to physical reality. It defines a hierar
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Storage` Peewee model with self-referential `parent_id` and `part_id` foreign keys.
-- [ ] Build FastAPI CRUD routes for locations.
-- [ ] Build FastAPI endpoint for rapid stock adjustments (+/-).
+- [x] Define `Storage` Peewee model with self-referential `parent_id` and `part_id` foreign keys.
+- [x] Build FastAPI CRUD routes for locations.
+- [x] Build FastAPI endpoint for rapid stock adjustments (+/-).
 - [ ] Create SolidJS recursive tree UI for managing the hierarchy.
-- [ ] Create SolidJS stock adjustment UI for the Part detail view.
-- [ ] Wire frontend to backend API.
+- [x] Create SolidJS stock adjustment UI for the Part detail view.
+- [x] Wire frontend to backend API.

@@ -14,6 +14,7 @@ import Parts from "./pages/Parts";
 import PartDetails from "./pages/PartDetails";
 import Scan from "./pages/Scan";
 import Design from "./pages/Design";
+import Storage from "./pages/Storage";
 import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
 import Suppliers from "./pages/Suppliers";
@@ -90,6 +91,16 @@ export default function App() {
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
                 <Design />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/storage" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <Storage />
               </Layout>
             </Show>
           )} 

@@ -13,7 +13,8 @@ import {
   User,
   ShieldCheck,
   FolderGit2,
-  Building2
+  Building2,
+  MapPin
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 
@@ -54,7 +55,8 @@ export default function Layout(props: LayoutProps) {
     { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },
-    { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] }
+    { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] },
+    { name: "Storage Locations", path: "/storage", icon: MapPin, roles: ["admin", "designer", "stocker", "puller"] }
   ];
 
   // Helper check
