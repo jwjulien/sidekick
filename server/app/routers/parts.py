@@ -481,3 +481,17 @@ def delete_part(
     db.delete(db_part)
     db.commit()
     return None
+
+@router.get("/{part_id}/products", response_model=List[schemas.ProductOut])
+def get_part_products(
+    part_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all supplier products associated with a part. Requires Analyst role.
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+    return db.query(models.Product).filter(models.Product.part_id == part_id).all()

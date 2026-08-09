@@ -1,18 +1,18 @@
 import { createSignal, onMount, For, Show } from "solid-js";
 import { useParams, useNavigate, A } from "@solidjs/router";
-import { 
-  Package, 
-  Tag, 
-  MapPin, 
-  AlertTriangle, 
-  Plus, 
-  Minus, 
-  FileText, 
-  Image as ImageIcon, 
-  Download, 
-  Trash2, 
-  History, 
-  Edit3, 
+import {
+  Package,
+  Tag,
+  MapPin,
+  AlertTriangle,
+  Plus,
+  Minus,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  Trash2,
+  History,
+  Edit3,
   Upload,
   ArrowLeft,
   Search,
@@ -59,7 +59,7 @@ export default function ItemDetails() {
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
-  
+
   const [barcodeValue, setBarcodeValue] = createSignal("");
 
   const fetchItemDetails = async () => {
@@ -67,7 +67,7 @@ export default function ItemDetails() {
     try {
       const data = await apiFetch(`/items/${itemId}`);
       setItem(data);
-      
+
       // Seed edit form values
       setEditValue(data.value);
       setEditNotes(data.notes || "");
@@ -77,11 +77,11 @@ export default function ItemDetails() {
       setEditWeight(data.weight || 0.0);
       setEditThreshold(data.threshold || 0);
       setEditCat(data.category_id ? String(data.category_id) : "");
-      
+
       // Load current barcode from attributes
       const barcode = data.attributes?.barcode || "";
       setBarcodeValue(barcode);
-      
+
       // Auto select first storage slot if available
       if (data.storage_records && data.storage_records.length > 0) {
         setSelectedStorageId(String(data.storage_records[0].id));
@@ -103,7 +103,7 @@ export default function ItemDetails() {
       setCategories(cats);
       setLocations(locs);
       setSuppliers(sups);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   onMount(() => {
@@ -166,7 +166,7 @@ export default function ItemDetails() {
       setUploadFile(null);
       const fileInput = document.getElementById("file-input-field") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
-      
+
       fetchItemDetails();
       alert("Attachment uploaded successfully.");
     } catch (err: any) {
@@ -292,7 +292,7 @@ export default function ItemDetails() {
   return (
     <div class="space-y-6">
       {/* Back button */}
-      <button 
+      <button
         onClick={() => navigate("/inventory")}
         class="btn-secondary py-1.5 px-3 flex items-center gap-2 text-xs"
       >
@@ -313,14 +313,14 @@ export default function ItemDetails() {
 
       <Show when={item()}>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* ----------------- LEFT 2 COLS: PART INFO & ATTACHMENTS ----------------- */}
           <div class="lg:col-span-2 space-y-6">
-            
+
             {/* Main Info Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6 relative overflow-hidden">
               <div class="absolute top-0 right-0 w-32 h-32 bg-accentCyan/5 rounded-full blur-2xl -z-10"></div>
-              
+
               <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                   <div class="flex items-center gap-3">
@@ -334,7 +334,7 @@ export default function ItemDetails() {
                   </div>
                   <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().notes || "No description/notes provided."}</p>
                 </div>
-                
+
                 {/* Edit details */}
                 <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                   <button
@@ -413,7 +413,7 @@ export default function ItemDetails() {
                 <Cpu size={18} class="text-accentCyan" />
                 Consumed by PCB Assemblies
               </h3>
-              
+
               <Show when={!item().materials || item().materials.length === 0}>
                 <p class="text-xs text-gray-500 italic">This component is not currently consumed by any active project BOM lists.</p>
               </Show>
@@ -443,7 +443,7 @@ export default function ItemDetails() {
                 <Building2 size={18} class="text-accentCyan" />
                 Linked Distributor Catalogs
               </h3>
-              
+
               {/* Linked Suppliers List */}
               <Show when={!item().products || item().products.length === 0}>
                 <p class="text-xs text-gray-500 italic">No distributor order listings linked to this component.</p>
@@ -456,9 +456,9 @@ export default function ItemDetails() {
                       <div class="glass-card p-3.5 rounded-xl border border-white/5 flex justify-between items-center">
                         <div>
                           <span class="font-bold text-white block">{prod.supplier?.name}</span>
-                          <span class="text-gray-400 font-mono text-[10px] block mt-0.5">DK/Mouser Ref: {prod.number}</span>
+                          <span class="text-gray-400 font-mono text-[10px] block mt-0.5">{prod.number}</span>
                         </div>
-                        
+
                         <div class="flex gap-2 items-center">
                           <a
                             href={`${prod.supplier?.search}${prod.number}`}
@@ -469,7 +469,7 @@ export default function ItemDetails() {
                             <Search size={10} />
                             Check Supplier
                           </a>
-                          
+
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                             <button
                               onClick={() => handleUnlinkSupplier(prod.id)}
@@ -503,7 +503,7 @@ export default function ItemDetails() {
                       </For>
                     </select>
                   </div>
-                  
+
                   <div class="flex-1 w-full">
                     <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Distributor SKU / Code</label>
                     <input
@@ -515,7 +515,7 @@ export default function ItemDetails() {
                       class="glass-input w-full py-2 text-xs"
                     />
                   </div>
-                  
+
                   <button
                     type="submit"
                     disabled={linkingSupplier() || !newSupplierId()}
@@ -534,7 +534,7 @@ export default function ItemDetails() {
                 <FileText size={18} class="text-accentCyan" />
                 Attachments (Datasheets & Layout Images)
               </h3>
-              
+
               {/* Upload interface */}
               <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                 <form onSubmit={handleFileUpload} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
@@ -607,19 +607,18 @@ export default function ItemDetails() {
 
           {/* ----------------- RIGHT 1 COL: INVENTORY CONTROLS & LOGS ----------------- */}
           <div class="space-y-6">
-            
+
             {/* Inventory Levels Controls */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 <Package size={18} class="text-accentCyan" />
                 Component Stock Levels
               </h3>
-              
+
               <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-6">
                 <span class="text-[10px] text-gray-500 uppercase font-semibold">Total Catalog Count</span>
-                <span class={`text-4xl font-extrabold block mt-2 ${
-                  item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
-                }`}>
+                <span class={`text-4xl font-extrabold block mt-2 ${item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
+                  }`}>
                   {item().total_quantity}
                 </span>
                 <span class="text-[10px] text-gray-500 mt-2 block">
@@ -710,13 +709,12 @@ export default function ItemDetails() {
                         </span>
                         <span class="text-gray-400 font-semibold">{tx.user?.username || "System"}</span>
                       </div>
-                      
+
                       <p class="text-gray-300 text-[11px] leading-normal">{tx.notes || "Stock updated."}</p>
-                      
+
                       <div class="flex justify-between items-center text-[10px]">
-                        <span class={`font-extrabold uppercase ${
-                          tx.quantity_change > 0 ? "text-cyan-400" : tx.quantity_change < 0 ? "text-rose-400" : "text-purple-400"
-                        }`}>
+                        <span class={`font-extrabold uppercase ${tx.quantity_change > 0 ? "text-cyan-400" : tx.quantity_change < 0 ? "text-rose-400" : "text-purple-400"
+                          }`}>
                           {tx.action_type}
                         </span>
                         <span class="font-bold text-white">
@@ -728,7 +726,7 @@ export default function ItemDetails() {
                 </For>
               </div>
             </div>
-            
+
             {/* Danger Zone */}
             <Show when={user()?.role === "admin"}>
               <div class="glass-panel rounded-2xl p-6 border border-red-500/20 bg-red-500/[0.01] space-y-3">
@@ -750,17 +748,17 @@ export default function ItemDetails() {
       <Show when={showEditModal()}>
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative my-8">
-            <button 
+            <button
               onClick={() => setShowEditModal(false)}
               class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
             >
               <X size={20} />
             </button>
-            
+
             <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">
               Edit Component Parameters
             </h3>
-            
+
             <form onSubmit={handleUpdateItemDetails} class="space-y-4 text-xs">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
@@ -773,7 +771,7 @@ export default function ItemDetails() {
                     class="glass-input w-full text-sm"
                   />
                 </div>
-                
+
                 <div class="sm:col-span-2">
                   <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Description Notes</label>
                   <textarea
@@ -860,7 +858,7 @@ export default function ItemDetails() {
                   </select>
                 </div>
               </div>
-              
+
               <div class="flex gap-3 pt-6 border-t border-white/5">
                 <button
                   type="button"

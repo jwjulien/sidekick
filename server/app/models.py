@@ -74,7 +74,7 @@ class Product(Base):
     modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
     part_id = Column(Integer, ForeignKey("parts.id", ondelete="CASCADE"), nullable=False)
-    number = Column(String(80), nullable=False)
+    sku = Column(String(100), nullable=False)
 
     supplier = relationship("Supplier", back_populates="products")
     part = relationship("Part", back_populates="products")

@@ -1,6 +1,6 @@
 ---
 title: Supplier Products
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -42,9 +42,9 @@ This feature bridges the gap between internal inventory (`Parts`) and the outsid
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Product` Peewee model with dual foreign keys (`part_id`, `supplier_id`).
-- [ ] Build FastAPI CRUD routes.
-- [ ] Create SolidJS UI for listing supplier sources on the Part detail page.
-- [ ] Create SolidJS form for adding a new source, wiring up the Supplier dropdown.
-- [ ] Install and implement Tauri `shell.open` for external links.
-- [ ] Wire frontend to backend API.
+- [x] Define `Product` Peewee model with dual foreign keys (`part_id`, `supplier_id`).
+- [x] Build FastAPI CRUD routes.
+- [x] Create SolidJS UI for listing supplier sources on the Part detail page.
+- [x] Create SolidJS form for adding a new source, wiring up the Supplier dropdown.
+- [x] Install and implement Tauri `shell.open` for external links.
+- [x] Wire frontend to backend API.

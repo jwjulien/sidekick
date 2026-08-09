@@ -40,7 +40,7 @@ def test_delete_supplier_blocked_by_product():
     part_id = part_res.json()["id"]
     
     # Create Product Link
-    prod_res = client.post("/suppliers/products", json={"supplier_id": sup_id, "part_id": part_id, "number": "123-ND"}, headers=stocker_headers)
+    prod_res = client.post("/products", json={"supplier_id": sup_id, "part_id": part_id, "sku": "123-ND"}, headers=stocker_headers)
     prod_id = prod_res.json()["id"]
     
     # Try deleting Supplier (should block)
@@ -48,7 +48,7 @@ def test_delete_supplier_blocked_by_product():
     assert del_res.status_code == 400
     
     # Clean up (delete product first, then supplier)
-    client.delete(f"/suppliers/products/{prod_id}", headers=stocker_headers)
+    client.delete(f"/products/{prod_id}", headers=stocker_headers)
     client.delete(f"/suppliers/{sup_id}", headers=admin_headers)
     client.delete(f"/items/{part_id}", headers=admin_headers)
     client.delete(f"/categories/{cat_id}", headers=admin_headers)

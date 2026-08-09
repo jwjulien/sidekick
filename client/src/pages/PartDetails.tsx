@@ -71,8 +71,20 @@ export default function PartDetails() {
 
   // Link Supplier State
   const [newSupplierId, setNewSupplierId] = createSignal("");
-  const [newSupplierPartNo, setNewSupplierPartNo] = createSignal("");
+  const [newSupplierSku, setNewSupplierSku] = createSignal("");
   const [linkingSupplier, setLinkingSupplier] = createSignal(false);
+  const [showAddSupplierPanel, setShowAddSupplierPanel] = createSignal(false);
+  const [products, setProducts] = createSignal<any[]>([]);
+  const [editingProductId, setEditingProductId] = createSignal<number | null>(null);
+  const [editSkuValue, setEditSkuValue] = createSignal("");
+  const [savingEdit, setSavingEdit] = createSignal(false);
+
+  const fetchProducts = async () => {
+    try {
+      const data = await apiFetch(`/parts/${itemId}/products`);
+      setProducts(data);
+    } catch (_) { }
+  };
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = createSignal(false);
@@ -187,6 +199,7 @@ export default function PartDetails() {
   onMount(() => {
     fetchItemDetails();
     fetchMetadata();
+    fetchProducts();
   });
 
   const handleLinkLocation = async () => {
@@ -270,7 +283,7 @@ export default function PartDetails() {
       const url = isDoc
         ? `${backendUrl()}/parts/${itemId}/documents`
         : `${backendUrl()}/uploads/item/${itemId}`;
-        
+
       const tokenHeader = localStorage.getItem("sidekick_token");
       const headers: Record<string, string> = {};
       if (tokenHeader) {
@@ -371,7 +384,7 @@ export default function PartDetails() {
 
   const handleImageUploadForm = async (e: Event) => {
     e.preventDefault();
-    
+
     // Check if we are uploading a downloaded URL
     const droppedUrl = stagedDroppedUrl();
     if (droppedUrl) {
@@ -383,7 +396,7 @@ export default function PartDetails() {
       await uploadImageFromLocalFile(file, newImageCaption() || file.name, newImageNotes());
       setUploadFile(null);
     }
-    
+
     setShowAddImageModal(false);
     setNewImageCaption("");
     setNewImageNotes("");
@@ -485,20 +498,22 @@ export default function PartDetails() {
 
   const handleLinkSupplier = async (e: Event) => {
     e.preventDefault();
-    if (!newSupplierId() || !newSupplierPartNo()) return;
+    if (!newSupplierId() || !newSupplierSku()) return;
     setLinkingSupplier(true);
     try {
-      await apiFetch("/suppliers/products", {
+      await apiFetch("/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           supplier_id: parseInt(newSupplierId()),
           part_id: itemId,
-          number: newSupplierPartNo()
+          sku: newSupplierSku()
         })
       });
       setNewSupplierId("");
-      setNewSupplierPartNo("");
+      setNewSupplierSku("");
+      setShowAddSupplierPanel(false);
+      fetchProducts();
       fetchItemDetails();
       toast.success("Supplier catalog link added successfully.");
     } catch (err: any) {
@@ -517,10 +532,50 @@ export default function PartDetails() {
     });
     if (!isConfirmed) return;
     try {
-      await apiFetch(`/suppliers/products/${prodId}`, { method: "DELETE" });
+      await apiFetch(`/products/${prodId}`, { method: "DELETE" });
+      fetchProducts();
       fetchItemDetails();
+      toast.success("Supplier catalog link removed successfully.");
     } catch (err: any) {
       toast.error(err.message || "Failed to unlink supplier.");
+    }
+  };
+
+  const handleUpdateSupplierSku = async (prodId: number) => {
+    if (!editSkuValue().trim()) return;
+    setSavingEdit(true);
+    try {
+      await apiFetch(`/products/${prodId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: editSkuValue()
+        })
+      });
+      setEditingProductId(null);
+      setEditSkuValue("");
+      fetchProducts();
+      fetchItemDetails();
+      toast.success("Supplier SKU updated successfully.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update SKU.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const openExternalUrl = async (url: string) => {
+    try {
+      const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined" || typeof (window as any).__TAURI__ !== "undefined";
+      if (isTauri) {
+        const { open } = await import("@tauri-apps/plugin-shell");
+        await open(url);
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      console.error("Failed to open URL:", err);
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -795,13 +850,12 @@ export default function PartDetails() {
             </div>
 
             {/* Responsive Image block: Only visible on mobile/small screens, hidden on large desktop screens */}
-            <div 
+            <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              class={`lg:hidden glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex flex-col justify-center items-center group h-64 ${
-                isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
-              }`}
+              class={`lg:hidden glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex flex-col justify-center items-center group h-64 ${isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
+                }`}
             >
               <Show when={!item().images || item().images.length === 0}>
                 <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
@@ -813,7 +867,7 @@ export default function PartDetails() {
                     <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
                   </div>
                   <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                    <button 
+                    <button
                       onClick={() => setShowAddImageModal(true)}
                       class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
                     >
@@ -829,13 +883,13 @@ export default function PartDetails() {
                   return (
                     <div class="w-full h-full relative flex flex-col justify-between">
                       {/* Render Image */}
-                      <div 
+                      <div
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                         class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
                       >
-                        <img 
+                        <img
                           src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
                           alt={currentImage()?.caption}
                           class="max-w-full max-h-full object-contain pointer-events-none"
@@ -848,7 +902,7 @@ export default function PartDetails() {
                             <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
                           </Show>
                         </div>
-                        
+
                         {/* Deletion & Add actions top right */}
                         <div class="absolute top-3 right-3 flex gap-2">
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
@@ -873,13 +927,13 @@ export default function PartDetails() {
                       {/* Carousel controls if > 1 image */}
                       <Show when={item().images.length > 1}>
                         <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
-                          <button 
+                          <button
                             onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
                             class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
                           >
                             <Minus size={14} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
                             class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
                           >
@@ -925,47 +979,92 @@ export default function PartDetails() {
 
             {/* Linked distributor catalog lines */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
-              <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <Building2 size={18} class="text-accentCyan" />
-                Linked Distributor Catalogs
-              </h3>
+              <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                  <Building2 size={18} class="text-accentCyan" />
+                  Linked Distributor Catalogs
+                </h3>
+                <Show when={!showAddSupplierPanel() && (user()?.role === "admin" || user()?.role === "stocker")}>
+                  <button
+                    onClick={() => setShowAddSupplierPanel(true)}
+                    class="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    Add Source
+                  </button>
+                </Show>
+              </div>
 
               {/* Linked Suppliers List */}
-              <Show when={!item().products || item().products.length === 0}>
+              <Show when={!products() || products().length === 0}>
                 <p class="text-xs text-gray-500 italic">No distributor order listings linked to this component.</p>
               </Show>
 
-              <Show when={item().products && item().products.length > 0}>
+              <Show when={products() && products().length > 0}>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <For each={item().products}>
+                  <For each={products()}>
                     {(prod) => (
                       <div class="glass-card p-3.5 rounded-xl border border-white/5 flex justify-between items-center">
-                        <div>
+                        <div class="flex-1 min-w-0 pr-2">
                           <span class="font-bold text-white block">{prod.supplier?.name}</span>
-                          <span class="text-gray-400 font-mono text-[10px] block mt-0.5">DK/Mouser Ref: {prod.number}</span>
-                        </div>
-
-                        <div class="flex gap-2 items-center">
-                          <a
-                            href={`${prod.supplier?.search}${prod.number}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="btn-secondary py-1 px-2.5 text-[10px] flex items-center gap-1.5"
-                          >
-                            <Search size={10} />
-                            Check Supplier
-                          </a>
-
-                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                            <button
-                              onClick={() => handleUnlinkSupplier(prod.id)}
-                              class="text-gray-600 hover:text-red-400 p-1 cursor-pointer transition-colors"
-                              title="Delete Link"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                          <Show when={editingProductId() === prod.id} fallback={
+                            <span class="text-gray-400 font-mono text-[10px] block mt-0.5">{prod.sku}</span>
+                          }>
+                            <div class="flex items-center gap-1.5 mt-1">
+                              <input
+                                type="text"
+                                value={editSkuValue()}
+                                onInput={(e) => setEditSkuValue(e.target.value)}
+                                class="glass-input py-0.5 px-2 text-[10px] w-full font-mono"
+                              />
+                              <button
+                                onClick={() => handleUpdateSupplierSku(prod.id)}
+                                disabled={savingEdit()}
+                                class="text-cyan-400 hover:text-cyan-300 font-bold text-[10px]"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingProductId(null)}
+                                class="text-gray-400 hover:text-gray-300 text-[10px]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </Show>
                         </div>
+
+                        <Show when={editingProductId() !== prod.id}>
+                          <div class="flex gap-2 items-center shrink-0">
+                            <button
+                              onClick={() => openExternalUrl(`${prod.supplier?.search}${prod.sku}`)}
+                              class="text-gray-600 hover:text-cyan-400 p-1 cursor-pointer transition-colors"
+                              title="Check Supplier"
+                            >
+                              <Search size={10} />
+                            </button>
+
+                            <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                              <button
+                                onClick={() => {
+                                  setEditingProductId(prod.id);
+                                  setEditSkuValue(prod.sku);
+                                }}
+                                class="text-gray-600 hover:text-cyan-400 p-1 cursor-pointer transition-colors"
+                                title="Edit SKU"
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleUnlinkSupplier(prod.id)}
+                                class="text-gray-600 hover:text-red-400 p-1 cursor-pointer transition-colors"
+                                title="Delete Link"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </Show>
+                          </div>
+                        </Show>
                       </div>
                     )}
                   </For>
@@ -973,7 +1072,7 @@ export default function PartDetails() {
               </Show>
 
               {/* Add supplier listing form (Stocker/Admin) */}
-              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+              <Show when={showAddSupplierPanel() && (user()?.role === "admin" || user()?.role === "stocker")}>
                 <form onSubmit={handleLinkSupplier} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
                   <div class="w-full sm:w-1/2">
                     <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Select Supplier</label>
@@ -995,21 +1094,34 @@ export default function PartDetails() {
                     <input
                       type="text"
                       required
-                      value={newSupplierPartNo()}
-                      onInput={(e) => setNewSupplierPartNo(e.target.value)}
+                      value={newSupplierSku()}
+                      onInput={(e) => setNewSupplierSku(e.target.value)}
                       placeholder="E.g. YAG10KCT-ND"
                       class="glass-input w-full py-2 text-xs"
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={linkingSupplier() || !newSupplierId()}
-                    class="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5 font-bold"
-                  >
-                    <Plus size={14} />
-                    Link SKU
-                  </button>
+                  <div class="flex gap-2 w-full sm:w-auto shrink-0">
+                    <button
+                      type="submit"
+                      disabled={linkingSupplier() || !newSupplierId()}
+                      class="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-1.5 font-bold py-2 px-4 rounded-xl"
+                    >
+                      <Plus size={14} />
+                      Link SKU
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddSupplierPanel(false);
+                        setNewSupplierId("");
+                        setNewSupplierSku("");
+                      }}
+                      class="btn-secondary flex-1 sm:flex-none flex items-center justify-center gap-1.5 font-bold py-2 px-4 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </form>
               </Show>
             </div>
@@ -1109,13 +1221,12 @@ export default function PartDetails() {
           <div class="space-y-6">
 
             {/* Prominent Image Carousel / Drop Zone */}
-            <div 
+            <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              class={`hidden lg:flex glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex-col justify-center items-center group h-64 ${
-                isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
-              }`}
+              class={`hidden lg:flex glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex-col justify-center items-center group h-64 ${isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
+                }`}
             >
               <Show when={!item().images || item().images.length === 0}>
                 <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
@@ -1127,7 +1238,7 @@ export default function PartDetails() {
                     <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
                   </div>
                   <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                    <button 
+                    <button
                       onClick={() => setShowAddImageModal(true)}
                       class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
                     >
@@ -1143,13 +1254,13 @@ export default function PartDetails() {
                   return (
                     <div class="w-full h-full relative flex flex-col justify-between">
                       {/* Render Image */}
-                      <div 
+                      <div
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                         class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
                       >
-                        <img 
+                        <img
                           src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
                           alt={currentImage()?.caption}
                           class="max-w-full max-h-full object-contain pointer-events-none"
@@ -1162,7 +1273,7 @@ export default function PartDetails() {
                             <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
                           </Show>
                         </div>
-                        
+
                         {/* Deletion & Add actions top right */}
                         <div class="absolute top-3 right-3 flex gap-2">
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
@@ -1187,13 +1298,13 @@ export default function PartDetails() {
                       {/* Carousel controls if > 1 image */}
                       <Show when={item().images.length > 1}>
                         <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
-                          <button 
+                          <button
                             onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
                             class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
                           >
                             <Minus size={14} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
                             class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
                           >
@@ -1742,7 +1853,7 @@ export default function PartDetails() {
                 </div>
                 <span class="text-[10px] text-gray-500 mt-1 block text-right">Available: {moveSourceLocation()?.quantity || 0} units</span>
               </div>
-               {/* Destination Mode Tabs */}
+              {/* Destination Mode Tabs */}
               <div class="space-y-3">
                 <label class="block font-semibold text-gray-400 uppercase">Destination Location</label>
                 <div class="flex rounded-lg overflow-hidden border border-white/10 text-xs font-semibold">
@@ -1766,7 +1877,7 @@ export default function PartDetails() {
                 {/* Combine Stock / Quick Selects */}
                 <Show when={moveDestMode() === "link"}>
                   <div class="space-y-2">
-                    <Show 
+                    <Show
                       when={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id).length > 0}
                       fallback={<p class="text-xs text-gray-500 italic">No other locations currently store this part. Use "Create New" to place stock in a new bin.</p>}
                     >
@@ -1776,11 +1887,10 @@ export default function PartDetails() {
                             <button
                               type="button"
                               onClick={() => setMoveDestLocationId(String(loc.id))}
-                              class={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${
-                                moveDestLocationId() === String(loc.id)
-                                  ? "bg-accentCyan/15 border-accentCyan text-white"
-                                  : "bg-white/[0.02] border-white/5 hover:border-white/10 text-gray-300"
-                              }`}
+                              class={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${moveDestLocationId() === String(loc.id)
+                                ? "bg-accentCyan/15 border-accentCyan text-white"
+                                : "bg-white/[0.02] border-white/5 hover:border-white/10 text-gray-300"
+                                }`}
                             >
                               <div class="flex items-center gap-2">
                                 <MapPin size={13} class={moveDestLocationId() === String(loc.id) ? "text-accentCyan" : "text-gray-500"} />
@@ -1864,7 +1974,7 @@ export default function PartDetails() {
           <div class="glass-panel w-full max-w-md p-6 rounded-2xl border border-white/10 space-y-4 animate-scaleUp">
             <div class="flex justify-between items-center border-b border-white/5 pb-3">
               <h3 class="text-lg font-bold text-white">Add Component Image</h3>
-              <button 
+              <button
                 onClick={() => { setShowAddImageModal(false); setUploadFile(null); }}
                 class="text-gray-400 hover:text-white"
               >
@@ -1876,7 +1986,7 @@ export default function PartDetails() {
               <Show when={!stagedDroppedUrl()}>
                 <div class="space-y-1.5">
                   <label class="block font-semibold text-gray-400 uppercase">Select File</label>
-                  <input 
+                  <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
@@ -1885,7 +1995,7 @@ export default function PartDetails() {
                   />
                 </div>
               </Show>
-              
+
               <Show when={stagedDroppedUrl()}>
                 <div class="space-y-1.5 p-3 bg-cyan-500/5 border border-cyan-500/10 rounded-xl text-[11px] text-cyan-300 truncate">
                   <span class="font-bold uppercase block text-[9px] text-cyan-400 mb-1">Source URL (Web Drag)</span>
@@ -1895,7 +2005,7 @@ export default function PartDetails() {
 
               <div class="space-y-1.5">
                 <label class="block font-semibold text-gray-400 uppercase">Caption / Label</label>
-                <input 
+                <input
                   type="text"
                   placeholder="E.g. Front Footprint, Package Outline (Optional)"
                   value={newImageCaption()}
@@ -1906,7 +2016,7 @@ export default function PartDetails() {
 
               <div class="space-y-1.5">
                 <label class="block font-semibold text-gray-400 uppercase">Notes / Details</label>
-                <textarea 
+                <textarea
                   placeholder="Additional context or Pinout details..."
                   value={newImageNotes()}
                   onInput={(e) => setNewImageNotes(e.target.value)}

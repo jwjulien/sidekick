@@ -7,7 +7,7 @@ import json
 
 from .database import engine, Base, get_db
 from . import models, auth
-from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects
+from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -42,6 +42,7 @@ app.include_router(parts.router)
 app.include_router(uploads.router)
 app.include_router(suppliers.router)
 app.include_router(projects.router)
+app.include_router(products.router)
 
 @app.get("/")
 def read_root():
@@ -151,10 +152,10 @@ def seed_database(db: Session = Depends(get_db)):
         db.commit()
         
         # 5. Seed Products (distributor catalog entries)
-        prod_res_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_res.id, number="P10K-0805-DK")
-        prod_res_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_res.id, number="603-RC0805JR-0710KL")
-        prod_mcu_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_mcu.id, number="497-6060-ND")
-        prod_mcu_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_mcu.id, number="511-STM32F103C8T6")
+        prod_res_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_res.id, sku="P10K-0805-DK")
+        prod_res_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_res.id, sku="603-RC0805JR-0710KL")
+        prod_mcu_dk = models.Product(supplier_id=supplier_digikey.id, part_id=part_mcu.id, sku="497-6060-ND")
+        prod_mcu_ms = models.Product(supplier_id=supplier_mouser.id, part_id=part_mcu.id, sku="511-STM32F103C8T6")
         db.add_all([prod_res_dk, prod_res_ms, prod_mcu_dk, prod_mcu_ms])
         db.commit()
         

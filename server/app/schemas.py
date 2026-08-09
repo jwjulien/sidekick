@@ -103,10 +103,13 @@ class SupplierOut(SupplierBase):
 class ProductBase(BaseModel):
     supplier_id: int
     part_id: int
-    number: str
+    sku: str
 
 class ProductCreate(ProductBase):
     pass
+
+class ProductUpdate(BaseModel):
+    sku: str
 
 class ProductOut(ProductBase):
     id: int
