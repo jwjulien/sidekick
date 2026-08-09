@@ -1,6 +1,6 @@
 ---
 title: Part Images
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows
@@ -41,9 +41,10 @@ This feature allows users to attach visual references (photos, pinout diagrams, 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Image` Peewee model with `part_id` foreign key.
-- [ ] Build FastAPI `POST` route for multipart uploads.
-- [ ] Build FastAPI `GET` route to serve the raw image binary to the frontend.
-- [ ] Create SolidJS image grid and lightbox UI.
-- [ ] Create SolidJS upload form (ensure `capture` attribute is present for mobile).
-- [ ] Wire frontend to backend API.
+- [x] Define `Image` model with `part_id` foreign key.
+- [x] Build FastAPI `POST` route for multipart uploads.
+- [x] Build FastAPI `GET` route to serve the raw image binary to the frontend.
+- [x] Create SolidJS image gallery / carousel view.
+- [x] Create SolidJS modal upload form.
+- [x] Wire frontend to backend API.
+- [ ] Add drag and drop support for local file uploads and browser image URL downloads.

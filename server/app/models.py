@@ -155,7 +155,8 @@ class Image(Base):
     id = Column(Integer, primary_key=True, index=True)
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
     modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    caption = Column(String(60), nullable=False)
+    caption = Column(String(60), nullable=True)
+    notes = Column(Text, nullable=True)
     content = Column(LargeBinary, nullable=False)
     part_id = Column(Integer, ForeignKey("parts.id", ondelete="CASCADE"), nullable=False)
 

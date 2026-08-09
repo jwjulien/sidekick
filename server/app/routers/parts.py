@@ -1,5 +1,5 @@
 from typing import List, Optional, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from pydantic import BaseModel
@@ -151,6 +151,127 @@ def get_part(
         
     part.total_quantity = sum(s.quantity for s in part.storage_records)
     return part
+
+@router.get("/{part_id}/images", response_model=List[schemas.ImageOut])
+def get_part_images(
+    part_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all images/photos for a part (excluding binary payload).
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+    return part.images
+
+@router.post("/{part_id}/images", response_model=schemas.ImageOut, status_code=status.HTTP_201_CREATED)
+async def upload_part_image(
+    part_id: int,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Upload a picture attachment directly linked to the Part.
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+        
+    import os
+    safe_filename = os.path.basename(file.filename)
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+        
+    try:
+        file_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not read upload file: {str(e)}"
+        )
+        
+    db_image = models.Image(
+        part_id=part_id,
+        caption=caption or safe_filename,
+        notes=notes,
+        content=file_bytes
+    )
+    db.add(db_image)
+    
+    db_tx = models.Transaction(
+        part_id=part_id,
+        user_id=current_user.id,
+        action_type="edit",
+        quantity_change=0,
+        notes=f"Uploaded image: {caption or safe_filename}."
+    )
+    db.add(db_tx)
+    db.commit()
+    db.refresh(db_image)
+    
+    return db_image
+
+class ImageUrlPayload(BaseModel):
+    url: str
+    caption: Optional[str] = None
+    notes: Optional[str] = None
+
+@router.post("/{part_id}/images/url", response_model=schemas.ImageOut, status_code=status.HTTP_201_CREATED)
+async def download_part_image_url(
+    part_id: int,
+    payload: ImageUrlPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Download an image from a remote URL and attach it to the Part.
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+        
+    import urllib.request
+    try:
+        # Fetch file contents
+        req = urllib.request.Request(
+            payload.url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            file_bytes = response.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to download image from URL: {str(e)}"
+        )
+    default_caption = payload.caption or payload.url.split("/")[-1].split("?")[0] or "Downloaded Image"
+        
+    db_image = models.Image(
+        part_id=part_id,
+        caption=default_caption,
+        notes=payload.notes,
+        content=file_bytes
+    )
+    db.add(db_image)
+    
+    db_tx = models.Transaction(
+        part_id=part_id,
+        user_id=current_user.id,
+        action_type="edit",
+        quantity_change=0,
+        notes=f"Downloaded and attached image from URL: {default_caption}."
+    )
+    db.add(db_tx)
+    db.commit()
+    db.refresh(db_image)
+    
+    return db_image
+
 
 @router.get("/{part_id}/documents", response_model=List[schemas.DocumentOut])
 def get_part_documents(

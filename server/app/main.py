@@ -192,7 +192,7 @@ def seed_database(db: Session = Depends(get_db)):
         db.add_all([storage_slot_res, storage_slot_cap, storage_slot_mcu])
         db.commit()
         
-        # 7. Seed Projects & Revisions & materials (BOM lists)
+        # 7. Seed Projects & Assemblies & Revisions & materials (BOM lists)
         proj_sensor = models.Project(
             title="Wireless Sensor Node PCB",
             description="Low-power IoT environmental telemetry PCB containing humidity and temperature sensors."
@@ -204,13 +204,18 @@ def seed_database(db: Session = Depends(get_db)):
         db.add_all([proj_sensor, proj_motor])
         db.commit()
         
+        assembly_sensor = models.Assembly(project_id=proj_sensor.id, name="Sensor Assembly")
+        assembly_motor = models.Assembly(project_id=proj_motor.id, name="Motor Assembly")
+        db.add_all([assembly_sensor, assembly_motor])
+        db.commit()
+        
         rev_sensor_v1 = models.Revision(
-            project_id=proj_sensor.id,
+            assembly_id=assembly_sensor.id,
             version="v1.0.0",
             date=date(2026, 1, 15)
         )
         rev_motor_v2 = models.Revision(
-            project_id=proj_motor.id,
+            assembly_id=assembly_motor.id,
             version="v2.1.0",
             date=date(2026, 7, 20)
         )

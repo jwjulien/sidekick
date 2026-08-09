@@ -244,7 +244,8 @@ class StorageDetailsOut(StorageOut):
 # ----------------- Image Schemas -----------------
 class ImageOut(BaseModel):
     id: int
-    caption: str
+    caption: Optional[str] = None
+    notes: Optional[str] = None
     part_id: int
     created_on: datetime
 

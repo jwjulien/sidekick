@@ -89,6 +89,14 @@ export default function PartDetails() {
   const [locations, setLocations] = createSignal<any[]>([]);
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
 
+  // Carousel & Drag & Drop State
+  const [activeImageIndex, setActiveImageIndex] = createSignal(0);
+  const [isDraggingOver, setIsDraggingOver] = createSignal(false);
+  const [showAddImageModal, setShowAddImageModal] = createSignal(false);
+  const [newImageCaption, setNewImageCaption] = createSignal("");
+  const [newImageNotes, setNewImageNotes] = createSignal("");
+
+
   const getLocationHeight = (locId: number, locs: any[]): number => {
     const children = locs.filter((l: any) => l.parent_id === locId);
     if (children.length === 0) return 0;
@@ -294,7 +302,7 @@ export default function PartDetails() {
     }
   };
 
-  const handleDeleteImage = async (attachId: number) => {
+  const handleDeleteImage = async (imageId: number) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this photo?",
@@ -303,13 +311,160 @@ export default function PartDetails() {
     });
     if (!isConfirmed) return;
     try {
-      await apiFetch(`/uploads/${attachId}`, { method: "DELETE" });
+      await apiFetch(`/api/images/${imageId}`, { method: "DELETE" });
+      setActiveImageIndex(0);
       fetchItemDetails();
       toast.success("Photo deleted successfully.");
     } catch (err: any) {
       toast.error(err.message || "Deletion failed.");
     }
   };
+
+  const [stagedDroppedUrl, setStagedDroppedUrl] = createSignal("");
+
+  const uploadImageFromLocalFile = async (file: File, caption: string, notes?: string) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("caption", caption);
+    if (notes) formData.append("notes", notes);
+
+    try {
+      const url = `${backendUrl()}/parts/${itemId}/images`;
+      const tokenHeader = localStorage.getItem("sidekick_token");
+      const headers: Record<string, string> = {};
+      if (tokenHeader) {
+        headers["Authorization"] = `Bearer ${tokenHeader}`;
+      }
+
+      const res = await fetch(url, { method: "POST", headers, body: formData });
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Upload failed.");
+      }
+
+      toast.success("Image uploaded successfully.");
+      fetchItemDetails();
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadImageFromUrl = async (imgUrl: string, caption: string, notes?: string) => {
+    setUploading(true);
+    try {
+      await apiFetch(`/parts/${itemId}/images/url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: imgUrl, caption, notes })
+      });
+      toast.success("Image downloaded and attached successfully.");
+      fetchItemDetails();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to download image.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageUploadForm = async (e: Event) => {
+    e.preventDefault();
+    
+    // Check if we are uploading a downloaded URL
+    const droppedUrl = stagedDroppedUrl();
+    if (droppedUrl) {
+      await uploadImageFromUrl(droppedUrl, newImageCaption() || "Dropped URL Image", newImageNotes());
+      setStagedDroppedUrl("");
+    } else {
+      const file = uploadFile();
+      if (!file) return;
+      await uploadImageFromLocalFile(file, newImageCaption() || file.name, newImageNotes());
+      setUploadFile(null);
+    }
+    
+    setShowAddImageModal(false);
+    setNewImageCaption("");
+    setNewImageNotes("");
+  };
+
+
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    console.log("Drop event detected!");
+    if (e.dataTransfer) {
+      console.log("Types available:", e.dataTransfer.types);
+      console.log("Files length:", e.dataTransfer.files?.length);
+    }
+
+    // 1. Check for files
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      console.log("Dropped file:", file.name, file.type);
+      if (file.type.startsWith("image/")) {
+        setUploadFile(file);
+        setStagedDroppedUrl("");
+        setNewImageCaption(file.name);
+        setShowAddImageModal(true);
+      } else {
+        toast.error("Only image files can be dropped here.");
+      }
+      return;
+    }
+
+    // 2. Check for image url drag from browser (HTML source containing image tag)
+    const htmlData = e.dataTransfer?.getData("text/html");
+    if (htmlData) {
+      console.log("Dropped HTML:", htmlData);
+      const doc = new DOMParser().parseFromString(htmlData, "text/html");
+      const img = doc.querySelector("img");
+      if (img && img.src) {
+        setStagedDroppedUrl(img.src);
+        setUploadFile(null);
+        setNewImageCaption("Dropped Browser Image");
+        setShowAddImageModal(true);
+        return;
+      }
+    }
+
+    // 3. Fallback plaintext URL (e.g. mouser image URL links)
+    const textData = e.dataTransfer?.getData("text/plain");
+    if (textData) {
+      console.log("Dropped text:", textData);
+      const urlMatch = textData.match(/https?:\/\/[^\s"']+\.(?:png|jpg|jpeg|gif|webp|svg)/i) || textData.trim().match(/^https?:\/\/[^\s"']+$/i);
+      if (urlMatch) {
+        const targetUrl = urlMatch[0];
+        setStagedDroppedUrl(targetUrl);
+        setUploadFile(null);
+        setNewImageCaption("Dropped URL Image");
+        setShowAddImageModal(true);
+        return;
+      }
+    }
+
+    toast.error("Could not extract image from drop data.");
+  };
+
 
   const handleDeleteDocument = async (docId: number) => {
     const isConfirmed = await confirm({
@@ -639,6 +794,105 @@ export default function PartDetails() {
               </div>
             </div>
 
+            {/* Responsive Image block: Only visible on mobile/small screens, hidden on large desktop screens */}
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              class={`lg:hidden glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex flex-col justify-center items-center group h-64 ${
+                isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
+              }`}
+            >
+              <Show when={!item().images || item().images.length === 0}>
+                <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
+                  <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 group-hover:text-accentCyan group-hover:border-accentCyan/30 transition-colors pointer-events-none">
+                    <ImageIcon size={28} />
+                  </div>
+                  <div class="pointer-events-none">
+                    <p class="text-sm font-semibold text-white">No Component Photo</p>
+                    <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
+                  </div>
+                  <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                    <button 
+                      onClick={() => setShowAddImageModal(true)}
+                      class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
+                    >
+                      <Plus size={12} /> Add Image
+                    </button>
+                  </Show>
+                </div>
+              </Show>
+
+              <Show when={item().images && item().images.length > 0}>
+                {() => {
+                  const currentImage = () => item().images[activeImageIndex()] || item().images[0];
+                  return (
+                    <div class="w-full h-full relative flex flex-col justify-between">
+                      {/* Render Image */}
+                      <div 
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
+                      >
+                        <img 
+                          src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
+                          alt={currentImage()?.caption}
+                          class="max-w-full max-h-full object-contain pointer-events-none"
+                        />
+
+                        {/* Image Caption overlay */}
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 text-xs text-white pointer-events-none">
+                          <p class="font-bold truncate">{currentImage()?.caption}</p>
+                          <Show when={currentImage()?.notes}>
+                            <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
+                          </Show>
+                        </div>
+                        
+                        {/* Deletion & Add actions top right */}
+                        <div class="absolute top-3 right-3 flex gap-2">
+                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                            <button
+                              onClick={() => setShowAddImageModal(true)}
+                              class="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
+                              title="Add another photo"
+                            >
+                              <Plus size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteImage(currentImage()?.id)}
+                              class="p-1.5 rounded-lg bg-black/60 text-red-400 hover:text-red-300 hover:bg-black/80 transition-colors cursor-pointer"
+                              title="Delete this photo"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+
+                      {/* Carousel controls if > 1 image */}
+                      <Show when={item().images.length > 1}>
+                        <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
+                          <button 
+                            onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
+                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <button 
+                            onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
+                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </Show>
+                    </div>
+                  );
+                }}
+              </Show>
+            </div>
+
             {/* Consumed by PCB projects Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
@@ -760,82 +1014,7 @@ export default function PartDetails() {
               </Show>
             </div>
 
-            {/* Photos & Images Card */}
-            <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
-              <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <ImageIcon size={18} class="text-accentCyan" />
-                Photos & Component Images
-              </h3>
 
-              {/* Upload interface */}
-              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                <form onSubmit={handleFileUpload} class="flex flex-col sm:flex-row gap-3 items-end p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
-                  <div class="flex-1 w-full">
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Upload Image file</label>
-                    <input
-                      type="file"
-                      id="file-input-field"
-                      accept="image/*"
-                      onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
-                      class="glass-input w-full py-2 px-3 text-xs"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={uploading() || !uploadFile()}
-                    class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
-                  >
-                    <Upload size={14} />
-                    {uploading() ? "Uploading..." : "Upload Image"}
-                  </button>
-                </form>
-              </Show>
-
-              {/* Images List */}
-              <Show when={!item().images || item().images.length === 0}>
-                <div class="text-center py-6 text-xs text-gray-500">
-                  No images uploaded for this component.
-                </div>
-              </Show>
-
-              <Show when={item().images && item().images.length > 0}>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <For each={item().images}>
-                    {(img) => (
-                      <div class="glass-card p-3 rounded-xl flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                          <div class="text-accentCyan shrink-0">
-                            <ImageIcon size={18} />
-                          </div>
-                          <span class="font-medium text-white truncate max-w-[150px]">{img.caption}</span>
-                        </div>
-
-                        <div class="flex items-center gap-1.5 shrink-0">
-                          <a
-                            href={`${backendUrl()}/uploads/file/${itemId}/${img.caption}`}
-                            target="_blank"
-                            class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
-                            title="Open Image"
-                          >
-                            <Download size={12} />
-                          </a>
-
-                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                            <button
-                              onClick={() => handleDeleteImage(img.id)}
-                              class="p-1.5 rounded-lg bg-white/5 text-red-400 hover:text-red-300 hover:bg-red-500/5 cursor-pointer"
-                              title="Delete Photo"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </Show>
-                        </div>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </div>
 
             {/* Document Attachments Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
@@ -928,6 +1107,105 @@ export default function PartDetails() {
 
           {/* ----------------- RIGHT 1 COL: INVENTORY CONTROLS & LOGS ----------------- */}
           <div class="space-y-6">
+
+            {/* Prominent Image Carousel / Drop Zone */}
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              class={`hidden lg:flex glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex-col justify-center items-center group h-64 ${
+                isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
+              }`}
+            >
+              <Show when={!item().images || item().images.length === 0}>
+                <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
+                  <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 group-hover:text-accentCyan group-hover:border-accentCyan/30 transition-colors pointer-events-none">
+                    <ImageIcon size={28} />
+                  </div>
+                  <div class="pointer-events-none">
+                    <p class="text-sm font-semibold text-white">No Component Photo</p>
+                    <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
+                  </div>
+                  <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                    <button 
+                      onClick={() => setShowAddImageModal(true)}
+                      class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
+                    >
+                      <Plus size={12} /> Add Image
+                    </button>
+                  </Show>
+                </div>
+              </Show>
+
+              <Show when={item().images && item().images.length > 0}>
+                {() => {
+                  const currentImage = () => item().images[activeImageIndex()] || item().images[0];
+                  return (
+                    <div class="w-full h-full relative flex flex-col justify-between">
+                      {/* Render Image */}
+                      <div 
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
+                      >
+                        <img 
+                          src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
+                          alt={currentImage()?.caption}
+                          class="max-w-full max-h-full object-contain pointer-events-none"
+                        />
+
+                        {/* Image Caption overlay */}
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 text-xs text-white pointer-events-none">
+                          <p class="font-bold truncate">{currentImage()?.caption}</p>
+                          <Show when={currentImage()?.notes}>
+                            <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
+                          </Show>
+                        </div>
+                        
+                        {/* Deletion & Add actions top right */}
+                        <div class="absolute top-3 right-3 flex gap-2">
+                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                            <button
+                              onClick={() => setShowAddImageModal(true)}
+                              class="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
+                              title="Add another photo"
+                            >
+                              <Plus size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteImage(currentImage()?.id)}
+                              class="p-1.5 rounded-lg bg-black/60 text-red-400 hover:text-red-300 hover:bg-black/80 transition-colors cursor-pointer"
+                              title="Delete this photo"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+
+                      {/* Carousel controls if > 1 image */}
+                      <Show when={item().images.length > 1}>
+                        <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
+                          <button 
+                            onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
+                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <button 
+                            onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
+                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </Show>
+                    </div>
+                  );
+                }}
+              </Show>
+            </div>
 
             {/* Inventory Levels Controls */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
@@ -1579,6 +1857,84 @@ export default function PartDetails() {
           </div>
         </div>
       </Show>
+
+      {/* Add Image Modal */}
+      <Show when={showAddImageModal()}>
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div class="glass-panel w-full max-w-md p-6 rounded-2xl border border-white/10 space-y-4 animate-scaleUp">
+            <div class="flex justify-between items-center border-b border-white/5 pb-3">
+              <h3 class="text-lg font-bold text-white">Add Component Image</h3>
+              <button 
+                onClick={() => { setShowAddImageModal(false); setUploadFile(null); }}
+                class="text-gray-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleImageUploadForm} class="space-y-4 text-xs">
+              <Show when={!stagedDroppedUrl()}>
+                <div class="space-y-1.5">
+                  <label class="block font-semibold text-gray-400 uppercase">Select File</label>
+                  <input 
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
+                    class="glass-input w-full py-2 px-3 text-xs"
+                    required={!uploadFile()}
+                  />
+                </div>
+              </Show>
+              
+              <Show when={stagedDroppedUrl()}>
+                <div class="space-y-1.5 p-3 bg-cyan-500/5 border border-cyan-500/10 rounded-xl text-[11px] text-cyan-300 truncate">
+                  <span class="font-bold uppercase block text-[9px] text-cyan-400 mb-1">Source URL (Web Drag)</span>
+                  {stagedDroppedUrl()}
+                </div>
+              </Show>
+
+              <div class="space-y-1.5">
+                <label class="block font-semibold text-gray-400 uppercase">Caption / Label</label>
+                <input 
+                  type="text"
+                  placeholder="E.g. Front Footprint, Package Outline (Optional)"
+                  value={newImageCaption()}
+                  onInput={(e) => setNewImageCaption(e.target.value)}
+                  class="glass-input w-full py-2 px-3 text-xs"
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="block font-semibold text-gray-400 uppercase">Notes / Details</label>
+                <textarea 
+                  placeholder="Additional context or Pinout details..."
+                  value={newImageNotes()}
+                  onInput={(e) => setNewImageNotes(e.target.value)}
+                  class="glass-input w-full py-2 px-3 text-xs h-20"
+                />
+              </div>
+
+              <div class="flex gap-3 pt-3 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddImageModal(false); setUploadFile(null); setStagedDroppedUrl(""); }}
+                  class="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading() || (!uploadFile() && !stagedDroppedUrl())}
+                  class="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {uploading() ? "Uploading..." : "Save Image"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }
+
