@@ -237,6 +237,43 @@ def delete_revision(
     db.commit()
     return
 
+@router.post("/revisions/{revision_id}/clone", response_model=schemas.RevisionOut, status_code=status.HTTP_201_CREATED)
+def clone_revision(
+    revision_id: int,
+    payload: schemas.RevisionClone,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Clone a revision and all of its associated BOM materials. Requires Designer role.
+    """
+    source_revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
+    if not source_revision:
+        raise HTTPException(status_code=404, detail="Source revision not found.")
+        
+    db_revision = models.Revision(
+        assembly_id=source_revision.assembly_id,
+        version=payload.version,
+        date=payload.date
+    )
+    db.add(db_revision)
+    db.commit()
+    db.refresh(db_revision)
+    
+    # Get all materials from the source revision
+    materials = db.query(models.Material).filter(models.Material.revision_id == source_revision.id).all()
+    for mat in materials:
+        db_material = models.Material(
+            revision_id=db_revision.id,
+            part_id=mat.part_id,
+            designator=mat.designator
+        )
+        db.add(db_material)
+    
+    db.commit()
+    db.refresh(db_revision)
+    return db_revision
+
 # --- Bill of Materials (BOM) Links ---
 
 @router.post("/materials", response_model=schemas.MaterialOut, status_code=status.HTTP_201_CREATED)

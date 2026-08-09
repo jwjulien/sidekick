@@ -167,6 +167,10 @@ class RevisionUpdate(BaseModel):
     version: Optional[str] = None
     date: Optional[date] = None
 
+class RevisionClone(BaseModel):
+    version: str
+    date: date
+
 class RevisionOut(RevisionBase):
     id: int
     created_on: datetime

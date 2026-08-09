@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Tag,
-  Boxes
+  Boxes,
+  Copy
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -48,6 +49,11 @@ export default function Projects() {
   const [editRevId, setEditRevId] = createSignal<number | null>(null);
   const [revVersion, setRevVersion] = createSignal("");
   const [revDate, setRevDate] = createSignal("");
+
+  // Clone Revision Modal
+  const [showCloneModal, setShowCloneModal] = createSignal(false);
+  const [cloneRevVersion, setCloneRevVersion] = createSignal("");
+  const [cloneRevDate, setCloneRevDate] = createSignal("");
 
   // Add BOM Material Modal
   const [showMatModal, setShowMatModal] = createSignal(false);
@@ -326,6 +332,41 @@ export default function Projects() {
       await handleSelectProject(selectedProjectId()!, currentAssemId);
     } catch (err: any) {
       toast.error(err.message || "Failed to delete revision.");
+    }
+  };
+
+  const handleCloneRevision = async (e: Event) => {
+    e.preventDefault();
+    const sourceRevId = selectedRevisionId();
+    const assemId = selectedAssemblyId();
+    if (!sourceRevId || !cloneRevVersion() || !cloneRevDate()) return;
+    
+    setSubmitting(true);
+    try {
+      const payload = {
+        version: cloneRevVersion(),
+        date: cloneRevDate()
+      };
+      
+      const newRev = await apiFetch(`/projects/revisions/${sourceRevId}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      toast.success("Revision cloned successfully.");
+      
+      setCloneRevVersion("");
+      setCloneRevDate("");
+      setShowCloneModal(false);
+      
+      // Refresh project detailed view and select the new revision
+      await handleSelectProject(selectedProjectId()!, assemId!);
+      handleSelectRevision(newRev.id);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to clone revision.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -629,6 +670,19 @@ export default function Projects() {
                               </button>
                               
                               <button
+                                onClick={() => {
+                                  setCloneRevVersion(`${selectedRevision().version}-clone`);
+                                  setCloneRevDate(new Date().toISOString().split("T")[0]);
+                                  setShowCloneModal(true);
+                                }}
+                                class="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 mr-2"
+                                title="Clone Revision"
+                              >
+                                <Copy size={14} />
+                                Clone Version
+                              </button>
+                              
+                              <button
                                 onClick={() => setShowMatModal(true)}
                                 class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
                               >
@@ -888,6 +942,67 @@ export default function Projects() {
                   class="btn-primary flex-1"
                 >
                   {submitting() ? "Saving..." : "Save Revision"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+
+      {/* Clone Revision Modal */}
+      <Show when={showCloneModal()}>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div class="glass-panel max-w-md w-full rounded-2xl p-6 border border-white/10 relative">
+            <button 
+              onClick={() => setShowCloneModal(false)}
+              class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+              <Copy class="text-accentCyan" size={20} />
+              Clone Revision Version
+            </h3>
+            
+            <form onSubmit={handleCloneRevision} class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">New Version Code</label>
+                <input
+                  type="text"
+                  required
+                  value={cloneRevVersion()}
+                  onInput={(e) => setCloneRevVersion(e.target.value)}
+                  placeholder="E.g. v2.0, v1.1-clone"
+                  class="glass-input w-full text-sm"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Layout Date</label>
+                <input
+                  type="date"
+                  required
+                  value={cloneRevDate()}
+                  onInput={(e) => setCloneRevDate(e.target.value)}
+                  class="glass-input w-full text-sm"
+                />
+              </div>
+
+              <div class="flex gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowCloneModal(false)}
+                  class="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting()}
+                  class="btn-primary flex-1"
+                >
+                  {submitting() ? "Cloning..." : "Clone Revision"}
                 </button>
               </div>
             </form>
