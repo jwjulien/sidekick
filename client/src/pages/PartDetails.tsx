@@ -19,12 +19,15 @@ import {
   Building2,
   Cpu,
   X,
-  Link2
+  Link2,
+  Printer,
+  Move
 } from "lucide-solid";
 import { apiFetch, user, backendUrl } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import StockController from "../components/StockController";
+import LabelPreviewModal from "../components/LabelPreviewModal";
 export default function PartDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -58,6 +61,7 @@ export default function PartDetails() {
   const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(true);
   const [moveSourceLocation, setMoveSourceLocation] = createSignal<any>(null);
   const [moveSubmitting, setMoveSubmitting] = createSignal(false);
+  const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
 
   const activeDrillSlot = createMemo(() => {
     const target = drillTarget();
@@ -1376,8 +1380,7 @@ export default function PartDetails() {
                         <MapPin size={13} class="text-accentCyan shrink-0" />
                         <span class="text-xs text-gray-300 font-medium truncate">{item().storage_records[0]?.name}</span>
                       </div>
-                      <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1">
                           <button
                             onClick={() => {
                               const rec = item().storage_records[0];
@@ -1391,19 +1394,27 @@ export default function PartDetails() {
                               setShowMoveModal(true);
                             }}
                             disabled={item().storage_records[0]?.quantity === 0}
-                            class="text-[10px] font-bold text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                            class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                            title="Move Parts"
                           >
-                            Move Parts
+                            <Move size={14} />
+                          </button>
+                          <button
+                            onClick={() => setActivePrintLocation(item().storage_records[0])}
+                            class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
+                            title="Print Label"
+                          >
+                            <Printer size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteLocation(item().storage_records[0])}
                             disabled={item().storage_records[0]?.quantity > 0}
-                            class="text-[10px] font-bold text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                            class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                            title="Delete Location"
                           >
-                            Delete Location
+                            <Trash2 size={14} />
                           </button>
                         </div>
-                      </Show>
                     </div>
 
                     {/* StockController */}
@@ -1436,8 +1447,7 @@ export default function PartDetails() {
                             <MapPin size={13} class="text-accentCyan shrink-0" />
                             <span class="text-sm font-bold text-white truncate">{activeDrillSlot()?.name}</span>
                           </div>
-                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-1">
                               <button
                                 onClick={() => {
                                   const rec = activeDrillSlot();
@@ -1451,19 +1461,27 @@ export default function PartDetails() {
                                   setShowMoveModal(true);
                                 }}
                                 disabled={activeDrillSlot()?.quantity === 0}
-                                class="text-[10px] font-bold text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                                class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                                title="Move Parts"
                               >
-                                Move Parts
+                                <Move size={14} />
+                              </button>
+                              <button
+                                onClick={() => setActivePrintLocation(activeDrillSlot())}
+                                class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
+                                title="Print Label"
+                              >
+                                <Printer size={14} />
                               </button>
                               <button
                                 onClick={() => handleDeleteLocation(activeDrillSlot())}
                                 disabled={activeDrillSlot()?.quantity > 0}
-                                class="text-[10px] font-bold text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+                                class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                                title="Delete Location"
                               >
-                                Delete Location
+                                <Trash2 size={14} />
                               </button>
                             </div>
-                          </Show>
                         </div>
                       </div>
                       <StockController
@@ -2044,6 +2062,12 @@ export default function PartDetails() {
           </div>
         </div>
       </Show>
+
+      {/* Label Print Modal */}
+      <LabelPreviewModal
+        location={activePrintLocation()}
+        onClose={() => setActivePrintLocation(null)}
+      />
     </div>
   );
 }

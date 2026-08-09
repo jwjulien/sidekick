@@ -7,11 +7,14 @@ import {
   Trash2, 
   ChevronRight, 
   ChevronDown,
-  Layers
+  Layers,
+  Printer
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
+import LabelPreviewModal from "../components/LabelPreviewModal";
+
 
 const CategoryNode = (props: {
   category: any;
@@ -100,6 +103,9 @@ export default function Design() {
   const [locParentId, setLocParentId] = createSignal("");
   const [locIndex, setLocIndex] = createSignal(0);
   const [locLabelScheme, setLocLabelScheme] = createSignal("");
+  
+  // Printing Reference Tags
+  const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -499,12 +505,22 @@ export default function Design() {
                             </div>
                           </div>
 
-                          <button
-                            onClick={() => handleDeleteLocation(loc.id)}
-                            class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div class="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setActivePrintLocation({ id: loc.id, name: loc.name, description: loc.description })}
+                              class="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                              title="Print Reference Tag"
+                            >
+                              <Printer size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLocation(loc.id)}
+                              class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
+                              title="Delete Location"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       );
                     }}
@@ -516,6 +532,12 @@ export default function Design() {
 
         </div>
       </Show>
+
+      {/* Label Print Modal */}
+      <LabelPreviewModal
+        location={activePrintLocation()}
+        onClose={() => setActivePrintLocation(null)}
+      />
     </div>
   );
 }
