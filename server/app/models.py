@@ -122,8 +122,10 @@ class Material(Base):
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
     modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     revision_id = Column(Integer, ForeignKey("revisions.id", ondelete="CASCADE"), nullable=False)
-    part_id = Column(Integer, ForeignKey("parts.id", ondelete="CASCADE"), nullable=False)
-    designator = Column(String(10), nullable=False)
+    part_id = Column(Integer, ForeignKey("parts.id", ondelete="SET NULL"), nullable=True)
+    quantity = Column(Integer, default=1, nullable=False)
+    designator = Column(String(255), nullable=True)
+    ghost_description = Column(String(255), nullable=True)
 
     revision = relationship("Revision", back_populates="materials")
     part = relationship("Part", back_populates="materials")

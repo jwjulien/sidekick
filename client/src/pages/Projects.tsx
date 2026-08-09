@@ -11,7 +11,11 @@ import {
   CheckCircle2,
   Tag,
   Boxes,
-  Copy
+  Copy,
+  Edit,
+  Check,
+  Link,
+  HelpCircle
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -59,6 +63,86 @@ export default function Projects() {
   const [showMatModal, setShowMatModal] = createSignal(false);
   const [matPartId, setMatPartId] = createSignal("");
   const [matDesignator, setMatDesignator] = createSignal("");
+  const [matQuantity, setMatQuantity] = createSignal("1");
+  const [matGhostDesc, setMatGhostDesc] = createSignal("");
+  const [addSearchQuery, setAddSearchQuery] = createSignal("");
+
+  const getSortedAddParts = () => {
+    const query = addSearchQuery().toLowerCase().trim();
+    if (!query) {
+      return parts();
+    }
+    const terms = query.split(/[\s,]+/).filter(Boolean);
+    if (terms.length === 0) {
+      return parts();
+    }
+    const scored = parts().map(p => {
+      let score = 0;
+      const value = (p.value || "").toLowerCase();
+      const number = (p.number || "").toLowerCase();
+      const pkg = (p.package || "").toLowerCase();
+      const catTitle = p.category ? (p.category.title || "").toLowerCase() : "";
+      
+      terms.forEach(term => {
+        if (value.includes(term)) score += 3;
+        if (number.includes(term)) score += 2;
+        if (pkg.includes(term)) score += 2;
+        if (catTitle.includes(term)) score += 1;
+      });
+      return { part: p, score };
+    });
+    return scored
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.part);
+  };
+
+  // Inline editing BOM materials
+  const [editingMaterialId, setEditingMaterialId] = createSignal<number | null>(null);
+  const [editQty, setEditQty] = createSignal("");
+  const [editDesignator, setEditDesignator] = createSignal("");
+  const [editGhostDesc, setEditGhostDesc] = createSignal("");
+
+  // Map Ghost Material Modal
+  const [showMapModal, setShowMapModal] = createSignal(false);
+  const [mappingMaterialId, setMappingMaterialId] = createSignal<number | null>(null);
+  const [mapPartId, setMapPartId] = createSignal("");
+  const [mapSearchQuery, setMapSearchQuery] = createSignal("");
+
+  const getSortedParts = () => {
+    const query = mapSearchQuery().toLowerCase().trim();
+    if (!query) {
+      return parts();
+    }
+    
+    // Split query by spaces or commas
+    const terms = query.split(/[\s,]+/).filter(Boolean);
+    if (terms.length === 0) {
+      return parts();
+    }
+    
+    const scored = parts().map(p => {
+      let score = 0;
+      const value = (p.value || "").toLowerCase();
+      const number = (p.number || "").toLowerCase();
+      const pkg = (p.package || "").toLowerCase();
+      const catTitle = p.category ? (p.category.title || "").toLowerCase() : "";
+      
+      terms.forEach(term => {
+        if (value.includes(term)) score += 3;
+        if (number.includes(term)) score += 2;
+        if (pkg.includes(term)) score += 2;
+        if (catTitle.includes(term)) score += 1;
+      });
+      
+      return { part: p, score };
+    });
+    
+    return scored
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.part);
+  };
 
   const [submitting, setSubmitting] = createSignal(false);
 
@@ -67,7 +151,7 @@ export default function Projects() {
     try {
       const [projs, catalogParts] = await Promise.all([
         apiFetch("/projects"),
-        apiFetch("/items")
+        apiFetch("/parts")
       ]);
       setProjects(projs);
       setParts(catalogParts);
@@ -373,14 +457,16 @@ export default function Projects() {
   const handleAddMaterial = async (e: Event) => {
     e.preventDefault();
     const revId = selectedRevisionId();
-    if (!revId || !matPartId() || !matDesignator()) return;
+    if (!revId) return;
     
     setSubmitting(true);
     try {
       const payload = {
         revision_id: revId,
-        part_id: parseInt(matPartId()),
-        designator: matDesignator()
+        part_id: matPartId() ? parseInt(matPartId()) : null,
+        designator: matDesignator() || null,
+        quantity: parseFloat(matQuantity()) || 1.0,
+        ghost_description: matGhostDesc() || null
       };
       
       await apiFetch("/projects/materials", {
@@ -391,6 +477,9 @@ export default function Projects() {
       
       setMatPartId("");
       setMatDesignator("");
+      setMatQuantity("1");
+      setMatGhostDesc("");
+      setAddSearchQuery("");
       setShowMatModal(false);
       
       // Refresh project detailed view and select revision
@@ -400,6 +489,71 @@ export default function Projects() {
       toast.success("BOM component added successfully.");
     } catch (err: any) {
       toast.error(err.message || "Failed to add BOM component.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStartInlineEdit = (mat: any) => {
+    setEditingMaterialId(mat.id);
+    setEditQty(String(mat.quantity));
+    setEditDesignator(mat.designator || "");
+    setEditGhostDesc(mat.ghost_description || "");
+  };
+
+  const handleSaveInlineEdit = async (matId: number) => {
+    try {
+      const payload = {
+        quantity: parseFloat(editQty()) || 1.0,
+        designator: editDesignator() || null,
+        ghost_description: editGhostDesc() || null
+      };
+      
+      await apiFetch(`/projects/materials/${matId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      setEditingMaterialId(null);
+      const currentAssemId = selectedAssemblyId()!;
+      const currentRevId = selectedRevisionId()!;
+      await handleSelectProject(selectedProjectId()!, currentAssemId);
+      handleSelectRevision(currentRevId, selectedProject().assemblies.find((a:any) => a.id === currentAssemId));
+      toast.success("BOM component updated.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update BOM component.");
+    }
+  };
+
+  const handleMapGhostMaterial = async (e: Event) => {
+    e.preventDefault();
+    const matId = mappingMaterialId();
+    if (!matId || !mapPartId()) return;
+    
+    setSubmitting(true);
+    try {
+      const payload = {
+        part_id: parseInt(mapPartId())
+      };
+      
+      await apiFetch(`/projects/materials/${matId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      setShowMapModal(false);
+      setMappingMaterialId(null);
+      setMapPartId("");
+      
+      const currentAssemId = selectedAssemblyId()!;
+      const currentRevId = selectedRevisionId()!;
+      await handleSelectProject(selectedProjectId()!, currentAssemId);
+      handleSelectRevision(currentRevId, selectedProject().assemblies.find((a:any) => a.id === currentAssemId));
+      toast.success("Ghost component mapped to inventory part.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to map component.");
     } finally {
       setSubmitting(false);
     }
@@ -683,7 +837,14 @@ export default function Projects() {
                               </button>
                               
                               <button
-                                onClick={() => setShowMatModal(true)}
+                                onClick={() => {
+                                  setMatPartId("");
+                                  setAddSearchQuery("");
+                                  setMatGhostDesc("");
+                                  setMatDesignator("");
+                                  setMatQuantity("1");
+                                  setShowMatModal(true);
+                                }}
                                 class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
                               >
                                 <Plus size={14} />
@@ -716,47 +877,174 @@ export default function Projects() {
                             <table class="w-full text-left border-collapse text-xs">
                               <thead>
                                 <tr class="bg-white/[0.02] border-b border-white/10 text-gray-400 font-semibold uppercase text-[10px] tracking-wider">
-                                  <th class="py-3 px-4 w-20">Designator</th>
-                                  <th class="py-3 px-4">Component Value</th>
-                                  <th class="py-3 px-4">Manufacturer SKU</th>
-                                  <th class="py-3 px-4">Package</th>
+                                  <th class="py-3 px-4 w-24">Designator</th>
+                                  <th class="py-3 px-4">Component / Description</th>
+                                  <th class="py-3 px-4 w-20 text-center">Qty Req</th>
                                   <th class="py-3 px-4 text-center">Available Stock</th>
-                                  <th class="py-3 px-4 text-center w-12">Actions</th>
+                                  <th class="py-3 px-4 text-center w-24">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 <For each={selectedRevision().materials}>
                                   {(mat) => {
-                                    const part = mat.part || {};
+                                    const part = mat.part || null;
+                                    const isGhost = !mat.part_id;
+                                    const isEditing = () => editingMaterialId() === mat.id;
+                                    
                                     // Calculate total stock of this part
-                                    const totalStock = part.storage_records ? part.storage_records.reduce((acc: number, curr: any) => acc + curr.quantity, 0) : 0;
-                                    const isLowStock = totalStock < (part.threshold || 0);
+                                    const totalStock = part && part.storage_records ? part.storage_records.reduce((acc: number, curr: any) => acc + curr.quantity, 0) : 0;
+                                    const isLowStock = part ? totalStock < (part.threshold || 0) : false;
                                     
                                     return (
-                                      <tr class="border-b border-white/5 hover:bg-white/[0.01] transition-all">
-                                        <td class="py-3 px-4 font-mono font-bold text-accentCyan text-sm">{mat.designator}</td>
-                                        <td class="py-3 px-4 font-medium text-white">{part.value || "Unknown"}</td>
-                                        <td class="py-3 px-4 font-mono text-gray-400">{part.number || "N/A"}</td>
-                                        <td class="py-3 px-4 text-gray-400">{part.package || "N/A"}</td>
-                                        <td class="py-3 px-4 text-center">
-                                          <div class="flex items-center justify-center gap-1.5">
-                                            <Show when={isLowStock} fallback={<CheckCircle2 size={14} class="text-cyan-400" />}>
-                                              <AlertTriangle size={14} class="text-amber-500 animate-pulse" />
-                                            </Show>
-                                            <span class={`font-bold ${isLowStock ? "text-amber-500" : "text-cyan-400"}`}>
-                                              {totalStock} units
+                                      <tr class={`border-b border-white/5 transition-all ${
+                                        isGhost 
+                                          ? "bg-amber-500/[0.03] hover:bg-amber-500/[0.06] text-amber-200/90" 
+                                          : "hover:bg-white/[0.01]"
+                                      }`}>
+                                        {/* Designator */}
+                                        <td class="py-3 px-4 font-mono font-bold text-sm">
+                                          <Show when={isEditing()} fallback={
+                                            <span class={isGhost ? "text-amber-400" : "text-accentCyan"}>
+                                              {mat.designator || "N/A"}
                                             </span>
-                                          </div>
+                                          }>
+                                            <input 
+                                              type="text" 
+                                              value={editDesignator()} 
+                                              onInput={(e) => setEditDesignator(e.target.value)} 
+                                              class="glass-input font-mono font-bold text-xs px-2 py-1 w-20 text-white bg-black/40" 
+                                            />
+                                          </Show>
                                         </td>
+                                        
+                                        {/* Component / Description */}
+                                        <td class="py-3 px-4">
+                                          <Show when={isEditing()}>
+                                            <Show when={isGhost} fallback={
+                                              <div>
+                                                <div class="font-medium text-white">{part.value || "Unknown"}</div>
+                                                <div class="font-mono text-[10px] text-gray-400">{part.number || "N/A"}</div>
+                                              </div>
+                                            }>
+                                              <div class="space-y-1">
+                                                <input 
+                                                  type="text" 
+                                                  value={editGhostDesc()} 
+                                                  onInput={(e) => setEditGhostDesc(e.target.value)} 
+                                                  class="glass-input text-xs px-2 py-1 w-full text-white bg-black/40" 
+                                                  placeholder="Ghost Description"
+                                                />
+                                                <span class="text-[9px] text-amber-500 font-semibold block">Unmapped Ghost Material</span>
+                                              </div>
+                                            </Show>
+                                          </Show>
+                                          
+                                          <Show when={!isEditing()}>
+                                            <Show when={isGhost} fallback={
+                                              <div>
+                                                <div class="font-medium text-white">{part.value || "Unknown"}</div>
+                                                <div class="flex items-center gap-2 mt-0.5">
+                                                  <span class="font-mono text-[10px] text-gray-400">{part.number || "N/A"}</span>
+                                                  <span class="text-[10px] text-gray-500">({part.package || "No Package"})</span>
+                                                </div>
+                                              </div>
+                                            }>
+                                              <div class="flex items-center justify-between gap-4">
+                                                <div>
+                                                  <div class="font-semibold text-amber-400 flex items-center gap-1">
+                                                    <HelpCircle size={12} class="text-amber-500" />
+                                                    <span>{mat.ghost_description || "Ghost Component"}</span>
+                                                  </div>
+                                                  <span class="text-[10px] text-amber-500/80 italic block mt-0.5">Not linked to inventory part</span>
+                                                </div>
+                                                <Show when={user()?.role === "admin" || user()?.role === "designer"}>
+                                                  <button
+                                                    onClick={() => {
+                                                      setMappingMaterialId(mat.id);
+                                                      setMapSearchQuery(mat.ghost_description || "");
+                                                      setMapPartId("");
+                                                      setShowMapModal(true);
+                                                    }}
+                                                    class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[10px] font-semibold flex items-center gap-1 transition-all border border-amber-500/30 cursor-pointer"
+                                                  >
+                                                    <Link size={10} />
+                                                    Map to Part
+                                                  </button>
+                                                </Show>
+                                              </div>
+                                            </Show>
+                                          </Show>
+                                        </td>
+                                        
+                                        {/* Qty Required */}
+                                        <td class="py-3 px-4 text-center">
+                                          <Show when={isEditing()} fallback={
+                                            <span class="font-semibold text-white">{mat.quantity}</span>
+                                          }>
+                                            <input 
+                                              type="number" 
+                                              step="any"
+                                              value={editQty()} 
+                                              onInput={(e) => setEditQty(e.target.value)} 
+                                              class="glass-input text-xs px-2 py-1 w-16 text-center text-white bg-black/40" 
+                                            />
+                                          </Show>
+                                        </td>
+                                        
+                                        {/* Available Stock */}
+                                        <td class="py-3 px-4 text-center">
+                                          <Show when={!isGhost} fallback={
+                                            <span class="text-gray-500 italic text-[10px]">N/A</span>
+                                          }>
+                                            <div class="flex items-center justify-center gap-1.5">
+                                              <Show when={isLowStock} fallback={<CheckCircle2 size={14} class="text-cyan-400" />}>
+                                                <AlertTriangle size={14} class="text-amber-500 animate-pulse" />
+                                              </Show>
+                                              <span class={`font-bold ${isLowStock ? "text-amber-500" : "text-cyan-400"}`}>
+                                                {totalStock} units
+                                              </span>
+                                            </div>
+                                          </Show>
+                                        </td>
+                                        
+                                        {/* Actions */}
                                         <td class="py-3 px-4 text-center">
                                           <Show when={user()?.role === "admin" || user()?.role === "designer"}>
-                                            <button
-                                              onClick={() => handleDeleteMaterial(mat.id)}
-                                              class="text-gray-600 hover:text-red-400 p-1 cursor-pointer transition-colors"
-                                              title="Remove Component"
-                                            >
-                                              <Trash2 size={14} />
-                                            </button>
+                                            <div class="flex items-center justify-center gap-2">
+                                              <Show when={isEditing()} fallback={
+                                                <>
+                                                  <button
+                                                    onClick={() => handleStartInlineEdit(mat)}
+                                                    class="text-gray-400 hover:text-white p-1 cursor-pointer transition-colors"
+                                                    title="Edit Material"
+                                                  >
+                                                    <Edit size={14} />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleDeleteMaterial(mat.id)}
+                                                    class="text-gray-500 hover:text-red-400 p-1 cursor-pointer transition-colors"
+                                                    title="Remove Component"
+                                                  >
+                                                    <Trash2 size={14} />
+                                                  </button>
+                                                </>
+                                              }>
+                                                <button
+                                                  onClick={() => handleSaveInlineEdit(mat.id)}
+                                                  class="text-green-400 hover:text-green-300 p-1 cursor-pointer transition-colors"
+                                                  title="Save Changes"
+                                                >
+                                                  <Check size={14} />
+                                                </button>
+                                                <button
+                                                  onClick={() => setEditingMaterialId(null)}
+                                                  class="text-red-400 hover:text-red-300 p-1 cursor-pointer transition-colors"
+                                                  title="Cancel Edit"
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              </Show>
+                                            </div>
                                           </Show>
                                         </td>
                                       </tr>
@@ -1013,7 +1301,7 @@ export default function Projects() {
       {/* Add BOM Material Modal */}
       <Show when={showMatModal()}>
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div class="glass-panel max-w-md w-full rounded-2xl p-6 border border-white/10 relative">
+          <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative">
             <button 
               onClick={() => setShowMatModal(false)}
               class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
@@ -1028,33 +1316,102 @@ export default function Projects() {
             
             <form onSubmit={handleAddMaterial} class="space-y-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Select Component</label>
-                <select
-                  required
-                  value={matPartId()}
-                  onChange={(e) => setMatPartId(e.currentTarget.value)}
-                  class="glass-input w-full text-sm text-white bg-black/50"
-                >
-                  <option value="">Choose Component...</option>
-                  <For each={parts()}>
-                    {(p) => <option value={p.id}>{p.value} - {p.number} ({p.package || "No Package"})</option>}
-                  </For>
-                </select>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Search Catalog</label>
+                <input
+                  type="text"
+                  value={addSearchQuery()}
+                  onInput={(e) => setAddSearchQuery(e.target.value)}
+                  placeholder="Search parts to link..."
+                  class="glass-input w-full text-sm text-white"
+                />
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Reference Designator</label>
-                <input
-                  type="text"
-                  required
-                  value={matDesignator()}
-                  onInput={(e) => setMatDesignator(e.target.value)}
-                  placeholder="E.g. R1, C12, U3"
-                  class="glass-input w-full text-sm font-mono font-bold"
-                />
-                <p class="text-[9px] text-gray-500 mt-1">
-                  Specific position reference on the PCB silkscreen layout.
-                </p>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">
+                  Select Part
+                </label>
+                <div class="max-h-48 overflow-y-auto space-y-1.5 border border-white/5 p-2 rounded-xl bg-black/30">
+                  {/* Option to leave unmapped (create ghost) */}
+                  <div
+                    onClick={() => setMatPartId("")}
+                    class={`p-2 rounded-lg border transition-all cursor-pointer text-xs font-semibold ${
+                      matPartId() === ""
+                        ? "bg-amber-500/20 border-amber-500 text-amber-300"
+                        : "bg-white/[0.01] hover:bg-white/[0.04] border-white/5 text-amber-400"
+                    }`}
+                  >
+                    Leave Unmapped (Create Ghost Component)
+                  </div>
+                  <For each={getSortedAddParts()}>
+                    {(p) => {
+                      return (
+                        <div
+                          onClick={() => setMatPartId(String(p.id))}
+                          class={`p-2 rounded-lg border transition-all cursor-pointer flex justify-between items-center text-xs ${
+                            matPartId() === String(p.id)
+                              ? "bg-accentCyan/20 border-accentCyan text-white"
+                              : "bg-white/[0.01] hover:bg-white/[0.04] border-white/5 text-gray-300"
+                          }`}
+                        >
+                          <div>
+                            <div class="font-bold text-white">{p.value}</div>
+                            <div class="flex items-center gap-2 mt-0.5 text-gray-400 text-[10px]">
+                              <span class="font-mono">{p.number || "No SKU"}</span>
+                              <span>•</span>
+                              <span>{p.package || "No Package"}</span>
+                            </div>
+                          </div>
+                          <Show when={p.category}>
+                            <span class="px-2 py-0.5 rounded-full bg-white/5 text-[9px] text-gray-400 uppercase">
+                              {p.category.title}
+                            </span>
+                          </Show>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
+              </div>
+
+              {/* Show Ghost Description input if no part is selected */}
+              <Show when={!matPartId()}>
+                <div class="bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg space-y-2">
+                  <label class="block text-xs font-semibold text-amber-400 uppercase">Ghost Description</label>
+                  <input
+                    type="text"
+                    required
+                    value={matGhostDesc()}
+                    onInput={(e) => setMatGhostDesc(e.target.value)}
+                    placeholder="E.g. 10k Resistor 0603, STM32 MCU, Custom Header..."
+                    class="glass-input w-full text-sm text-amber-100"
+                  />
+                </div>
+              </Show>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Reference Designator</label>
+                  <input
+                    type="text"
+                    value={matDesignator()}
+                    onInput={(e) => setMatDesignator(e.target.value)}
+                    placeholder="E.g. R1, C12, U3"
+                    class="glass-input w-full text-sm font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Quantity Required</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={matQuantity()}
+                    onInput={(e) => setMatQuantity(e.target.value)}
+                    placeholder="E.g. 1, 4"
+                    class="glass-input w-full text-sm font-semibold"
+                  />
+                </div>
               </div>
 
               <div class="flex gap-3 pt-4 border-t border-white/5">
@@ -1071,6 +1428,103 @@ export default function Projects() {
                   class="btn-primary flex-1"
                 >
                   {submitting() ? "Adding..." : "Add to BOM"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+
+      {/* Map Ghost Material Modal */}
+      <Show when={showMapModal()}>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative">
+            <button 
+              onClick={() => {
+                setShowMapModal(false);
+                setMappingMaterialId(null);
+                setMapPartId("");
+              }}
+              class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 class="text-lg font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+              <Link class="text-accentCyan" size={20} />
+              PartFinder - Map Ghost Material
+            </h3>
+            
+            <form onSubmit={handleMapGhostMaterial} class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Search Catalog</label>
+                <input
+                  type="text"
+                  value={mapSearchQuery()}
+                  onInput={(e) => setMapSearchQuery(e.target.value)}
+                  placeholder="Search by value, SKU, package, or category..."
+                  class="glass-input w-full text-sm text-white"
+                  autofocus
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">
+                  Select Matching Part (Sorted by Relevance)
+                </label>
+                <div class="max-h-60 overflow-y-auto space-y-1.5 border border-white/5 p-2 rounded-xl bg-black/30">
+                  <Show when={getSortedParts().length === 0}>
+                    <div class="text-center py-6 text-gray-500 text-xs">No parts match your search.</div>
+                  </Show>
+                  <For each={getSortedParts()}>
+                    {(p) => {
+                      return (
+                        <div
+                          onClick={() => setMapPartId(String(p.id))}
+                          class={`p-2.5 rounded-lg border transition-all cursor-pointer flex justify-between items-center text-xs ${
+                            mapPartId() === String(p.id)
+                              ? "bg-accentCyan/20 border-accentCyan text-white"
+                              : "bg-white/[0.01] hover:bg-white/[0.04] border-white/5 text-gray-300"
+                          }`}
+                        >
+                          <div>
+                            <div class="font-bold text-white text-sm">{p.value}</div>
+                            <div class="flex items-center gap-2 mt-0.5 text-gray-400">
+                              <span class="font-mono text-[10px]">{p.number || "No SKU"}</span>
+                              <span>•</span>
+                              <span>{p.package || "No Package"}</span>
+                            </div>
+                          </div>
+                          <Show when={p.category}>
+                            <span class="px-2 py-0.5 rounded-full bg-white/5 text-[9px] text-gray-400 border border-white/5 uppercase">
+                              {p.category.title}
+                            </span>
+                          </Show>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
+              </div>
+
+              <div class="flex gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMapModal(false);
+                    setMappingMaterialId(null);
+                    setMapPartId("");
+                  }}
+                  class="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting() || !mapPartId()}
+                  class="btn-primary flex-1"
+                >
+                  {submitting() ? "Mapping..." : "Map Component"}
                 </button>
               </div>
             </form>

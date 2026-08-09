@@ -1,6 +1,6 @@
 ---
 title: Materials BOM
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -31,7 +31,7 @@ This feature acts as the core Bill of Materials (BOM) engine for Sidekick. It is
     * `POST /api/materials` - Adds a part to the BOM.
     * `PUT /api/materials/{id}` - Updates the required `quantity`, `designator`, or updates the `part_id` (mapping a ghost row).
     * `DELETE /api/materials/{id}` - Removes the part from this specific BOM.
-* **Database Schema (SQLite / Peewee):** * Model: `Material`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Material`
     * Columns: `id` (PK), `created_on`, `modified_on`, `revision_id` (FK to Revisions), `part_id` (FK to Parts, **NULLABLE**), `quantity` (REAL/INTEGER), `designator` (VARCHAR 255), `ghost_description` (VARCHAR 255, stores imported text if unmapped).
 
 ## 4. Out of Scope
@@ -41,8 +41,8 @@ This feature acts as the core Bill of Materials (BOM) engine for Sidekick. It is
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Material` Peewee model with nullable `part_id` and `ghost_description`.
-- [ ] Build FastAPI route to fetch the `LEFT JOIN` BOM list.
-- [ ] Build FastAPI CRUD routes for materials.
-- [ ] Create SolidJS BOM data grid with warning states for unmapped rows.
-- [ ] Wire frontend to backend API.
+- [x] Define `Material` SQLAlchemy model with nullable `part_id` and `ghost_description`.
+- [x] Build FastAPI route to fetch the `LEFT JOIN` BOM list.
+- [x] Build FastAPI CRUD routes for materials.
+- [x] Create SolidJS BOM data grid with warning states for unmapped rows.
+- [x] Wire frontend to backend API.

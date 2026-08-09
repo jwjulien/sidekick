@@ -224,16 +224,20 @@ def seed_database(db: Session = Depends(get_db)):
         db.commit()
         
         # BOM lines for Sensor Node
-        bom1 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, designator="R1")
-        bom2 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, designator="R2")
-        bom3 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_cap.id, designator="C1")
-        bom4 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_mcu.id, designator="U1")
+        bom1 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, quantity=1, designator="R1")
+        bom2 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_res.id, quantity=1, designator="R2")
+        bom3 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_cap.id, quantity=2, designator="C1")
+        bom4 = models.Material(revision_id=rev_sensor_v1.id, part_id=part_mcu.id, quantity=1, designator="U1")
+        # Add a ghost material to Sensor Node
+        bom_ghost1 = models.Material(revision_id=rev_sensor_v1.id, part_id=None, quantity=1, designator="U2", ghost_description="Temperature Sensor IC (I2C)")
         
         # BOM lines for Motor Controller
-        bom5 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, designator="C1")
-        bom6 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, designator="C2")
-        bom7 = models.Material(revision_id=rev_motor_v2.id, part_id=part_mcu.id, designator="U1")
-        db.add_all([bom1, bom2, bom3, bom4, bom5, bom6, bom7])
+        bom5 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, quantity=1, designator="C1")
+        bom6 = models.Material(revision_id=rev_motor_v2.id, part_id=part_cap.id, quantity=1, designator="C2")
+        bom7 = models.Material(revision_id=rev_motor_v2.id, part_id=part_mcu.id, quantity=1, designator="U1")
+        # Add a ghost material to Motor Controller
+        bom_ghost2 = models.Material(revision_id=rev_motor_v2.id, part_id=None, quantity=10, designator="R10", ghost_description="0.1 Ohm Current Sense Resistor (1206)")
+        db.add_all([bom1, bom2, bom3, bom4, bom_ghost1, bom5, bom6, bom7, bom_ghost2])
         db.commit()
         
         # 8. Seed Audit Transaction history logs

@@ -185,11 +185,19 @@ class RevisionOut(RevisionBase):
 # ----------------- Material (BOM Line) Schemas -----------------
 class MaterialBase(BaseModel):
     revision_id: int
-    part_id: int
-    designator: str
+    part_id: Optional[int] = None
+    quantity: int = 1
+    designator: Optional[str] = None
+    ghost_description: Optional[str] = None
 
 class MaterialCreate(MaterialBase):
     pass
+
+class MaterialUpdate(BaseModel):
+    part_id: Optional[int] = None
+    quantity: Optional[int] = None
+    designator: Optional[str] = None
+    ghost_description: Optional[str] = None
 
 class MaterialOut(MaterialBase):
     id: int

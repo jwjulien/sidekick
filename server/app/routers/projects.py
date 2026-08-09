@@ -291,20 +291,60 @@ def add_material_to_revision(
     if not revision:
         raise HTTPException(status_code=404, detail="Project revision not found.")
         
-    # Verify part
-    part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
-    if not part:
-        raise HTTPException(status_code=404, detail="Part component not found.")
+    # Verify part if provided
+    if payload.part_id is not None:
+        part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
+        if not part:
+            raise HTTPException(status_code=404, detail="Part component not found.")
         
     db_material = models.Material(
         revision_id=payload.revision_id,
         part_id=payload.part_id,
-        designator=payload.designator
+        quantity=payload.quantity,
+        designator=payload.designator,
+        ghost_description=payload.ghost_description
     )
     db.add(db_material)
     db.commit()
     db.refresh(db_material)
     return db_material
+
+@router.put("/materials/{material_id}", response_model=schemas.MaterialOut)
+def update_material_in_revision(
+    material_id: int,
+    payload: schemas.MaterialUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update a BOM line (quantity, designator, part mapping, or description).
+    Requires Designer role.
+    """
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="BOM item not found.")
+        
+    if payload.part_id is not None:
+        part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
+        if not part:
+            raise HTTPException(status_code=404, detail="Part component not found.")
+        material.part_id = payload.part_id
+    elif "part_id" in payload.model_fields_set and payload.part_id is None:
+        # Allow explicit unmapping if needed
+        material.part_id = None
+        
+    if payload.quantity is not None:
+        material.quantity = payload.quantity
+        
+    if payload.designator is not None:
+        material.designator = payload.designator
+        
+    if payload.ghost_description is not None:
+        material.ghost_description = payload.ghost_description
+        
+    db.commit()
+    db.refresh(material)
+    return material
 
 @router.delete("/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_material_from_revision(
