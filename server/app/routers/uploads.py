@@ -44,6 +44,7 @@ def delete_image(
 @router.get("/api/documents/{id}/download")
 def download_document(
     id: int,
+    inline: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -59,10 +60,11 @@ def download_document(
         media_type = "application/pdf"
         
     from fastapi.responses import Response
+    disposition = "inline" if inline else "attachment"
     return Response(
         content=doc.content,
         media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename={doc.filename}"}
+        headers={"Content-Disposition": f'{disposition}; filename="{doc.filename}"'}
     )
 
 @router.delete("/api/documents/{id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -3,13 +3,13 @@ import httpx
 from datetime import datetime
 from typing import List
 from jose import jwt, JWTError
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from .database import get_db
 from . import models
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Load configuration
 OIDC_ISSUER_URL = os.environ.get("OIDC_ISSUER_URL", "")
@@ -107,6 +107,7 @@ def verify_oidc_token(token: str) -> dict:
         )
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> models.User:
@@ -114,7 +115,10 @@ def get_current_user(
     Dependency that extracts the credentials, validates them (or simulates them in DEV_MODE),
     and retrieves the corresponding local database User profile.
     """
-    token = credentials.credentials
+    token = credentials.credentials if credentials else request.query_params.get("token")
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
     claims = {}
     if DEV_MODE or not OIDC_ISSUER_URL:

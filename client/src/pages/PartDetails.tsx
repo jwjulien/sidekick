@@ -23,12 +23,13 @@ import {
   Printer,
   Move
 } from "lucide-solid";
-import { apiFetch, user, backendUrl } from "../hooks/useAuth";
+import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import StockController from "../components/StockController";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
+import DocumentViewer from "../components/DocumentViewer";
 export default function PartDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -74,6 +75,9 @@ export default function PartDetails() {
   const [uploadFile, setUploadFile] = createSignal<File | null>(null);
   const [uploadDocUrl, setUploadDocUrl] = createSignal("");
   const [uploading, setUploading] = createSignal(false);
+
+  // Document Viewer state
+  const [selectedDocumentForView, setSelectedDocumentForView] = createSignal<any>(null);
 
   // Link Supplier State
   const [newSupplierId, setNewSupplierId] = createSignal("");
@@ -1060,25 +1064,29 @@ export default function PartDetails() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <For each={item().documents}>
                     {(doc) => (
-                      <div class="glass-card p-3 rounded-xl flex items-center justify-between gap-3">
+                      <div 
+                        class="glass-card p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-white/5 transition-colors group"
+                        onClick={() => setSelectedDocumentForView(doc)}
+                      >
                         <div class="flex flex-col min-w-0">
-                          <span class="font-medium text-white truncate max-w-[150px]">{doc.label}</span>
+                          <span class="font-medium text-white truncate max-w-[150px] group-hover:text-indigo-300 transition-colors">{doc.label}</span>
                           <span class="text-[10px] text-gray-500 truncate max-w-[150px]">{doc.filename}</span>
                         </div>
 
                         <div class="flex items-center gap-1.5 shrink-0">
                           <a
-                            href={`${backendUrl()}/api/documents/${doc.id}/download`}
+                            href={token() ? `${backendUrl()}/api/documents/${doc.id}/download?token=${token()}` : `${backendUrl()}/api/documents/${doc.id}/download`}
                             target="_blank"
                             class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
                             title="Download/Open"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Download size={12} />
                           </a>
 
                           <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                             <button
-                              onClick={() => handleDeleteDocument(doc.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }}
                               class="p-1.5 rounded-lg bg-white/5 text-red-400 hover:text-red-300 hover:bg-red-500/5 cursor-pointer"
                               title="Delete File"
                             >
@@ -1928,6 +1936,13 @@ export default function PartDetails() {
         location={activePrintLocation()}
         onClose={() => setActivePrintLocation(null)}
       />
+
+      <Show when={selectedDocumentForView()}>
+        <DocumentViewer 
+          document={selectedDocumentForView()} 
+          onClose={() => setSelectedDocumentForView(null)} 
+        />
+      </Show>
     </div>
   );
 }
