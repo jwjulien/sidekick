@@ -34,7 +34,7 @@ export default function PartDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
   const navigate = useNavigate();
-  const itemId = parseInt(params.id);
+  const itemId = params.id;
 
   const [item, setItem] = createSignal<any>(null);
   const [loading, setLoading] = createSignal(true);
@@ -119,14 +119,14 @@ export default function PartDetails() {
   const [newImageNotes, setNewImageNotes] = createSignal("");
 
 
-  const getLocationHeight = (locId: number, locs: any[]): number => {
+  const getLocationHeight = (locId: string, locs: any[]): number => {
     const children = locs.filter((l: any) => l.parent_id === locId);
     if (children.length === 0) return 0;
     const childHeights = children.map((c: any) => getLocationHeight(c.id, locs));
     return 1 + Math.max(...childHeights);
   };
 
-  const splitParentIfNeeded = async (parentId: number) => {
+  const splitParentIfNeeded = async (parentId: string) => {
     const parentLoc = allLocations().find((l: any) => l.id === parentId);
     if (parentLoc && parentLoc.part_id) {
       // Create child for the original part
@@ -238,14 +238,14 @@ export default function PartDetails() {
     try {
       const parentIdVal = newLocationParentId();
       if (parentIdVal) {
-        await splitParentIfNeeded(parseInt(parentIdVal));
+        await splitParentIfNeeded(parentIdVal);
       }
       const created = await apiFetch("/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newLocationName(),
-          parent_id: parentIdVal ? parseInt(parentIdVal) : null,
+          parent_id: parentIdVal ? parentIdVal : null,
           part_id: itemId,
           quantity: 0
         })
@@ -263,7 +263,7 @@ export default function PartDetails() {
   };
 
   // Called by StockController when quantity or last_counted changes
-  const handleStorageChanged = (storageId: number, newQty: number, newLastCounted: string) => {
+  const handleStorageChanged = (storageId: string, newQty: number, newLastCounted: string) => {
     setItem((prev: any) => ({
       ...prev,
       total_quantity: (prev.storage_records || []).reduce((sum: number, s: any) =>
@@ -338,7 +338,7 @@ export default function PartDetails() {
     }
   };
 
-  const handleDeleteImage = async (imageId: number) => {
+  const handleDeleteImage = async (imageId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this photo?",
@@ -502,7 +502,7 @@ export default function PartDetails() {
   };
 
 
-  const handleDeleteDocument = async (docId: number) => {
+  const handleDeleteDocument = async (docId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this document?",
@@ -528,7 +528,7 @@ export default function PartDetails() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          supplier_id: parseInt(newSupplierId()),
+          supplier_id: newSupplierId(),
           part_id: itemId,
           sku: newSupplierSku()
         })
@@ -546,7 +546,7 @@ export default function PartDetails() {
     }
   };
 
-  const handleUnlinkSupplier = async (prodId: number) => {
+  const handleUnlinkSupplier = async (prodId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Remove this supplier product catalog link?",
@@ -564,7 +564,7 @@ export default function PartDetails() {
     }
   };
 
-  const handleUpdateSupplierSku = async (prodId: number) => {
+  const handleUpdateSupplierSku = async (prodId: string) => {
     if (!editSkuValue().trim()) return;
     setSavingEdit(true);
     try {
@@ -610,7 +610,7 @@ export default function PartDetails() {
         notes: editNotes(),
         number: editNumber() || null,
         threshold: editThreshold(),
-        category_id: editCat() ? parseInt(editCat()) : null,
+        category_id: editCat() ? editCat() : null,
         package: editPackage() || null,
         price: editPrice(),
         weight: editWeight()
@@ -668,14 +668,14 @@ export default function PartDetails() {
         }
         const parentIdVal = moveNewLocationParentId();
         if (parentIdVal) {
-          await splitParentIfNeeded(parseInt(parentIdVal));
+          await splitParentIfNeeded(parentIdVal);
         }
         const created = await apiFetch("/locations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: moveNewLocationName(),
-            parent_id: parentIdVal ? parseInt(parentIdVal) : null,
+            parent_id: parentIdVal ? parentIdVal : null,
             part_id: itemId,
             quantity: 0
           })
@@ -687,7 +687,7 @@ export default function PartDetails() {
           setMoveSubmitting(false);
           return;
         }
-        destId = parseInt(moveDestLocationId());
+        destId = moveDestLocationId();
         await apiFetch(`/locations/${destId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

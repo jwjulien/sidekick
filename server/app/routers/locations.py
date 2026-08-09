@@ -58,7 +58,7 @@ def create_location(
 
 @router.get("/{location_id}", response_model=schemas.StorageDetailsOut)
 def get_location_details(
-    location_id: int,
+    location_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -72,7 +72,7 @@ def get_location_details(
 
 @router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_location(
-    location_id: int,
+    location_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):
@@ -101,7 +101,7 @@ class LocationLinkPayload(BaseModel):
 
 @router.patch("/{location_id}", response_model=schemas.StorageOut)
 def patch_location(
-    location_id: int,
+    location_id: str,
     payload: LocationLinkPayload,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
@@ -125,7 +125,7 @@ def patch_location(
 
 @router.put("/{location_id}/touch", response_model=schemas.StorageOut)
 def touch_location(
-    location_id: int,
+    location_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -146,7 +146,7 @@ class CountPayload(BaseModel):
 
 @router.put("/{location_id}/count", response_model=schemas.StorageOut)
 def count_location(
-    location_id: int,
+    location_id: str,
     payload: CountPayload,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)

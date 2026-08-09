@@ -52,7 +52,7 @@ def create_category(
 
 @router.get("/{category_id}", response_model=schemas.CategoryDetailsOut)
 def get_category_details(
-    category_id: int,
+    category_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -66,7 +66,7 @@ def get_category_details(
 
 @router.put("/{category_id}", response_model=schemas.CategoryOut)
 def update_category(
-    category_id: int,
+    category_id: str,
     payload: schemas.CategoryUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -111,7 +111,7 @@ def update_category(
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_category(
-    category_id: int,
+    category_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):

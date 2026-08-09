@@ -147,7 +147,7 @@ export default function Parts() {
       });
 
       const payload = {
-        category_id: parseInt(newPartCat()),
+        category_id: newPartCat(),
         value: newPartValue(),
         number: newPartNumber(),
         package: newPartPackage() || null,

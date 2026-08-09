@@ -65,7 +65,7 @@ export default function Dashboard() {
     fetchDashboardData();
   });
 
-  const handleQuickStock = async (itemId: number) => {
+  const handleQuickStock = async (itemId: string) => {
     if (!quickAction()) return;
     try {
       await apiFetch(`/items/${itemId}/stock`, {

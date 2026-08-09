@@ -12,7 +12,7 @@ const [token, setToken] = createSignal<string | null>(
   localStorage.getItem("sidekick_token")
 );
 const [user, setUser] = createSignal<{
-  id: number;
+  id: string;
   oidc_sub: string;
   email: string | null;
   username: string | null;

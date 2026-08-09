@@ -94,8 +94,8 @@ export default function Inventory() {
         barcode: newItemBarcode() || null,
         quantity: newItemQty(),
         min_quantity_alert: newItemMinQty(),
-        category_id: newItemCat() ? parseInt(newItemCat()) : null,
-        location_id: newItemLoc() ? parseInt(newItemLoc()) : null,
+        category_id: newItemCat() ? newItemCat() : null,
+        location_id: newItemLoc() ? newItemLoc() : null,
         custom_values: []
       };
       

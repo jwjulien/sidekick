@@ -171,7 +171,7 @@ export default function Projects() {
     loadInitialData();
   });
 
-  const handleSelectProject = async (id: number, autoSelectAssemblyId?: number) => {
+  const handleSelectProject = async (id: string, autoSelectAssemblyId?: number) => {
     setSelectedProjectId(id);
     setSelectedAssemblyId(null);
     setSelectedAssembly(null);
@@ -191,7 +191,7 @@ export default function Projects() {
     }
   };
 
-  const handleSelectAssembly = (assemId: number, projDetails = selectedProject()) => {
+  const handleSelectAssembly = (assemId: string, projDetails = selectedProject()) => {
     setSelectedAssemblyId(assemId);
     setSelectedRevisionId(null);
     setSelectedRevision(null);
@@ -207,7 +207,7 @@ export default function Projects() {
     }
   };
 
-  const handleSelectRevision = (revId: number, assemDetails = selectedAssembly()) => {
+  const handleSelectRevision = (revId: string, assemDetails = selectedAssembly()) => {
     setSelectedRevisionId(revId);
     if (assemDetails) {
       const rev = assemDetails.revisions.find((r: any) => r.id === revId);
@@ -263,7 +263,7 @@ export default function Projects() {
     setShowProjModal(true);
   };
 
-  const handleDeleteProject = async (id: number) => {
+  const handleDeleteProject = async (id: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to permanently delete this project? All assemblies, revisions and materials records will be lost.",
@@ -335,7 +335,7 @@ export default function Projects() {
     setShowAssemModal(true);
   };
 
-  const handleDeleteAssembly = async (assemId: number) => {
+  const handleDeleteAssembly = async (assemId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this assembly? All revisions and materials records will be lost.",
@@ -402,7 +402,7 @@ export default function Projects() {
     setShowRevModal(true);
   };
 
-  const handleDeleteRevision = async (revId: number) => {
+  const handleDeleteRevision = async (revId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this revision version?",
@@ -463,7 +463,7 @@ export default function Projects() {
     try {
       const payload = {
         revision_id: revId,
-        part_id: matPartId() ? parseInt(matPartId()) : null,
+        part_id: matPartId() ? matPartId() : null,
         designator: matDesignator() || null,
         quantity: parseFloat(matQuantity()) || 1.0,
         ghost_description: matGhostDesc() || null
@@ -501,7 +501,7 @@ export default function Projects() {
     setEditGhostDesc(mat.ghost_description || "");
   };
 
-  const handleSaveInlineEdit = async (matId: number) => {
+  const handleSaveInlineEdit = async (matId: string) => {
     try {
       const payload = {
         quantity: parseFloat(editQty()) || 1.0,
@@ -534,7 +534,7 @@ export default function Projects() {
     setSubmitting(true);
     try {
       const payload = {
-        part_id: parseInt(mapPartId())
+        part_id: mapPartId()
       };
       
       await apiFetch(`/projects/materials/${matId}`, {
@@ -559,7 +559,7 @@ export default function Projects() {
     }
   };
 
-  const handleDeleteMaterial = async (matId: number) => {
+  const handleDeleteMaterial = async (matId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Remove this component from the Bill of Materials?",

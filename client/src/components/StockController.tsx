@@ -5,7 +5,7 @@ import toast from "solid-toast";
 import ConfirmCountWidget from "./ConfirmCountWidget";
 
 interface StockControllerProps {
-  storageId: number;
+  storageId: string;
   currentQty: number;
   lastCounted?: string | null;
   compact?: boolean;

@@ -24,7 +24,7 @@ import { apiFetch, user, backendUrl } from "../hooks/useAuth";
 export default function ItemDetails() {
   const params = useParams();
   const navigate = useNavigate();
-  const itemId = parseInt(params.id);
+  const itemId = params.id;
 
   const [item, setItem] = createSignal<any>(null);
   const [loading, setLoading] = createSignal(true);
@@ -121,7 +121,7 @@ export default function ItemDetails() {
           quantity_change: stockQty(),
           action_type: action,
           notes: stockNotes() || `Stock adjusted via component details.`,
-          location_id: selectedStorageId() ? parseInt(selectedStorageId()) : null
+          location_id: selectedStorageId() ? selectedStorageId() : null
         })
       });
       setStockNotes("");
@@ -176,7 +176,7 @@ export default function ItemDetails() {
     }
   };
 
-  const handleDeleteAttachment = async (attachId: number) => {
+  const handleDeleteAttachment = async (attachId: string) => {
     if (!confirm("Are you sure you want to delete this attachment?")) return;
     try {
       await apiFetch(`/uploads/${attachId}`, { method: "DELETE" });
@@ -195,7 +195,7 @@ export default function ItemDetails() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          supplier_id: parseInt(newSupplierId()),
+          supplier_id: newSupplierId(),
           part_id: itemId,
           number: newSupplierPartNo()
         })
@@ -211,7 +211,7 @@ export default function ItemDetails() {
     }
   };
 
-  const handleUnlinkSupplier = async (prodId: number) => {
+  const handleUnlinkSupplier = async (prodId: string) => {
     if (!confirm("Remove this supplier product catalog link?")) return;
     try {
       await apiFetch(`/suppliers/products/${prodId}`, { method: "DELETE" });
@@ -229,8 +229,8 @@ export default function ItemDetails() {
         description: editNotes(),
         sku: editNumber() || null,
         min_quantity_alert: editThreshold(),
-        category_id: editCat() ? parseInt(editCat()) : null,
-        location_id: editLoc() ? parseInt(editLoc()) : null,
+        category_id: editCat() ? editCat() : null,
+        location_id: editLoc() ? editLoc() : null,
         barcode: barcodeValue() || null
       };
 
@@ -257,8 +257,8 @@ export default function ItemDetails() {
         description: editNotes(),
         sku: editNumber() || null,
         min_quantity_alert: editThreshold(),
-        category_id: editCat() ? parseInt(editCat()) : null,
-        location_id: editLoc() ? parseInt(editLoc()) : null,
+        category_id: editCat() ? editCat() : null,
+        location_id: editLoc() ? editLoc() : null,
         barcode: barcodeValue() || null,
         package: editPackage() || null,
         price: editPrice(),

@@ -5,7 +5,7 @@ import { apiFetch } from "../hooks/useAuth";
 
 interface LabelPreviewModalProps {
   location: {
-    id: number;
+    id: string;
     name: string;
     description?: string;
   } | null;

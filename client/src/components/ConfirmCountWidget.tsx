@@ -4,7 +4,7 @@ import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
 
 interface ConfirmCountWidgetProps {
-  storageId: number;
+  storageId: string;
   lastCounted?: string | null;
   onConfirmed?: (newLastCounted: string) => void;
 }

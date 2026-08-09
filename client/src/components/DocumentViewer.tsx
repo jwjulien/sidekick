@@ -4,7 +4,7 @@ import { backendUrl, token } from "../hooks/useAuth";
 
 interface DocumentViewerProps {
   document: {
-    id: number;
+    id: string;
     filename: string;
     label: string;
   };

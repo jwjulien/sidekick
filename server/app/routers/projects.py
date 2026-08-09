@@ -43,7 +43,7 @@ def create_project(
 
 @router.get("/{project_id}", response_model=schemas.ProjectDetailsOut)
 def get_project_details(
-    project_id: int,
+    project_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -57,7 +57,7 @@ def get_project_details(
 
 @router.put("/{project_id}", response_model=schemas.ProjectOut)
 def update_project(
-    project_id: int,
+    project_id: str,
     payload: schemas.ProjectUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -85,7 +85,7 @@ def update_project(
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
-    project_id: int,
+    project_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):
@@ -129,7 +129,7 @@ def create_assembly(
 
 @router.put("/assemblies/{assembly_id}", response_model=schemas.AssemblyOut)
 def update_assembly(
-    assembly_id: int,
+    assembly_id: str,
     payload: schemas.AssemblyUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -150,7 +150,7 @@ def update_assembly(
 
 @router.delete("/assemblies/{assembly_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_assembly(
-    assembly_id: int,
+    assembly_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):
@@ -195,7 +195,7 @@ def create_revision(
 
 @router.put("/revisions/{revision_id}", response_model=schemas.RevisionOut)
 def update_revision(
-    revision_id: int,
+    revision_id: str,
     payload: schemas.RevisionUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -219,7 +219,7 @@ def update_revision(
 
 @router.delete("/revisions/{revision_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_revision(
-    revision_id: int,
+    revision_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):
@@ -239,7 +239,7 @@ def delete_revision(
 
 @router.post("/revisions/{revision_id}/clone", response_model=schemas.RevisionOut, status_code=status.HTTP_201_CREATED)
 def clone_revision(
-    revision_id: int,
+    revision_id: str,
     payload: schemas.RevisionClone,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -311,7 +311,7 @@ def add_material_to_revision(
 
 @router.put("/materials/{material_id}", response_model=schemas.MaterialOut)
 def update_material_in_revision(
-    material_id: int,
+    material_id: str,
     payload: schemas.MaterialUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -348,7 +348,7 @@ def update_material_in_revision(
 
 @router.delete("/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_material_from_revision(
-    material_id: int,
+    material_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):

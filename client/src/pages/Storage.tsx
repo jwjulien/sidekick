@@ -53,7 +53,7 @@ export default function Storage() {
         body: JSON.stringify({
           name: locName(),
           description: locDesc(),
-          parent_id: locParentId() ? parseInt(locParentId()) : null,
+          parent_id: locParentId() ? locParentId() : null,
           index: locIndex(),
           label_scheme: locLabelScheme() || null
         })
@@ -70,7 +70,7 @@ export default function Storage() {
     }
   };
 
-  const handleDeleteLocation = async (locId: number) => {
+  const handleDeleteLocation = async (locId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this storage location? All sub-bins and drawers in this hierarchy will also be deleted!",
@@ -86,7 +86,7 @@ export default function Storage() {
     }
   };
 
-  const getParentLocationName = (parentId: number | null) => {
+  const getParentLocationName = (parentId: string | null) => {
     if (!parentId) return "";
     const parent = locations().find(l => l.id === parentId);
     return parent ? parent.name : "";

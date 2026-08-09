@@ -36,7 +36,7 @@ def create_product(
 
 @router.put("/{product_id}", response_model=schemas.ProductOut)
 def update_product(
-    product_id: int,
+    product_id: str,
     payload: schemas.ProductUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
@@ -55,7 +55,7 @@ def update_product(
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(
-    product_id: int,
+    product_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
 ):

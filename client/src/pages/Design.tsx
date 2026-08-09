@@ -16,7 +16,7 @@ const CategoryNode = (props: {
   category: any;
   allCategories: any[];
   depth: number;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onEdit: (cat: any) => void;
 }) => {
   const [expanded, setExpanded] = createSignal(false);
@@ -121,7 +121,7 @@ export default function Design() {
           body: JSON.stringify({ 
             title: catTitle(), 
             designator: catDesignator() || null,
-            parent_id: catParentId() ? parseInt(catParentId()) : null
+            parent_id: catParentId() ? catParentId() : null
           })
         });
         toast.success("Category updated successfully.");
@@ -132,7 +132,7 @@ export default function Design() {
           body: JSON.stringify({ 
             title: catTitle(), 
             designator: catDesignator() || null,
-            parent_id: catParentId() ? parseInt(catParentId()) : null
+            parent_id: catParentId() ? catParentId() : null
           })
         });
         toast.success("Category created successfully.");
@@ -158,7 +158,7 @@ export default function Design() {
     setCatParentId(cat.parent_id ? String(cat.parent_id) : "");
   };
 
-  const handleDeleteCategory = async (catId: number) => {
+  const handleDeleteCategory = async (catId: string) => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
       message: "Are you sure you want to delete this category? Any subcategories or parts attached will have catalog references deleted.",
@@ -175,7 +175,7 @@ export default function Design() {
   };
 
   // Helper to resolve parents
-  const getParentCategoryName = (parentId: number | null) => {
+  const getParentCategoryName = (parentId: string | null) => {
     if (!parentId) return "";
     const parent = categories().find(c => c.id === parentId);
     return parent ? parent.title : "";

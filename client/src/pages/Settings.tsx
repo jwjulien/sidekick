@@ -60,7 +60,7 @@ export default function Settings() {
     }
   };
 
-  const handleRoleChange = async (userId: number, newRole: string) => {
+  const handleRoleChange = async (userId: string, newRole: string) => {
     try {
       await apiFetch(`/auth/users/${userId}/role`, {
         method: "PUT",

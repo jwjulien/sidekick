@@ -8,7 +8,7 @@ router = APIRouter(prefix="", tags=["documents_and_uploads"])
 
 @router.get("/api/images/{id}/render")
 def render_image(
-    id: int,
+    id: str,
     db: Session = Depends(get_db)
 ):
     """
@@ -24,7 +24,7 @@ def render_image(
 
 @router.delete("/api/images/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_image(
-    id: int,
+    id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
 ):
@@ -43,7 +43,7 @@ def delete_image(
 
 @router.get("/api/documents/{id}/download")
 def download_document(
-    id: int,
+    id: str,
     inline: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
@@ -69,7 +69,7 @@ def download_document(
 
 @router.delete("/api/documents/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
-    id: int,
+    id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
 ):

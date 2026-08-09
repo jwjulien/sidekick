@@ -44,7 +44,7 @@ def create_supplier(
 
 @router.put("/{supplier_id}", response_model=schemas.SupplierOut)
 def update_supplier(
-    supplier_id: int,
+    supplier_id: str,
     payload: schemas.SupplierUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
@@ -75,7 +75,7 @@ def update_supplier(
 
 @router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_supplier(
-    supplier_id: int,
+    supplier_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_designer)
 ):

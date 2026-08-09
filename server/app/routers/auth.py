@@ -25,7 +25,7 @@ def get_all_users(
 
 @router.put("/users/{user_id}/role", response_model=schemas.UserOut)
 def update_user_role(
-    user_id: int,
+    user_id: str,
     payload: schemas.UserUpdateRole,
     db: Session = Depends(get_db),
     admin_user: models.User = Depends(auth.require_admin)

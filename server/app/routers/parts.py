@@ -138,7 +138,7 @@ def get_recent_transactions(
 
 @router.get("/{part_id}", response_model=schemas.PartDetailsOut)
 def get_part(
-    part_id: int,
+    part_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -154,7 +154,7 @@ def get_part(
 
 @router.get("/{part_id}/images", response_model=List[schemas.ImageOut])
 def get_part_images(
-    part_id: int,
+    part_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -168,7 +168,7 @@ def get_part_images(
 
 @router.post("/{part_id}/images", response_model=schemas.ImageOut, status_code=status.HTTP_201_CREATED)
 async def upload_part_image(
-    part_id: int,
+    part_id: str,
     file: UploadFile = File(...),
     caption: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
@@ -227,7 +227,7 @@ class DocumentUrlPayload(BaseModel):
 
 @router.post("/{part_id}/images/url", response_model=schemas.ImageOut, status_code=status.HTTP_201_CREATED)
 async def download_part_image_url(
-    part_id: int,
+    part_id: str,
     payload: ImageUrlPayload,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
@@ -278,7 +278,7 @@ async def download_part_image_url(
 
 @router.post("/{part_id}/documents/url", response_model=schemas.DocumentOut, status_code=status.HTTP_201_CREATED)
 async def download_part_document_url(
-    part_id: int,
+    part_id: str,
     payload: DocumentUrlPayload,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
@@ -337,7 +337,7 @@ async def download_part_document_url(
 
 @router.get("/{part_id}/documents", response_model=List[schemas.DocumentOut])
 def get_part_documents(
-    part_id: int,
+    part_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -352,7 +352,7 @@ def get_part_documents(
 from fastapi import UploadFile, File, Form
 @router.post("/{part_id}/documents", response_model=schemas.DocumentOut, status_code=status.HTTP_201_CREATED)
 async def upload_part_document(
-    part_id: int,
+    part_id: str,
     file: UploadFile = File(...),
     label: str = Form(...),
     db: Session = Depends(get_db),
@@ -403,7 +403,7 @@ async def upload_part_document(
 
 @router.put("/{part_id}", response_model=schemas.PartOut)
 def update_part(
-    part_id: int,
+    part_id: str,
     payload: schemas.PartUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_stocker)
@@ -450,7 +450,7 @@ def update_part(
 
 @router.post("/{part_id}/stock", response_model=schemas.PartOut)
 def update_part_stock(
-    part_id: int,
+    part_id: str,
     payload: schemas.PartStockUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
@@ -519,7 +519,7 @@ def update_part_stock(
 
 @router.delete("/{part_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_part(
-    part_id: int,
+    part_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_admin)
 ):
@@ -546,7 +546,7 @@ def delete_part(
 
 @router.get("/{part_id}/products", response_model=List[schemas.ProductOut])
 def get_part_products(
-    part_id: int,
+    part_id: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
