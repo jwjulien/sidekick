@@ -28,6 +28,7 @@ import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import StockController from "../components/StockController";
 import LabelPreviewModal from "../components/LabelPreviewModal";
+import PartImages from "../components/PartImages";
 export default function PartDetails() {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -71,6 +72,7 @@ export default function PartDetails() {
 
   // Upload state
   const [uploadFile, setUploadFile] = createSignal<File | null>(null);
+  const [uploadDocUrl, setUploadDocUrl] = createSignal("");
   const [uploading, setUploading] = createSignal(false);
 
   // Link Supplier State
@@ -272,46 +274,59 @@ export default function PartDetails() {
   const handleFileUpload = async (e: Event) => {
     e.preventDefault();
     const file = uploadFile();
-    if (!file) return;
+    const urlValue = uploadDocUrl();
+
+    if (!file && !urlValue) return;
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const isDoc = !file.type.startsWith("image/");
-    if (isDoc) {
-      formData.append("label", uploadLabel() || file.name);
-    }
 
     try {
-      const url = isDoc
-        ? `${backendUrl()}/parts/${itemId}/documents`
-        : `${backendUrl()}/uploads/item/${itemId}`;
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
 
-      const tokenHeader = localStorage.getItem("sidekick_token");
-      const headers: Record<string, string> = {};
-      if (tokenHeader) {
-        headers["Authorization"] = `Bearer ${tokenHeader}`;
-      }
+        const isDoc = !file.type.startsWith("image/");
+        if (isDoc) {
+          formData.append("label", uploadLabel() || file.name);
+        }
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: formData
-      });
+        const url = isDoc
+          ? `${backendUrl()}/parts/${itemId}/documents`
+          : `${backendUrl()}/uploads/item/${itemId}`;
 
-      if (!res.ok) {
-        const errorJson = await res.json();
-        throw new Error(errorJson.detail || "Upload failed.");
+        const tokenHeader = localStorage.getItem("sidekick_token");
+        const headers: Record<string, string> = {};
+        if (tokenHeader) {
+          headers["Authorization"] = `Bearer ${tokenHeader}`;
+        }
+
+        const res = await fetch(url, {
+          method: "POST",
+          headers,
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errorJson = await res.json();
+          throw new Error(errorJson.detail || "Upload failed.");
+        }
+        toast.success(isDoc ? "Document uploaded successfully." : "Photo uploaded successfully.");
+      } else if (urlValue) {
+        await apiFetch(`/parts/${itemId}/documents/url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlValue, label: uploadLabel() || "" })
+        });
+        toast.success("Document downloaded from URL successfully.");
       }
 
       setUploadFile(null);
+      setUploadDocUrl("");
       setUploadLabel("");
-      const fileInput = document.getElementById("file-input-field") as HTMLInputElement;
+      const fileInput = document.getElementById("file-input-field-doc") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
 
       fetchItemDetails();
-      toast.success(isDoc ? "Document uploaded successfully." : "Photo uploaded successfully.");
     } catch (err: any) {
       toast.error(err.message || "Upload failed.");
     } finally {
@@ -828,128 +843,23 @@ export default function PartDetails() {
                   </For>
                 </div>
               </div>
-
-              {/* Bins List */}
-              <div class="space-y-3">
-                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Inventory Storage Slots</h4>
-                <Show when={!item().storage_records || item().storage_records.length === 0}>
-                  <p class="text-xs text-gray-500 italic">No storage bins currently hold this component. Check stock in to assign location.</p>
-                </Show>
-                <Show when={item().storage_records && item().storage_records.length > 0}>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <For each={item().storage_records}>
-                      {(bin) => (
-                        <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
-                          <span class="text-white font-medium flex items-center gap-1.5">
-                            <MapPin size={14} class="text-accentCyan" />
-                            {bin.name}
-                          </span>
-                          <span class="text-cyan-400 font-bold text-sm">{bin.quantity} units</span>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-              </div>
             </div>
 
             {/* Responsive Image block: Only visible on mobile/small screens, hidden on large desktop screens */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              class={`lg:hidden glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex flex-col justify-center items-center group h-64 ${isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
-                }`}
-            >
-              <Show when={!item().images || item().images.length === 0}>
-                <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
-                  <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 group-hover:text-accentCyan group-hover:border-accentCyan/30 transition-colors pointer-events-none">
-                    <ImageIcon size={28} />
-                  </div>
-                  <div class="pointer-events-none">
-                    <p class="text-sm font-semibold text-white">No Component Photo</p>
-                    <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
-                  </div>
-                  <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                    <button
-                      onClick={() => setShowAddImageModal(true)}
-                      class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
-                    >
-                      <Plus size={12} /> Add Image
-                    </button>
-                  </Show>
-                </div>
-              </Show>
-
-              <Show when={item().images && item().images.length > 0}>
-                {() => {
-                  const currentImage = () => item().images[activeImageIndex()] || item().images[0];
-                  return (
-                    <div class="w-full h-full relative flex flex-col justify-between">
-                      {/* Render Image */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
-                      >
-                        <img
-                          src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
-                          alt={currentImage()?.caption}
-                          class="max-w-full max-h-full object-contain pointer-events-none"
-                        />
-
-                        {/* Image Caption overlay */}
-                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 text-xs text-white pointer-events-none">
-                          <p class="font-bold truncate">{currentImage()?.caption}</p>
-                          <Show when={currentImage()?.notes}>
-                            <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
-                          </Show>
-                        </div>
-
-                        {/* Deletion & Add actions top right */}
-                        <div class="absolute top-3 right-3 flex gap-2">
-                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                            <button
-                              onClick={() => setShowAddImageModal(true)}
-                              class="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
-                              title="Add another photo"
-                            >
-                              <Plus size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteImage(currentImage()?.id)}
-                              class="p-1.5 rounded-lg bg-black/60 text-red-400 hover:text-red-300 hover:bg-black/80 transition-colors cursor-pointer"
-                              title="Delete this photo"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </Show>
-                        </div>
-                      </div>
-
-                      {/* Carousel controls if > 1 image */}
-                      <Show when={item().images.length > 1}>
-                        <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
-                          <button
-                            onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
-                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <button
-                            onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
-                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
-                      </Show>
-                    </div>
-                  );
-                }}
-              </Show>
-            </div>
+            <PartImages
+              class="lg:hidden flex flex-col"
+              item={item()}
+              user={user()}
+              isDraggingOver={isDraggingOver()}
+              handleDragOver={handleDragOver}
+              handleDragLeave={handleDragLeave}
+              handleDrop={handleDrop}
+              setShowAddImageModal={setShowAddImageModal}
+              activeImageIndex={activeImageIndex()}
+              setActiveImageIndex={setActiveImageIndex}
+              backendUrl={backendUrl()}
+              handleDeleteImage={handleDeleteImage}
+            />
 
             {/* Consumed by PCB projects Card */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
@@ -1139,42 +1049,6 @@ export default function PartDetails() {
                 Documents & Datasheets
               </h3>
 
-              {/* Upload interface */}
-              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                <form onSubmit={handleFileUpload} class="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
-                  <div class="w-full">
-                    <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Select Document (e.g. PDF)</label>
-                    <input
-                      type="file"
-                      id="file-input-field-doc"
-                      accept=".pdf,.doc,.docx,.txt"
-                      onChange={(e) => setUploadFile(e.currentTarget.files?.[0] || null)}
-                      class="glass-input w-full py-2 px-3 text-xs"
-                    />
-                  </div>
-                  <div class="flex flex-col sm:flex-row gap-3 items-end w-full">
-                    <div class="flex-1 w-full">
-                      <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Friendly Label Name</label>
-                      <input
-                        type="text"
-                        placeholder="E.g. Texas Instruments Datasheet"
-                        value={uploadLabel()}
-                        onInput={(e) => setUploadLabel(e.target.value)}
-                        class="glass-input w-full py-2 px-3 text-xs"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={uploading() || !uploadFile()}
-                      class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
-                    >
-                      <Upload size={14} />
-                      {uploading() ? "Uploading..." : "Upload Document"}
-                    </button>
-                  </div>
-                </form>
-              </Show>
-
               {/* Documents List */}
               <Show when={!item().documents || item().documents.length === 0}>
                 <div class="text-center py-6 text-xs text-gray-500">
@@ -1217,6 +1091,74 @@ export default function PartDetails() {
                   </For>
                 </div>
               </Show>
+
+              {/* Upload interface */}
+              <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
+                <form onSubmit={handleFileUpload} class="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
+                  <div class="w-full flex gap-2 items-end">
+                    <div class="flex-1">
+                      <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Document URL or Local File</label>
+                      <input
+                        type="text"
+                        placeholder="https://... or browse for a file"
+                        value={uploadDocUrl()}
+                        onInput={(e) => {
+                          setUploadDocUrl(e.target.value);
+                          if (uploadFile()) {
+                            setUploadFile(null); // Clear selected file if user edits manually
+                            const fileInput = document.getElementById("file-input-field-doc") as HTMLInputElement;
+                            if (fileInput) fileInput.value = "";
+                          }
+                        }}
+                        class="glass-input w-full py-2 px-3 text-xs"
+                      />
+                    </div>
+                    <input
+                      type="file"
+                      id="file-input-field-doc"
+                      accept=".pdf,.doc,.docx,.txt"
+                      class="hidden"
+                      onChange={(e) => {
+                        const file = e.currentTarget.files?.[0];
+                        if (file) {
+                          setUploadFile(file);
+                          setUploadDocUrl(file.name);
+                        } else {
+                          setUploadFile(null);
+                          setUploadDocUrl("");
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("file-input-field-doc")?.click()}
+                      class="btn-secondary py-2 px-4 text-xs font-bold whitespace-nowrap"
+                    >
+                      Browse...
+                    </button>
+                  </div>
+                  <div class="flex flex-col sm:flex-row gap-3 items-end w-full">
+                    <div class="flex-1 w-full">
+                      <label class="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase">Friendly Label Name</label>
+                      <input
+                        type="text"
+                        placeholder="E.g. Texas Instruments Datasheet"
+                        value={uploadLabel()}
+                        onInput={(e) => setUploadLabel(e.target.value)}
+                        class="glass-input w-full py-2 px-3 text-xs"
+                      />
+                    </div>
+                      <button
+                        type="submit"
+                        disabled={uploading() || !uploadDocUrl().trim()}
+                        class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
+                      >
+                        <Upload size={14} />
+                        {uploading() ? "Uploading..." : "Upload Document"}
+                      </button>
+                  </div>
+                </form>
+              </Show>
             </div>
 
           </div>
@@ -1225,102 +1167,20 @@ export default function PartDetails() {
           <div class="space-y-6">
 
             {/* Prominent Image Carousel / Drop Zone */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              class={`hidden lg:flex glass-panel rounded-2xl border transition-all duration-200 overflow-hidden relative flex-col justify-center items-center group h-64 ${isDraggingOver() ? "border-accentCyan bg-accentCyan/10 scale-[1.02]" : "border-white/5 bg-white/[0.01]"
-                }`}
-            >
-              <Show when={!item().images || item().images.length === 0}>
-                <div class="text-center p-6 space-y-3 flex flex-col items-center pointer-events-none">
-                  <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 group-hover:text-accentCyan group-hover:border-accentCyan/30 transition-colors pointer-events-none">
-                    <ImageIcon size={28} />
-                  </div>
-                  <div class="pointer-events-none">
-                    <p class="text-sm font-semibold text-white">No Component Photo</p>
-                    <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Drag & drop an image file or web image link here to upload.</p>
-                  </div>
-                  <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                    <button
-                      onClick={() => setShowAddImageModal(true)}
-                      class="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1 pointer-events-auto"
-                    >
-                      <Plus size={12} /> Add Image
-                    </button>
-                  </Show>
-                </div>
-              </Show>
-
-              <Show when={item().images && item().images.length > 0}>
-                {() => {
-                  const currentImage = () => item().images[activeImageIndex()] || item().images[0];
-                  return (
-                    <div class="w-full h-full relative flex flex-col justify-between">
-                      {/* Render Image */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        class="flex-1 w-full relative flex items-center justify-center overflow-hidden bg-black/20"
-                      >
-                        <img
-                          src={`${backendUrl()}/api/images/${currentImage()?.id}/render`}
-                          alt={currentImage()?.caption}
-                          class="max-w-full max-h-full object-contain pointer-events-none"
-                        />
-
-                        {/* Image Caption overlay */}
-                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 text-xs text-white pointer-events-none">
-                          <p class="font-bold truncate">{currentImage()?.caption}</p>
-                          <Show when={currentImage()?.notes}>
-                            <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{currentImage()?.notes}</p>
-                          </Show>
-                        </div>
-
-                        {/* Deletion & Add actions top right */}
-                        <div class="absolute top-3 right-3 flex gap-2">
-                          <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                            <button
-                              onClick={() => setShowAddImageModal(true)}
-                              class="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
-                              title="Add another photo"
-                            >
-                              <Plus size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteImage(currentImage()?.id)}
-                              class="p-1.5 rounded-lg bg-black/60 text-red-400 hover:text-red-300 hover:bg-black/80 transition-colors cursor-pointer"
-                              title="Delete this photo"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </Show>
-                        </div>
-                      </div>
-
-                      {/* Carousel controls if > 1 image */}
-                      <Show when={item().images.length > 1}>
-                        <div class="absolute inset-y-0 left-0 right-0 flex justify-between items-center px-2 pointer-events-none">
-                          <button
-                            onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : item().images.length - 1))}
-                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <button
-                            onClick={() => setActiveImageIndex((prev) => (prev < item().images.length - 1 ? prev + 1 : 0))}
-                            class="pointer-events-auto p-1 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
-                      </Show>
-                    </div>
-                  );
-                }}
-              </Show>
-            </div>
+            <PartImages
+              class="hidden lg:flex flex-col"
+              item={item()}
+              user={user()}
+              isDraggingOver={isDraggingOver()}
+              handleDragOver={handleDragOver}
+              handleDragLeave={handleDragLeave}
+              handleDrop={handleDrop}
+              setShowAddImageModal={setShowAddImageModal}
+              activeImageIndex={activeImageIndex()}
+              setActiveImageIndex={setActiveImageIndex}
+              backendUrl={backendUrl()}
+              handleDeleteImage={handleDeleteImage}
+            />
 
             {/* Inventory Levels Controls */}
             <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
@@ -1380,41 +1240,41 @@ export default function PartDetails() {
                         <MapPin size={13} class="text-accentCyan shrink-0" />
                         <span class="text-xs text-gray-300 font-medium truncate">{item().storage_records[0]?.name}</span>
                       </div>
-                        <div class="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              const rec = item().storage_records[0];
-                              setMoveSourceLocation(rec);
-                              setMoveQuantity(rec.quantity);
-                              setMoveDestMode("create");
-                              setMoveDestLocationId("");
-                              setMoveNewLocationName("");
-                              setMoveNewLocationParentId("");
-                              setDeleteSourceAfterMove(true);
-                              setShowMoveModal(true);
-                            }}
-                            disabled={item().storage_records[0]?.quantity === 0}
-                            class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                            title="Move Parts"
-                          >
-                            <Move size={14} />
-                          </button>
-                          <button
-                            onClick={() => setActivePrintLocation(item().storage_records[0])}
-                            class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
-                            title="Print Label"
-                          >
-                            <Printer size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLocation(item().storage_records[0])}
-                            disabled={item().storage_records[0]?.quantity > 0}
-                            class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                            title="Delete Location"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                      <div class="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            const rec = item().storage_records[0];
+                            setMoveSourceLocation(rec);
+                            setMoveQuantity(rec.quantity);
+                            setMoveDestMode("create");
+                            setMoveDestLocationId("");
+                            setMoveNewLocationName("");
+                            setMoveNewLocationParentId("");
+                            setDeleteSourceAfterMove(true);
+                            setShowMoveModal(true);
+                          }}
+                          disabled={item().storage_records[0]?.quantity === 0}
+                          class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                          title="Move Parts"
+                        >
+                          <Move size={14} />
+                        </button>
+                        <button
+                          onClick={() => setActivePrintLocation(item().storage_records[0])}
+                          class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
+                          title="Print Label"
+                        >
+                          <Printer size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLocation(item().storage_records[0])}
+                          disabled={item().storage_records[0]?.quantity > 0}
+                          class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                          title="Delete Location"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* StockController */}
@@ -1447,41 +1307,41 @@ export default function PartDetails() {
                             <MapPin size={13} class="text-accentCyan shrink-0" />
                             <span class="text-sm font-bold text-white truncate">{activeDrillSlot()?.name}</span>
                           </div>
-                            <div class="flex items-center gap-1">
-                              <button
-                                onClick={() => {
-                                  const rec = activeDrillSlot();
-                                  setMoveSourceLocation(rec);
-                                  setMoveQuantity(rec.quantity);
-                                  setMoveDestMode("link");
-                                  setMoveDestLocationId("");
-                                  setMoveNewLocationName("");
-                                  setMoveNewLocationParentId("");
-                                  setDeleteSourceAfterMove(true);
-                                  setShowMoveModal(true);
-                                }}
-                                disabled={activeDrillSlot()?.quantity === 0}
-                                class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                                title="Move Parts"
-                              >
-                                <Move size={14} />
-                              </button>
-                              <button
-                                onClick={() => setActivePrintLocation(activeDrillSlot())}
-                                class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
-                                title="Print Label"
-                              >
-                                <Printer size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteLocation(activeDrillSlot())}
-                                disabled={activeDrillSlot()?.quantity > 0}
-                                class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                                title="Delete Location"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                          <div class="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const rec = activeDrillSlot();
+                                setMoveSourceLocation(rec);
+                                setMoveQuantity(rec.quantity);
+                                setMoveDestMode("link");
+                                setMoveDestLocationId("");
+                                setMoveNewLocationName("");
+                                setMoveNewLocationParentId("");
+                                setDeleteSourceAfterMove(true);
+                                setShowMoveModal(true);
+                              }}
+                              disabled={activeDrillSlot()?.quantity === 0}
+                              class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                              title="Move Parts"
+                            >
+                              <Move size={14} />
+                            </button>
+                            <button
+                              onClick={() => setActivePrintLocation(activeDrillSlot())}
+                              class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
+                              title="Print Label"
+                            >
+                              <Printer size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLocation(activeDrillSlot())}
+                              disabled={activeDrillSlot()?.quantity > 0}
+                              class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+                              title="Delete Location"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                       <StockController

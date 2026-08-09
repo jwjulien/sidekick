@@ -221,6 +221,10 @@ class ImageUrlPayload(BaseModel):
     caption: Optional[str] = None
     notes: Optional[str] = None
 
+class DocumentUrlPayload(BaseModel):
+    url: str
+    label: Optional[str] = None
+
 @router.post("/{part_id}/images/url", response_model=schemas.ImageOut, status_code=status.HTTP_201_CREATED)
 async def download_part_image_url(
     part_id: int,
@@ -271,6 +275,64 @@ async def download_part_image_url(
     db.refresh(db_image)
     
     return db_image
+
+@router.post("/{part_id}/documents/url", response_model=schemas.DocumentOut, status_code=status.HTTP_201_CREATED)
+async def download_part_document_url(
+    part_id: int,
+    payload: DocumentUrlPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Download a document from a remote URL and attach it to the Part.
+    """
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+        
+    import urllib.request
+    from urllib.error import URLError, HTTPError
+    
+    try:
+        req = urllib.request.Request(
+            payload.url, 
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            file_bytes = response.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to download document from URL: {str(e)}"
+        )
+        
+    # Attempt to extract a sensible filename
+    filename = payload.url.split("/")[-1].split("?")[0]
+    if not filename or "." not in filename:
+        filename = "document.pdf"  # Fallback
+        
+    default_label = payload.label or filename
+        
+    db_document = models.Document(
+        part_id=part_id,
+        label=default_label,
+        filename=filename,
+        content=file_bytes
+    )
+    db.add(db_document)
+    
+    db_tx = models.Transaction(
+        part_id=part_id,
+        user_id=current_user.id,
+        action_type="edit",
+        quantity_change=0,
+        notes=f"Downloaded and attached document from URL: {default_label}."
+    )
+    db.add(db_tx)
+    db.commit()
+    db.refresh(db_document)
+    
+    return db_document
 
 
 @router.get("/{part_id}/documents", response_model=List[schemas.DocumentOut])
