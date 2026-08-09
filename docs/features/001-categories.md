@@ -1,6 +1,6 @@
 ---
 title: Core Categories
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows

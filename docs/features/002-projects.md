@@ -1,6 +1,6 @@
 ---
 title: Core Projects
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows

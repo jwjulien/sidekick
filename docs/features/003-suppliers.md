@@ -1,6 +1,6 @@
 ---
 title: Core Suppliers
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
