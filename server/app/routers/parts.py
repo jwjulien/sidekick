@@ -14,7 +14,7 @@ def get_parts(
     request: Request,
     q: Optional[str] = Query(None, description="Search term for part value, number, package, or notes"),
     category_id: Optional[int] = Query(None),
-    location_id: Optional[int] = Query(None),
+    location_id: Optional[str] = Query(None),
     low_stock: Optional[bool] = Query(None, description="Filter parts falling below alert threshold"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)

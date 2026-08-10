@@ -77,27 +77,118 @@ def delete_location(
     current_user: models.User = Depends(auth.require_designer)
 ):
     """
-    Delete storage location. If the location has children (sub-locations), it only clears the part linkage
-    (part_id=None, quantity=0, last_counted=None) to preserve the hierarchy. Otherwise, deletes it.
+    Delete storage location. Enforces strict deletion safety: blocked if children or parts exist.
     """
     storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
     if not storage:
         raise HTTPException(status_code=404, detail="Storage location not found.")
     
-    # Check if there are any child locations in the tree hierarchy
+    # Check if there are any child locations
     has_children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).first() is not None
     if has_children:
-        storage.part_id = None
-        storage.quantity = 0
-        storage.last_counted = None
-    else:
-        db.delete(storage)
+        raise HTTPException(status_code=400, detail="Cannot delete a location that contains child locations.")
         
+    if storage.part_id is not None:
+        raise HTTPException(status_code=400, detail="Cannot delete a location that has a part assigned.")
+        
+    db.delete(storage)
     db.commit()
     return
 
+class LayoutPayload(BaseModel):
+    dimensions: Optional[List[int]] = None
+
+@router.put("/{location_id}/layout", response_model=schemas.StorageOut)
+def update_layout(
+    location_id: str,
+    payload: LayoutPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update layout dimensions. Validates that children fit within new bounds.
+    """
+    storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+        
+    children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).all()
+    
+    # Validate children constraints
+    if payload.dimensions:
+        if len(payload.dimensions) == 1:
+            max_idx = payload.dimensions[0]
+            for child in children:
+                span_len = child.span[0] if child.span else 1
+                if child.index + span_len > max_idx:
+                    raise HTTPException(status_code=400, detail="Cannot resize: child item out of bounds.")
+        elif len(payload.dimensions) == 2:
+            cols, rows = payload.dimensions
+            max_cap = cols * rows
+            for child in children:
+                if child.index >= max_cap:
+                    raise HTTPException(status_code=400, detail="Cannot resize: child item out of bounds.")
+                
+    storage.dimensions = payload.dimensions
+    db.commit()
+    db.refresh(storage)
+    return storage
+
+class ReorderItem(BaseModel):
+    id: str
+    index: int
+
+class ReorderPayload(BaseModel):
+    items: List[ReorderItem]
+
+@router.put("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+def reorder_locations(
+    payload: ReorderPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Bulk update indices for sibling nodes after a flat-list drag-sort.
+    """
+    for item in payload.items:
+        db.query(models.Storage).filter(models.Storage.id == item.id).update({"index": item.index})
+    db.commit()
+    return
+
+class SlotPayload(BaseModel):
+    index: int
+    span: Optional[List[int]] = None
+
+@router.put("/{location_id}/slot", response_model=schemas.StorageOut)
+def update_slot(
+    location_id: str,
+    payload: SlotPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_designer)
+):
+    """
+    Update a child's index and span within its parent's geometry.
+    """
+    storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+        
+    storage.index = payload.index
+    if payload.span is not None:
+        storage.span = payload.span
+        
+    db.commit()
+    db.refresh(storage)
+    return storage
+
 class LocationLinkPayload(BaseModel):
-    part_id: Optional[int] = None
+    part_id: Optional[str] = None
+    parent_id: Optional[str] = None
+    set_parent: bool = False
+    index: Optional[int] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    label_scheme: Optional[str] = None
 
 @router.patch("/{location_id}", response_model=schemas.StorageOut)
 def patch_location(
@@ -118,7 +209,53 @@ def patch_location(
         part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
         if not part:
             raise HTTPException(status_code=404, detail="Part not found.")
-    storage.part_id = payload.part_id
+        storage.part_id = payload.part_id
+
+    if payload.name is not None:
+        storage.name = payload.name
+    if payload.description is not None:
+        storage.description = payload.description
+    if payload.label_scheme is not None:
+        storage.label_scheme = payload.label_scheme
+
+    if payload.set_parent:
+        if payload.parent_id is not None:
+            # Verify new parent exists and does not have an affiliated part
+            new_parent = db.query(models.Storage).filter(models.Storage.id == payload.parent_id).first()
+            if not new_parent:
+                raise HTTPException(status_code=404, detail="Target parent location not found.")
+            if new_parent.part_id is not None:
+                raise HTTPException(status_code=400, detail="Cannot move location into a node that has an affiliated part.")
+            
+            # Check for cyclical dependency (can't move into a descendant)
+            def check_cycle(curr_id, target_id):
+                if curr_id == target_id:
+                    return True
+                parent = db.query(models.Storage).filter(models.Storage.id == curr_id).first()
+                if not parent or not parent.parent_id:
+                    return False
+                return check_cycle(parent.parent_id, target_id)
+                
+            if check_cycle(payload.parent_id, location_id):
+                raise HTTPException(status_code=400, detail="Cannot move location into its own descendant.")
+            
+            # Calculate new index
+            if payload.index is not None:
+                storage.index = payload.index
+            else:
+                existing_children = db.query(models.Storage).filter(models.Storage.parent_id == payload.parent_id).all()
+                max_idx = max([c.index for c in existing_children], default=-1)
+                storage.index = max_idx + 1
+            storage.parent_id = payload.parent_id
+        else:
+            # Move to root
+            if payload.index is not None:
+                storage.index = payload.index
+            else:
+                existing_roots = db.query(models.Storage).filter(models.Storage.parent_id == None).all()
+                max_idx = max([c.index for c in existing_roots], default=-1)
+                storage.index = max_idx + 1
+            storage.parent_id = None
     db.commit()
     db.refresh(storage)
     return storage

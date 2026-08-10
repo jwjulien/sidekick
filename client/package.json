@@ -15,6 +15,7 @@
     "@solidjs/router": "^1.0.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-window-state": "^2.4.1",
+    "@thisbeyond/solid-dnd": "^0.7.5",
     "bwip-js": "^4.11.2",
     "lucide-solid": "^1.30.0",
     "oidc-client-ts": "^3.5.0",

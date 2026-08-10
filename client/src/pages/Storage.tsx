@@ -1,15 +1,14 @@
-import { createSignal, onMount, For, Show } from "solid-js";
-import { 
-  MapPin, 
-  Plus, 
-  Trash2, 
-  Layers,
-  Printer
-} from "lucide-solid";
+import { createSignal, onMount, Show } from "solid-js";
+import { MapPin, Plus } from "lucide-solid";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import LabelPreviewModal from "../components/LabelPreviewModal";
+import StorageColumns from "../components/storage/StorageColumns";
+import LocationEditModal from "../components/storage/LocationEditModal";
+import LocationMoveModal from "../components/storage/LocationMoveModal";
+import PartsBrowser from "../components/storage/PartsBrowser";
+import PartDetails from "./PartDetails";
 
 export default function Storage() {
   const { confirm } = useConfirm();
@@ -19,22 +18,35 @@ export default function Storage() {
   // Storage Location Form State
   const [locName, setLocName] = createSignal("");
   const [locDesc, setLocDesc] = createSignal("");
-  const [locParentId, setLocParentId] = createSignal("");
+  const [locParentId, setLocParentId] = createSignal<string | null>(null);
   const [locIndex, setLocIndex] = createSignal(0);
-  const [locLabelScheme, setLocLabelScheme] = createSignal("");
+  const [showCreateForm, setShowCreateForm] = createSignal(false);
+  
+  // Edit Location Modal State
+  const [editLocation, setEditLocation] = createSignal<any | null>(null);
+  
+  // Move Location Modal State
+  const [moveLocation, setMoveLocation] = createSignal<any | null>(null);
+
+  // Navigation State
+  const [activePath, setActivePath] = createSignal<string[]>([]);
+  
+  // Parts Browser & Inline Part Details
+  const [inlinePartId, setInlinePartId] = createSignal<string | null>(null);
+  const [isAutoSelected, setIsAutoSelected] = createSignal(false);
   
   // Printing Reference Tags
   const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const locs = await apiFetch("/locations?flat=true");
-      setLocations(locs);
-    } catch (err) {
-      console.error("Failed to load storage structure:", err);
+      const locRes = await apiFetch("/locations?flat=true");
+      setLocations(locRes);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load data.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -42,30 +54,98 @@ export default function Storage() {
     loadData();
   });
 
+  const handleSelectNode = (id: string) => {
+    setActivePath(prev => {
+      const loc = locations().find((l: any) => l.id === id);
+      if (!loc) return prev;
+      if (!loc.parent_id) return [id];
+      const parentIdx = prev.indexOf(loc.parent_id);
+      if (parentIdx !== -1) {
+        return [...prev.slice(0, parentIdx + 1), id];
+      }
+      return [...prev, id];
+    });
+    setShowCreateForm(false);
+    setInlinePartId(null); // reset inline part view when navigating
+  };
+
   const handleCreateLocation = async (e: Event) => {
     e.preventDefault();
     if (!locName()) return;
     try {
+      let finalParentId = locParentId();
+      let finalIndex = locIndex();
+
+      const parentLoc = locations().find(l => l.id === locParentId());
+      if (parentLoc && parentLoc.dimensions && parentLoc.dimensions.length === 2) {
+        const cols = parentLoc.dimensions[0];
+        const rowIdx = Math.floor(locIndex() / cols);
+        const colIdx = locIndex() % cols;
+
+        let rowContainer = locations().find(l => l.parent_id === parentLoc.id && l.index === rowIdx);
+        
+        if (!rowContainer) {
+          const rowRes = await apiFetch("/locations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: `Row ${rowIdx + 1}`,
+              description: `Row ${rowIdx + 1} Container`,
+              parent_id: parentLoc.id,
+              index: rowIdx
+            })
+          });
+          rowContainer = rowRes;
+        }
+
+        finalParentId = rowContainer.id;
+        finalIndex = colIdx;
+      }
+
       await apiFetch("/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: locName(),
           description: locDesc(),
-          parent_id: locParentId() ? locParentId() : null,
-          index: locIndex(),
-          label_scheme: locLabelScheme() || null
+          parent_id: finalParentId,
+          index: finalIndex
         })
       });
+      
       setLocName("");
       setLocDesc("");
-      setLocParentId("");
+      setLocParentId(null);
       setLocIndex(0);
-      setLocLabelScheme("");
+      setShowCreateForm(false);
       loadData();
       toast.success("Storage location created successfully.");
     } catch (err: any) {
       toast.error(err.message || "Failed to create storage location.");
+    }
+  };
+
+  const handleReorderLocation = async (items: { id: string; index: number }[]) => {
+    try {
+      // Optimistically update UI state to avoid flicker
+      const updatedLocations = [...locations()];
+      for (const item of items) {
+        const idx = updatedLocations.findIndex(l => l.id === item.id);
+        if (idx !== -1) {
+          updatedLocations[idx] = { ...updatedLocations[idx], index: item.index };
+        }
+      }
+      setLocations(updatedLocations);
+
+      await apiFetch("/locations/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items })
+      });
+      loadData(true); // Ensure synchronization silently
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reorder locations.");
+      loadData(true); // Revert on failure
     }
   };
 
@@ -79,27 +159,35 @@ export default function Storage() {
     if (!isConfirmed) return;
     try {
       await apiFetch(`/locations/${locId}`, { method: "DELETE" });
+      
+      const pathIdx = activePath().indexOf(locId);
+      if (pathIdx !== -1) {
+        setActivePath(activePath().slice(0, pathIdx));
+      }
+      
+      setEditLocation(null);
       loadData();
+      toast.success("Location deleted.");
     } catch (err: any) {
       toast.error(err.message || "Failed to delete location.");
     }
   };
 
-  const getParentLocationName = (parentId: string | null) => {
-    if (!parentId) return "";
-    const parent = locations().find(l => l.id === parentId);
-    return parent ? parent.name : "";
+  const activeNode = () => {
+    const path = activePath();
+    if (path.length === 0) return null;
+    return locations().find(l => l.id === path[path.length - 1]);
   };
 
   return (
-    <div class="space-y-6">
+    <div class="space-y-6 h-[calc(100vh-100px)] flex flex-col">
       {/* Page Header */}
       <div>
         <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
           <MapPin class="text-accentCyan" />
           Storage Structure Designer
         </h2>
-        <p class="text-gray-400 text-sm">Define storage drawers, cabinets, and bin hierarchy.</p>
+        <p class="text-gray-400 text-sm">Navigate and define storage containers using Miller Columns.</p>
       </div>
 
       <Show when={loading()}>
@@ -107,155 +195,133 @@ export default function Storage() {
       </Show>
 
       <Show when={!loading()}>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 1 Col: Storage creation */}
-          <div class="glass-panel rounded-2xl p-6 border border-white/5 h-fit">
+        {/* Top: Miller Columns */}
+        <div class="h-[400px] shrink-0 overflow-hidden relative">
+          <StorageColumns 
+            locations={locations()} 
+            activePath={activePath()}
+            onSelect={handleSelectNode}
+            onCreateChild={(parentId, index = 0) => {
+              setLocParentId(parentId);
+              setLocIndex(index);
+              setShowCreateForm(true);
+            }}
+            onEditLocation={(loc) => setEditLocation(loc)}
+            creatingParentId={locParentId()}
+            creatingIndex={locIndex()}
+            isCreating={showCreateForm()}
+            onReorder={handleReorderLocation}
+          />
+        </div>
+        
+        {/* Creation Form Overlay (if needed) */}
+        <Show when={showCreateForm()}>
+          <div class="glass-panel p-5 rounded-xl border border-white/10 shrink-0">
             <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5">
               <Plus size={16} class="text-accentCyan" />
-              Add Storage Slot
+              Add Storage Slot {locParentId() ? `to ${locations().find(l => l.id === locParentId())?.name}` : "to Root"}
             </h3>
             
-            <form onSubmit={handleCreateLocation} class="space-y-4 text-xs">
-              <div>
-                <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Bin / Drawer Name</label>
+            <form onSubmit={handleCreateLocation} class="flex items-end gap-4 text-xs">
+              <div class="flex-1">
+                <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Name</label>
                 <input
                   type="text"
                   required
                   value={locName()}
                   onInput={(e) => setLocName(e.target.value)}
-                  placeholder="E.g. Drawer 1, Drawer 2 - ICs, Slot A1"
+                  placeholder="E.g. Drawer 1"
                   class="glass-input w-full text-xs"
                 />
               </div>
-              
-              <div>
+              <div class="flex-1">
                 <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Description</label>
                 <input
                   type="text"
                   value={locDesc()}
                   onInput={(e) => setLocDesc(e.target.value)}
-                  placeholder="E.g. top shelf, bin organizer code..."
+                  placeholder="Optional details"
                   class="glass-input w-full text-xs"
                 />
               </div>
-
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Grid Index</label>
-                  <input
-                    type="number"
-                    value={locIndex()}
-                    onInput={(e) => setLocIndex(parseInt(e.target.value) || 0)}
-                    class="glass-input w-full text-xs"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Label Scheme</label>
-                  <input
-                    type="text"
-                    value={locLabelScheme()}
-                    onInput={(e) => setLocLabelScheme(e.target.value)}
-                    placeholder="E.g. row-col"
-                    class="glass-input w-full text-xs font-mono"
-                  />
-                </div>
+              <div class="flex gap-2 w-48 shrink-0">
+                <button type="button" onClick={() => setShowCreateForm(false)} class="btn-secondary flex-1 py-2 text-xs">Cancel</button>
+                <button type="submit" class="btn-primary flex-1 py-2 text-xs">Save</button>
               </div>
-
-              <div>
-                <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Parent Unit (Cabinet / Box)</label>
-                <select
-                  value={locParentId()}
-                  onChange={(e) => setLocParentId(e.currentTarget.value)}
-                  class="glass-input w-full text-xs"
-                >
-                  <option value="">No Parent (Cabinet Root)</option>
-                  <For each={locations()}>
-                    {(loc) => (
-                      <option value={loc.id}>
-                        {loc.name} {loc.parent_id ? `(under ${getParentLocationName(loc.parent_id)})` : ""}
-                      </option>
-                    )}
-                  </For>
-                </select>
-                <p class="text-[9px] text-gray-500 mt-1">Allows building multi-layered bin layouts.</p>
-              </div>
-
-              <button type="submit" class="btn-primary w-full py-2.5">
-                Save Storage Slot
-              </button>
             </form>
           </div>
+        </Show>
 
-          {/* Right 2 Cols: Storage Tree */}
-          <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
-            <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <MapPin size={16} class="text-accentCyan" />
-              Storage Drawers Tree
-            </h3>
-            
-            <Show when={locations().length === 0}>
-              <div class="text-center py-10 text-xs text-gray-500">
-                No storage slots designed yet. Define one on the left.
-              </div>
-            </Show>
-
-            <Show when={locations().length > 0}>
-              <div class="space-y-2 text-xs">
-                <For each={locations()}>
-                  {(loc) => {
-                    let depth = 0;
-                    let currentParentId = loc.parent_id;
-                    while (currentParentId) {
-                      depth++;
-                      const parent = locations().find(l => l.id === currentParentId);
-                      currentParentId = parent ? parent.parent_id : null;
-                    }
-                    
-                    return (
-                      <div 
-                        style={{ "margin-left": `${depth * 20}px` }}
-                        class="glass-card p-3.5 rounded-xl border border-white/5 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div class="flex items-center gap-2">
-                          <span class="text-accentCyan shrink-0">
-                            {depth > 0 ? <Layers size={14} class="opacity-60" /> : <MapPin size={14} />}
-                          </span>
-                          <div>
-                            <span class="font-bold text-white">{loc.name}</span>
-                            <Show when={loc.label_scheme}>
-                              <span class="bg-white/5 text-[9px] border border-white/5 px-1.5 py-0.5 rounded font-mono ml-2 uppercase text-gray-400">
-                                Format: {loc.label_scheme}
-                              </span>
-                            </Show>
-                            <span class="text-gray-500 block text-[10px] mt-0.5">{loc.description || "No description."}</span>
-                          </div>
-                        </div>
-
-                        <div class="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => setActivePrintLocation({ id: loc.id, name: loc.name, description: loc.description })}
-                            class="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
-                            title="Print Reference Tag"
-                          >
-                            <Printer size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLocation(loc.id)}
-                            class="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded transition-colors"
-                            title="Delete Location"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
-            </Show>
-          </div>
+        {/* Bottom: Aggregated Parts Browser or Inline Details */}
+        <div class="flex-1 overflow-y-auto">
+          <Show when={activeNode() && !inlinePartId()}>
+            <PartsBrowser 
+              locationId={activeNode().id}
+              onSelectPart={(part) => {
+                setIsAutoSelected(false);
+                setInlinePartId(part.id);
+              }}
+              onAutoSelect={(part) => {
+                setIsAutoSelected(true);
+                setInlinePartId(part.id);
+              }}
+            />
+          </Show>
+          
+          <Show when={inlinePartId()}>
+            <div class="glass-panel p-6 rounded-2xl border border-white/5 bg-dark/50">
+              <PartDetails 
+                id={inlinePartId()!} 
+                onCloseInline={() => setInlinePartId(null)}
+                hideBackButton={isAutoSelected()}
+              />
+            </div>
+          </Show>
+          
+          <Show when={!activeNode()}>
+            <div class="bg-black/20 p-8 rounded-xl border border-white/5 text-center text-gray-500 text-sm">
+              Select a location above to browse its parts.
+            </div>
+          </Show>
         </div>
+      </Show>
+
+      {/* Edit Location Modal */}
+      <Show when={editLocation()}>
+        <LocationEditModal
+          location={editLocation()}
+          onClose={() => setEditLocation(null)}
+          onUpdate={() => loadData(true)}
+          onPrint={(loc) => {
+            setEditLocation(null);
+            setActivePrintLocation(loc);
+          }}
+          onDelete={handleDeleteLocation}
+          onMove={(loc) => {
+            setEditLocation(null);
+            setMoveLocation(loc);
+          }}
+        />
+      </Show>
+
+      {/* Move Location Modal */}
+      <Show when={moveLocation()}>
+        <LocationMoveModal
+          location={moveLocation()}
+          allLocations={locations()}
+          onClose={() => setMoveLocation(null)}
+          onMoved={() => {
+            const movedLoc = moveLocation();
+            if (movedLoc) {
+              const idx = activePath().indexOf(movedLoc.id);
+              if (idx !== -1) {
+                setActivePath(activePath().slice(0, idx));
+              }
+            }
+            setMoveLocation(null);
+            loadData(true);
+          }}
+        />
       </Show>
 
       {/* Label Print Modal */}

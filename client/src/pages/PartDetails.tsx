@@ -30,11 +30,11 @@ import StockController from "../components/StockController";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
-export default function PartDetails() {
+export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const params = useParams();
   const navigate = useNavigate();
-  const itemId = params.id;
+  const itemId = props.id || params.id;
 
   const [item, setItem] = createSignal<any>(null);
   const [loading, setLoading] = createSignal(true);
@@ -750,13 +750,15 @@ export default function PartDetails() {
   return (
     <div class="space-y-6">
       {/* Back button */}
-      <button
-        onClick={() => navigate("/inventory")}
-        class="btn-secondary py-1.5 px-3 flex items-center gap-2 text-xs"
-      >
-        <ArrowLeft size={14} />
-        Back to Catalog
-      </button>
+      <Show when={!props.hideBackButton}>
+        <button
+          onClick={() => props.onCloseInline ? props.onCloseInline() : navigate("/inventory")}
+          class="btn-secondary py-1.5 px-3 flex items-center gap-2 text-xs"
+        >
+          <ArrowLeft size={14} />
+          {props.onCloseInline ? "Back to Storage Layout" : "Back to Catalog"}
+        </button>
+      </Show>
 
       <Show when={loading() && !item()}>
         <div class="glass-panel p-8 rounded-2xl animate-pulse h-64"></div>
