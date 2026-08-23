@@ -50,23 +50,71 @@ export default function Storage() {
     }
   };
 
+  const updateUrlHistory = (path: string[], replace = false) => {
+    const url = new URL(window.location.href);
+    if (path.length > 0) {
+      url.searchParams.set("locPath", path.join(","));
+    } else {
+      url.searchParams.delete("locPath");
+    }
+    if (replace) {
+      window.history.replaceState({ activePath: path }, "", url.toString());
+    } else {
+      window.history.pushState({ activePath: path }, "", url.toString());
+    }
+  };
+
   onMount(() => {
     loadData();
+
+    // Initialize activePath from URL if present
+    const params = new URLSearchParams(window.location.search);
+    const locParam = params.get("locPath");
+    if (locParam) {
+      const initialPath = locParam.split(",").filter(Boolean);
+      setActivePath(initialPath);
+      window.history.replaceState({ activePath: initialPath }, "", window.location.href);
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && Array.isArray(e.state.activePath)) {
+        setActivePath(e.state.activePath);
+      } else {
+        const p = new URLSearchParams(window.location.search).get("locPath");
+        setActivePath(p ? p.split(",").filter(Boolean) : []);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
   });
 
   const handleSelectNode = (id: string) => {
+    let newPath: string[] = [];
     setActivePath(prev => {
       const loc = locations().find((l: any) => l.id === id);
       if (!loc) return prev;
-      if (!loc.parent_id) return [id];
-      const parentIdx = prev.indexOf(loc.parent_id);
-      if (parentIdx !== -1) {
-        return [...prev.slice(0, parentIdx + 1), id];
+      if (!loc.parent_id) {
+        newPath = [id];
+      } else {
+        const parentIdx = prev.indexOf(loc.parent_id);
+        if (parentIdx !== -1) {
+          newPath = [...prev.slice(0, parentIdx + 1), id];
+        } else {
+          newPath = [...prev, id];
+        }
       }
-      return [...prev, id];
+      return newPath;
     });
+    if (newPath.length > 0) updateUrlHistory(newPath);
     setShowCreateForm(false);
     setInlinePartId(null); // reset inline part view when navigating
+  };
+
+  const handleSelectSearchPath = (pathIds: string[]) => {
+    setActivePath(pathIds);
+    updateUrlHistory(pathIds);
+    setShowCreateForm(false);
+    setInlinePartId(null);
   };
 
   const handleCreateLocation = async (e: Event) => {
@@ -201,6 +249,7 @@ export default function Storage() {
             locations={locations()} 
             activePath={activePath()}
             onSelect={handleSelectNode}
+            onSelectSearchPath={handleSelectSearchPath}
             onCreateChild={(parentId, index = 0) => {
               setLocParentId(parentId);
               setLocIndex(index);
