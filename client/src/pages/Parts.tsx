@@ -1,11 +1,11 @@
 import { createSignal, onMount, For, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Tag, 
-  MapPin, 
+import {
+  Search,
+  Filter,
+  Plus,
+  Tag,
+  MapPin,
   AlertTriangle,
   FolderOpen,
   X,
@@ -21,16 +21,16 @@ export default function Parts() {
   const [parts, setParts] = createSignal<any[]>([]);
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
-  
+
   const [search, setSearch] = createSignal("");
   const [selectedCat, setSelectedCat] = createSignal("");
   const [selectedLoc, setSelectedLoc] = createSignal("");
   const [filterLowStock, setFilterLowStock] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
-  
+
   // Advanced Dynamic Filters State
   const [showAdvancedFilters, setShowAdvancedFilters] = createSignal(false);
-  const [dynamicFilters, setDynamicFilters] = createSignal<Array<{key: string, value: string}>>([]);
+  const [dynamicFilters, setDynamicFilters] = createSignal<Array<{ key: string, value: string }>>([]);
 
   // Add Part Modal state
   const [showAddModal, setShowAddModal] = createSignal(false);
@@ -42,10 +42,10 @@ export default function Parts() {
   const [newPartMinQty, setNewPartMinQty] = createSignal(5);
   const [newPartCat, setNewPartCat] = createSignal("");
   const [newPartNotes, setNewPartNotes] = createSignal("");
-  
+
   // Dynamic Attributes State
-  const [attributes, setAttributes] = createSignal<Array<{key: string, value: string}>>([]);
-  
+  const [attributes, setAttributes] = createSignal<Array<{ key: string, value: string }>>([]);
+
   const [submitting, setSubmitting] = createSignal(false);
 
   const fetchFilters = async () => {
@@ -69,14 +69,14 @@ export default function Parts() {
       if (selectedCat()) queryParams.push(`category_id=${selectedCat()}`);
       if (selectedLoc()) queryParams.push(`location_id=${selectedLoc()}`);
       if (filterLowStock()) queryParams.push(`low_stock=true`);
-      
+
       // Add dynamic JSON attribute filters
       dynamicFilters().forEach(filter => {
         if (filter.key && filter.value) {
           queryParams.push(`attr_${encodeURIComponent(filter.key)}=${encodeURIComponent(filter.value)}`);
         }
       });
-      
+
       const queryStr = queryParams.length > 0 ? `?${queryParams.join("&")}` : "";
       const data = await apiFetch(`/parts${queryStr}`);
       setParts(data);
@@ -135,7 +135,7 @@ export default function Parts() {
       toast.error("Value, Part Number, and Category are required.");
       return;
     }
-    
+
     setSubmitting(true);
     try {
       // Serialize attributes into an object map
@@ -157,7 +157,7 @@ export default function Parts() {
         notes: newPartNotes(),
         attributes: attributesObj
       };
-      
+
       await apiFetch("/parts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -174,7 +174,7 @@ export default function Parts() {
       setNewPartCat("");
       setNewPartNotes("");
       setAttributes([]);
-      
+
       setShowAddModal(false);
       fetchParts();
       toast.success("Part created successfully.");
@@ -193,7 +193,7 @@ export default function Parts() {
           <h2 class="text-2xl font-bold text-white tracking-tight">Parts Catalog</h2>
           <p class="text-gray-400 text-sm">Browse, search, filter, and track components in stock.</p>
         </div>
-        
+
         {/* Create Button */}
         <Show when={user()?.role === "admin" || user()?.role === "stocker" || user()?.role === "designer"}>
           <button
@@ -217,9 +217,8 @@ export default function Parts() {
               placeholder="Search by value, part number, package, description..."
               class="glass-input w-full pl-10"
             />
-            <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           </div>
-          
+
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters())}
@@ -228,7 +227,7 @@ export default function Parts() {
             <Filter size={16} />
             Advanced
           </button>
-          
+
           <button
             type="submit"
             class="btn-primary px-6 font-semibold flex items-center justify-center gap-2"
@@ -278,7 +277,7 @@ export default function Parts() {
             </label>
           </div>
         </div>
-        
+
         {/* Advanced Filters Drawer */}
         <Show when={showAdvancedFilters()}>
           <div class="pt-4 border-t border-white/5 space-y-3">
@@ -292,7 +291,7 @@ export default function Parts() {
                 <Plus size={12} /> Add Filter Rule
               </button>
             </div>
-            
+
             <For each={dynamicFilters()}>
               {(filter, index) => (
                 <div class="flex items-center gap-3">
@@ -351,11 +350,10 @@ export default function Parts() {
             {(part) => {
               const isAlert = part.total_quantity < part.threshold;
               return (
-                <div 
+                <div
                   onClick={() => navigate(`/parts/${part.id}`)}
-                  class={`glass-card glass-card-hover p-6 rounded-2xl flex flex-col justify-between h-48 cursor-pointer relative ${
-                    isAlert ? "border-amber-500/20 bg-amber-500/[0.01]" : ""
-                  }`}
+                  class={`glass-card glass-card-hover p-6 rounded-2xl flex flex-col justify-between h-48 cursor-pointer relative ${isAlert ? "border-amber-500/20 bg-amber-500/[0.01]" : ""
+                    }`}
                 >
                   <div>
                     <div class="flex justify-between items-start gap-2">
@@ -405,13 +403,13 @@ export default function Parts() {
       <Show when={showAddModal()}>
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 border border-white/10 relative my-8">
-            <button 
+            <button
               onClick={() => setShowAddModal(false)}
               class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
             >
               <X size={20} />
             </button>
-            
+
             <h3 class="text-xl font-bold text-white mb-2">Create New Part</h3>
             <p class="text-xs text-gray-400 mb-6">Define a core component and its attributes.</p>
 
@@ -512,7 +510,7 @@ export default function Parts() {
                   class="glass-input w-full text-sm min-h-[80px]"
                 ></textarea>
               </div>
-              
+
               {/* Dynamic Attributes Builder */}
               <div class="pt-4 border-t border-white/5 space-y-3">
                 <div class="flex justify-between items-center">
@@ -526,7 +524,7 @@ export default function Parts() {
                   </button>
                 </div>
                 <p class="text-[10px] text-gray-500">Define dynamic Key/Value pairs like Tolerance, Voltage, or Thread Pitch.</p>
-                
+
                 <For each={attributes()}>
                   {(attr, index) => (
                     <div class="flex items-center gap-3">

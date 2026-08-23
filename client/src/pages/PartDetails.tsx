@@ -1,14 +1,12 @@
 import { createSignal, createMemo, onMount, For, Show } from "solid-js";
-import { useParams, useNavigate, A } from "@solidjs/router";
+import { useParams, useNavigate } from "@solidjs/router";
 import {
   Package,
-  Tag,
   MapPin,
   AlertTriangle,
   Plus,
   Minus,
   FileText,
-  Image as ImageIcon,
   Download,
   Trash2,
   History,
@@ -106,10 +104,35 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   const [editWeight, setEditWeight] = createSignal(0.0);
   const [editThreshold, setEditThreshold] = createSignal(0);
   const [editCat, setEditCat] = createSignal("");
-  const [editLoc, setEditLoc] = createSignal("");
   const [categories, setCategories] = createSignal<any[]>([]);
-  const [locations, setLocations] = createSignal<any[]>([]);
   const [suppliers, setSuppliers] = createSignal<any[]>([]);
+
+  const categoryChain = () => {
+    const currentCat = item()?.category;
+    if (!currentCat) return "Uncategorized";
+
+    const allCats = categories();
+    const chain: string[] = [];
+
+    let curr: any = currentCat;
+    if (allCats && allCats.length > 0) {
+      const found = allCats.find((c: any) => String(c.id) === String(curr.id));
+      if (found) curr = found;
+    }
+
+    const visited = new Set<string>();
+    while (curr && !visited.has(String(curr.id))) {
+      visited.add(String(curr.id));
+      chain.unshift(curr.title);
+      if (curr.parent_id && allCats && allCats.length > 0) {
+        curr = allCats.find((c: any) => String(c.id) === String(curr.parent_id));
+      } else {
+        curr = null;
+      }
+    }
+
+    return chain.length > 0 ? chain.join(", ") : (currentCat.title || "Uncategorized");
+  };
 
   // Carousel & Drag & Drop State
   const [activeImageIndex, setActiveImageIndex] = createSignal(0);
@@ -200,7 +223,6 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
         apiFetch("/suppliers")
       ]);
       setCategories(cats);
-      setLocations(locs);
       setAllLocations(locs);
       setSuppliers(sups);
     } catch (_) { }
@@ -783,6 +805,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
 
               <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
+                  <span class="text-white font-semibold" title={categoryChain()}>{categoryChain()}</span>
                   <div class="flex items-center gap-3">
                     <h2 class="text-2xl font-bold text-white tracking-tight">{item().value}</h2>
                     <Show when={item().total_quantity < item().threshold}>
@@ -835,10 +858,6 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
               <div class="space-y-3 pt-2">
                 <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Attributes</h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
-                    <span class="text-gray-400 font-medium">Category</span>
-                    <span class="text-white font-semibold">{item().category?.title || "Uncategorized"}</span>
-                  </div>
                   <For each={attributesEntries()}>
                     {([key, value]) => (
                       <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
@@ -1066,7 +1085,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <For each={item().documents}>
                     {(doc) => (
-                      <div 
+                      <div
                         class="glass-card p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-white/5 transition-colors group"
                         onClick={() => setSelectedDocumentForView(doc)}
                       >
@@ -1158,14 +1177,14 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                         class="glass-input w-full py-2 px-3 text-xs"
                       />
                     </div>
-                      <button
-                        type="submit"
-                        disabled={uploading() || !uploadDocUrl().trim()}
-                        class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
-                      >
-                        <Upload size={14} />
-                        {uploading() ? "Uploading..." : "Upload Document"}
-                      </button>
+                    <button
+                      type="submit"
+                      disabled={uploading() || !uploadDocUrl().trim()}
+                      class="btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
+                    >
+                      <Upload size={14} />
+                      {uploading() ? "Uploading..." : "Upload Document"}
+                    </button>
                   </div>
                 </form>
               </Show>
@@ -1940,9 +1959,9 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
       />
 
       <Show when={selectedDocumentForView()}>
-        <DocumentViewer 
-          document={selectedDocumentForView()} 
-          onClose={() => setSelectedDocumentForView(null)} 
+        <DocumentViewer
+          document={selectedDocumentForView()}
+          onClose={() => setSelectedDocumentForView(null)}
         />
       </Show>
     </div>
