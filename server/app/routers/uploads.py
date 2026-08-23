@@ -18,8 +18,30 @@ def render_image(
     if not img:
         raise HTTPException(status_code=404, detail="Image not found.")
     
-    # Simple media type detection
+    # Dynamic media type detection based on magic bytes & caption extension fallback
     media_type = "image/png"
+    if img.content:
+        header = img.content[:12]
+        if header.startswith(b'\xff\xd8\xff'):
+            media_type = "image/jpeg"
+        elif header.startswith(b'\x89PNG\r\n\x1a\n'):
+            media_type = "image/png"
+        elif header.startswith(b'GIF8'):
+            media_type = "image/gif"
+        elif header.startswith(b'RIFF') and b'WEBP' in header:
+            media_type = "image/webp"
+        elif b'<svg' in header.lower():
+            media_type = "image/svg+xml"
+        elif img.caption:
+            cap = img.caption.lower()
+            if cap.endswith(".jpg") or cap.endswith(".jpeg"):
+                media_type = "image/jpeg"
+            elif cap.endswith(".webp"):
+                media_type = "image/webp"
+            elif cap.endswith(".gif"):
+                media_type = "image/gif"
+            elif cap.endswith(".svg"):
+                media_type = "image/svg+xml"
     return Response(content=img.content, media_type=media_type)
 
 @router.delete("/api/images/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -55,9 +77,9 @@ def download_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
         
-    media_type = "application/octet-stream"
-    if doc.filename.lower().endswith(".pdf"):
-        media_type = "application/pdf"
+    import mimetypes
+    guessed_type, _ = mimetypes.guess_type(doc.filename)
+    media_type = guessed_type or "application/octet-stream"
         
     from fastapi.responses import Response
     disposition = "inline" if inline else "attachment"

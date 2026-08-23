@@ -104,12 +104,14 @@ class ProductBase(BaseModel):
     supplier_id: str
     part_id: str
     sku: str
+    url: Optional[str] = None
 
 class ProductCreate(ProductBase):
     pass
 
 class ProductUpdate(BaseModel):
-    sku: str
+    sku: Optional[str] = None
+    url: Optional[str] = None
 
 class ProductOut(ProductBase):
     id: str
@@ -235,6 +237,12 @@ class StorageBase(BaseModel):
     quantity: int = 0
     description: Optional[str] = None
     last_counted: Optional[datetime] = None
+    pos_x: float = 0.0
+    pos_y: float = 0.0
+    pos_z: float = 0.0
+    size_x: float = 0.0
+    size_y: float = 0.0
+    size_z: float = 0.0
 
 class StorageCreate(StorageBase):
     pass

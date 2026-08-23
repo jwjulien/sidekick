@@ -80,11 +80,13 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   // Link Supplier State
   const [newSupplierId, setNewSupplierId] = createSignal("");
   const [newSupplierSku, setNewSupplierSku] = createSignal("");
+  const [newSupplierUrl, setNewSupplierUrl] = createSignal("");
   const [linkingSupplier, setLinkingSupplier] = createSignal(false);
   const [showAddSupplierPanel, setShowAddSupplierPanel] = createSignal(false);
   const [products, setProducts] = createSignal<any[]>([]);
-  const [editingProductId, setEditingProductId] = createSignal<number | null>(null);
+  const [editingProductId, setEditingProductId] = createSignal<string | null>(null);
   const [editSkuValue, setEditSkuValue] = createSignal("");
+  const [editUrlValue, setEditUrlValue] = createSignal("");
   const [savingEdit, setSavingEdit] = createSignal(false);
 
   const fetchProducts = async () => {
@@ -552,11 +554,13 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
         body: JSON.stringify({
           supplier_id: newSupplierId(),
           part_id: itemId,
-          sku: newSupplierSku()
+          sku: newSupplierSku(),
+          url: newSupplierUrl() || null
         })
       });
       setNewSupplierId("");
       setNewSupplierSku("");
+      setNewSupplierUrl("");
       setShowAddSupplierPanel(false);
       fetchProducts();
       fetchItemDetails();
@@ -594,11 +598,13 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sku: editSkuValue()
+          sku: editSkuValue(),
+          url: editUrlValue() || null
         })
       });
       setEditingProductId(null);
       setEditSkuValue("");
+      setEditUrlValue("");
       fetchProducts();
       fetchItemDetails();
       toast.success("Supplier SKU updated successfully.");
@@ -1089,9 +1095,14 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                         class="glass-card p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-white/5 transition-colors group"
                         onClick={() => setSelectedDocumentForView(doc)}
                       >
-                        <div class="flex flex-col min-w-0">
-                          <span class="font-medium text-white truncate max-w-[150px] group-hover:text-indigo-300 transition-colors">{doc.label}</span>
-                          <span class="text-[10px] text-gray-500 truncate max-w-[150px]">{doc.filename}</span>
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase shrink-0 bg-accentCyan/10 text-accentCyan border border-accentCyan/20">
+                            {doc.filename?.includes(".") ? doc.filename.split(".").pop() : "FILE"}
+                          </span>
+                          <div class="flex flex-col min-w-0">
+                            <span class="font-medium text-white truncate max-w-[150px] group-hover:text-indigo-300 transition-colors">{doc.label}</span>
+                            <span class="text-[10px] text-gray-500 truncate max-w-[150px]">{doc.filename}</span>
+                          </div>
                         </div>
 
                         <div class="flex items-center gap-1.5 shrink-0">

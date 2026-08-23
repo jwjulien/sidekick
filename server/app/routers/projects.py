@@ -170,6 +170,51 @@ def delete_assembly(
 
 # --- Revisions ---
 
+@router.get("/{project_id}/revisions", response_model=List[schemas.RevisionOut])
+def get_project_revisions(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all revisions for a specific project. Requires Analyst role.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+        
+    assemblies = db.query(models.Assembly).filter(models.Assembly.project_id == project_id).all()
+    assembly_ids = [a.id for a in assemblies]
+    return db.query(models.Revision).filter(models.Revision.assembly_id.in_(assembly_ids)).order_by(models.Revision.date.desc()).all()
+
+@router.get("/revisions/{revision_id}", response_model=schemas.RevisionDetailsOut)
+def get_revision_details(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get details for a single revision including materials. Requires Analyst role.
+    """
+    revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revision not found.")
+    return revision
+
+@router.get("/revisions/{revision_id}/materials", response_model=List[schemas.MaterialOut])
+def get_revision_materials(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get all BOM material lines for a specific revision (includes ghost materials). Requires Analyst role.
+    """
+    revision = db.query(models.Revision).filter(models.Revision.id == revision_id).first()
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revision not found.")
+    return db.query(models.Material).filter(models.Material.revision_id == revision_id).all()
+
 @router.post("/revisions", response_model=schemas.RevisionOut, status_code=status.HTTP_201_CREATED)
 def create_revision(
     payload: schemas.RevisionCreate,

@@ -160,9 +160,9 @@ export default function Design() {
 
   const handleDeleteCategory = async (catId: string) => {
     const isConfirmed = await confirm({
-      title: "Confirm Action",
-      message: "Are you sure you want to delete this category? Any subcategories or parts attached will have catalog references deleted.",
-      confirmText: "Proceed",
+      title: "Delete Category",
+      message: "Are you sure you want to delete this category? Note: Categories containing subcategories or assigned parts cannot be deleted until they are re-parented or unassigned.",
+      confirmText: "Delete",
       type: "warning"
     });
     if (!isConfirmed) return;

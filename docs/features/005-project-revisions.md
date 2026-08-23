@@ -43,8 +43,8 @@ This feature introduces version control into Sidekick. A "Revision" represents a
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Revision` Peewee model with `project_id` foreign key.
-- [ ] Build FastAPI CRUD routes (nested under projects for the `GET` list).
-- [ ] Create SolidJS UI timeline/list component inside the Project detail view.
-- [ ] Create SolidJS form for creating/editing revisions.
-- [ ] Wire frontend to backend API.
+- [x] Define `Revision` Peewee model with `project_id` foreign key.
+- [x] Build FastAPI CRUD routes (nested under projects for the `GET` list).
+- [x] Create SolidJS UI timeline/list component inside the Project detail view.
+- [x] Create SolidJS form for creating/editing revisions.
+- [x] Wire frontend to backend API.

@@ -47,4 +47,4 @@ This feature allows users to attach visual references (photos, pinout diagrams, 
 - [x] Create SolidJS image gallery / carousel view.
 - [x] Create SolidJS modal upload form.
 - [x] Wire frontend to backend API.
-- [ ] Add drag and drop support for local file uploads and browser image URL downloads.
+- [x] Add drag and drop support for local file uploads and browser image URL downloads.

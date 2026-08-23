@@ -39,8 +39,8 @@ This feature establishes the foundational, hierarchical taxonomy for all parts i
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Category` SQLAlchemy model with self-referential foreign key.
-- [ ] Build FastAPI CRUD routes.
-- [ ] Create SolidJS recursive tree UI component.
-- [ ] Create SolidJS form for creating/editing categories.
-- [ ] Wire frontend to backend API.
+- [x] Define `Category` SQLAlchemy model with self-referential foreign key.
+- [x] Build FastAPI CRUD routes.
+- [x] Create SolidJS recursive tree UI component.
+- [x] Create SolidJS form for creating/editing categories.
+- [x] Wire frontend to backend API.

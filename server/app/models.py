@@ -76,6 +76,7 @@ class Product(Base):
     supplier_id = Column(String(36), ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
     part_id = Column(String(36), ForeignKey("parts.id", ondelete="CASCADE"), nullable=False)
     sku = Column(String(100), nullable=False)
+    url = Column(String(255), nullable=True)
 
     supplier = relationship("Supplier", back_populates="products")
     part = relationship("Part", back_populates="products")
@@ -147,6 +148,12 @@ class Storage(Base):
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
     modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     description = Column(Text, nullable=True)
+    pos_x = Column(Float, default=0.0, nullable=False)
+    pos_y = Column(Float, default=0.0, nullable=False)
+    pos_z = Column(Float, default=0.0, nullable=False)
+    size_x = Column(Float, default=0.0, nullable=False)
+    size_y = Column(Float, default=0.0, nullable=False)
+    size_z = Column(Float, default=0.0, nullable=False)
 
     parent = relationship("Storage", remote_side=[id], back_populates="children")
     children = relationship("Storage", back_populates="parent", cascade="all, delete-orphan")

@@ -61,7 +61,7 @@ This feature provides a robust visual navigation and editing system for the phys
 
 ## 5. Implementation Tasks
 - [x] Build SolidJS Miller Columns layout with column headers.
-- [ ] TODO: Implement advanced `name` search filter for Miller Columns.
+- [x] Implement advanced `name` search filter for Miller Columns.
 - [x] Build Details Pane component (via modals and inline views) to display metadata, Print, Delete, and Move actions.
 - [x] Add empty-state interactions in Miller Columns and Grid views to Create new child locations.
 - [x] Implement "Move Location" dialog to transfer nodes to different parents (Feature 026 integration).
@@ -71,5 +71,5 @@ This feature provides a robust visual navigation and editing system for the phys
 - [ ] TODO: Add footprint / span configuration in Details Pane for child nodes in Grid/Linear layouts.
 - [x] Build FastAPI transactional routes for bulk-updating `index` arrays.
 - [x] Build Part Card UI (inside Details Pane) with sibling jump-links.
-- [ ] TODO: Implement node validation warnings (flagging if a node has BOTH children AND an assigned `part_id`).
+- [x] Implement node validation warnings (flagging if a node has BOTH children AND an assigned `part_id`).
 - [ ] Bug: Changing the type from default to 2D grid is possible on nodes in the tree.

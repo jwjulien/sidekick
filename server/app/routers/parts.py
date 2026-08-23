@@ -53,9 +53,40 @@ def get_parts(
     # Dynamic JSON Filtering
     for key, value in request.query_params.items():
         if key.startswith("attr_"):
-            attr_key = key[5:] # Strip "attr_"
-            # Use SQLite json_extract to filter
-            query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") == value)
+            attr_param = key[5:]  # Strip "attr_"
+            if "__contains" in attr_param:
+                attr_key = attr_param.replace("__contains", "")
+                query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}").ilike(f"%{value}%"))
+            elif "__gt" in attr_param:
+                attr_key = attr_param.replace("__gt", "")
+                try:
+                    num_val = float(value)
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") > num_val)
+                except ValueError:
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") > value)
+            elif "__lt" in attr_param:
+                attr_key = attr_param.replace("__lt", "")
+                try:
+                    num_val = float(value)
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") < num_val)
+                except ValueError:
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") < value)
+            elif "__gte" in attr_param:
+                attr_key = attr_param.replace("__gte", "")
+                try:
+                    num_val = float(value)
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") >= num_val)
+                except ValueError:
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") >= value)
+            elif "__lte" in attr_param:
+                attr_key = attr_param.replace("__lte", "")
+                try:
+                    num_val = float(value)
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") <= num_val)
+                except ValueError:
+                    query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_key}") <= value)
+            else:
+                query = query.filter(func.json_extract(models.Part.attributes, f"$.{attr_param}") == value)
             
     parts = query.all()
     

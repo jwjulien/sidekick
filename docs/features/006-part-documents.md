@@ -41,9 +41,9 @@ This feature allows users to attach reference files (primarily PDF datasheets, m
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `Document` Peewee model with `part_id` foreign key.
-- [ ] Build FastAPI `POST` route to handle `multipart/form-data` uploads.
-- [ ] Build FastAPI `GET` download route returning `FileResponse` or streaming response.
-- [ ] Create SolidJS UI for listing documents.
-- [ ] Create SolidJS UI for uploading new files.
-- [ ] Wire frontend forms to the FastAPI backend.
+- [x] Define `Document` Peewee model with `part_id` foreign key.
+- [x] Build FastAPI `POST` route to handle `multipart/form-data` uploads.
+- [x] Build FastAPI `GET` download route returning `FileResponse` or streaming response.
+- [x] Create SolidJS UI for listing documents.
+- [x] Create SolidJS UI for uploading new files.
+- [x] Wire frontend forms to the FastAPI backend.

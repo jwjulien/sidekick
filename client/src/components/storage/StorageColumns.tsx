@@ -1,5 +1,5 @@
 import { createSignal, createEffect, on, For, Show } from "solid-js";
-import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash } from "lucide-solid";
+import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search } from "lucide-solid";
 import {
   DragDropProvider,
   DragDropSensors,
@@ -52,6 +52,9 @@ const SortableItem = (props: {
         <div class="flex items-center gap-2 truncate">
           <MapPin size={12} class={isActive() ? "text-accentCyan" : "text-gray-500"} />
           <span class="truncate">{props.item.name}</span>
+          <Show when={hasChildren() && props.item.part_id}>
+            <AlertTriangle size={12} class="text-amber-400 shrink-0" title="Warning: Node has both child locations and an assigned part." />
+          </Show>
         </div>
         <Show when={hasChildren()}>
           <ChevronRight size={14} class="text-gray-500" />
@@ -74,6 +77,8 @@ export default function StorageColumns(props: {
   pickerMode?: boolean;
   onPickerSelect?: (parentId: string | null, index?: number) => void;
 }) {
+  const [filterText, setFilterText] = createSignal("");
+
   const pathSteps = () => {
     return [null, ...props.activePath.filter(id => {
       const parent = props.locations.find(l => l.id === id);
@@ -96,7 +101,7 @@ export default function StorageColumns(props: {
   }));
 
   return (
-    <>
+    <div class="flex flex-col h-full gap-3">
       <style>{`
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(30px); }
@@ -106,12 +111,27 @@ export default function StorageColumns(props: {
           animation: slideInRight 0.3s ease-out forwards;
         }
       `}</style>
-      <div ref={scrollRef} class="flex overflow-x-auto gap-4 pb-4 snap-x h-full">
+      
+      {/* Miller Column Search Filter */}
+      <div class="relative max-w-xs">
+        <Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input
+          type="text"
+          value={filterText()}
+          onInput={(e) => setFilterText(e.target.value)}
+          placeholder="Search locations in columns..."
+          class="glass-input pl-9 pr-3 py-1.5 text-xs w-full"
+        />
+      </div>
+
+      <div ref={scrollRef} class="flex overflow-x-auto gap-4 pb-4 snap-x h-full flex-1">
         <For each={pathSteps()}>
           {(parentId) => {
             const parentLoc = () => parentId ? props.locations.find(l => l.id === parentId) : null;
             const title = () => parentLoc() ? parentLoc()!.name : "Root Locations";
-            const items = () => props.locations.filter(l => l.parent_id === parentId).sort((a, b) => a.index - b.index);
+            const items = () => props.locations
+              .filter(l => l.parent_id === parentId && (!filterText() || l.name.toLowerCase().includes(filterText().toLowerCase())))
+              .sort((a, b) => a.index - b.index);
             
             const layoutType = () => {
               const p = parentLoc();
@@ -357,6 +377,6 @@ export default function StorageColumns(props: {
         }}
       </For>
     </div>
-    </>
+  </div>
   );
 }

@@ -42,6 +42,20 @@ def create_supplier(
     db.refresh(db_supplier)
     return db_supplier
 
+@router.get("/{supplier_id}", response_model=schemas.SupplierOut)
+def get_supplier_details(
+    supplier_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Get details for a single supplier. Requires Analyst role.
+    """
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found.")
+    return supplier
+
 @router.put("/{supplier_id}", response_model=schemas.SupplierOut)
 def update_supplier(
     supplier_id: str,
