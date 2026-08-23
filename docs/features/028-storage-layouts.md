@@ -72,3 +72,4 @@ This feature provides a robust visual navigation and editing system for the phys
 - [x] Build FastAPI transactional routes for bulk-updating `index` arrays.
 - [x] Build Part Card UI (inside Details Pane) with sibling jump-links.
 - [ ] TODO: Implement node validation warnings (flagging if a node has BOTH children AND an assigned `part_id`).
+- [ ] Bug: Changing the type from default to 2D grid is possible on nodes in the tree.
