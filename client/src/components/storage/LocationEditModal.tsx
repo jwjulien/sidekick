@@ -5,6 +5,8 @@ import toast from "solid-toast";
 
 export default function LocationEditModal(props: {
   location: any;
+  locations?: any[];
+  hasChildren?: boolean;
   onClose: () => void;
   onUpdate: () => void;
   onPrint: (loc: any) => void;
@@ -15,6 +17,12 @@ export default function LocationEditModal(props: {
   const [desc, setDesc] = createSignal(props.location.description || "");
   const [labelScheme, setLabelScheme] = createSignal(props.location.label_scheme || "");
   
+  const hasChildren = () => {
+    if (props.hasChildren !== undefined) return props.hasChildren;
+    if (props.locations) return props.locations.some(l => String(l.parent_id) === String(props.location.id));
+    return false;
+  };
+
   const [layoutType, setLayoutType] = createSignal(
     !props.location.dimensions ? "default" : (props.location.dimensions.length === 1 ? "linear" : "grid")
   );
@@ -126,9 +134,16 @@ export default function LocationEditModal(props: {
             <button type="button" onClick={() => props.onMove(props.location)} class="flex-1 bg-accentCyan/10 text-accentCyan hover:bg-accentCyan/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
               <MapPin size={16} /> Move
             </button>
-            <button type="button" onClick={() => props.onDelete(props.location.id)} class="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
-              <Trash2 size={16} /> Delete
-            </button>
+            <div title={hasChildren() ? "Cannot delete a location that contains child locations" : "Delete location"} class="flex-1">
+              <button 
+                type="button" 
+                disabled={hasChildren()}
+                onClick={() => props.onDelete(props.location.id)} 
+                class="w-full h-full bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors"
+              >
+                <Trash2 size={16} /> Delete
+              </button>
+            </div>
           </div>
         </div>
 

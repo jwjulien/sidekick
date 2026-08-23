@@ -2,7 +2,6 @@ import { createSignal, onMount, Show } from "solid-js";
 import { MapPin, Plus } from "lucide-solid";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
-import { useConfirm } from "../contexts/ConfirmContext";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import StorageColumns from "../components/storage/StorageColumns";
 import LocationEditModal from "../components/storage/LocationEditModal";
@@ -11,7 +10,6 @@ import PartsBrowser from "../components/storage/PartsBrowser";
 import PartDetails from "./PartDetails";
 
 export default function Storage() {
-  const { confirm } = useConfirm();
   const [locations, setLocations] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   
@@ -88,24 +86,30 @@ export default function Storage() {
     window.addEventListener("popstate", handlePopState);
   });
 
-  const handleSelectNode = (id: string) => {
-    let newPath: string[] = [];
-    setActivePath(prev => {
-      const loc = locations().find((l: any) => l.id === id);
-      if (!loc) return prev;
-      if (!loc.parent_id) {
-        newPath = [id];
+  let nameInputRef: HTMLInputElement | undefined;
+
+  const getAncestorChain = (locId: string, allLocs: any[]): string[] => {
+    const chain: string[] = [];
+    let curr = allLocs.find(l => l.id === locId);
+    const visited = new Set<string>();
+    while (curr && !visited.has(curr.id)) {
+      visited.add(curr.id);
+      chain.unshift(curr.id);
+      if (curr.parent_id) {
+        curr = allLocs.find(l => l.id === curr.parent_id);
       } else {
-        const parentIdx = prev.indexOf(loc.parent_id);
-        if (parentIdx !== -1) {
-          newPath = [...prev.slice(0, parentIdx + 1), id];
-        } else {
-          newPath = [...prev, id];
-        }
+        curr = null;
       }
-      return newPath;
-    });
-    if (newPath.length > 0) updateUrlHistory(newPath);
+    }
+    return chain;
+  };
+
+  const handleSelectNode = (id: string) => {
+    const newPath = getAncestorChain(id, locations());
+    if (newPath.length > 0) {
+      setActivePath(newPath);
+      updateUrlHistory(newPath);
+    }
     setShowCreateForm(false);
     setInlinePartId(null); // reset inline part view when navigating
   };
@@ -121,7 +125,7 @@ export default function Storage() {
     e.preventDefault();
     if (!locName()) return;
     try {
-      await apiFetch("/locations", {
+      const newLoc = await apiFetch("/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -137,7 +141,13 @@ export default function Storage() {
       setLocParentId(null);
       setLocIndex(0);
       setShowCreateForm(false);
-      loadData();
+      
+      await loadData(true);
+
+      if (newLoc && newLoc.id) {
+        handleSelectNode(newLoc.id);
+      }
+
       toast.success("Storage location created successfully.");
     } catch (err: any) {
       toast.error(err.message || "Failed to create storage location.");
@@ -169,13 +179,6 @@ export default function Storage() {
   };
 
   const handleDeleteLocation = async (locId: string) => {
-    const isConfirmed = await confirm({
-      title: "Confirm Action",
-      message: "Are you sure you want to delete this storage location? All sub-bins and drawers in this hierarchy will also be deleted!",
-      confirmText: "Proceed",
-      type: "warning"
-    });
-    if (!isConfirmed) return;
     try {
       await apiFetch(`/locations/${locId}`, { method: "DELETE" });
       
@@ -185,7 +188,7 @@ export default function Storage() {
       }
       
       setEditLocation(null);
-      loadData();
+      await loadData(true);
       toast.success("Location deleted.");
     } catch (err: any) {
       toast.error(err.message || "Failed to delete location.");
@@ -225,6 +228,9 @@ export default function Storage() {
               setLocParentId(parentId);
               setLocIndex(index);
               setShowCreateForm(true);
+              setTimeout(() => {
+                nameInputRef?.focus();
+              }, 50);
             }}
             onEditLocation={(loc) => setEditLocation(loc)}
             creatingParentId={locParentId()}
@@ -246,6 +252,10 @@ export default function Storage() {
               <div class="flex-1">
                 <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Name</label>
                 <input
+                  ref={(el) => {
+                    nameInputRef = el;
+                    setTimeout(() => el?.focus(), 50);
+                  }}
                   type="text"
                   required
                   value={locName()}
@@ -310,6 +320,7 @@ export default function Storage() {
       <Show when={editLocation()}>
         <LocationEditModal
           location={editLocation()}
+          locations={locations()}
           onClose={() => setEditLocation(null)}
           onUpdate={() => loadData(true)}
           onPrint={(loc) => {

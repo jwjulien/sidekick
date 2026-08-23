@@ -57,6 +57,7 @@ const SortableItem = (props: {
   const sortable = createSortable(props.item.id);
   const isActive = () => props.activePath.includes(props.item.id);
   const hasChildren = () => props.locations.some(l => l.parent_id === props.item.id);
+  const isEmptyLeaf = () => !hasChildren() && !props.item.part_id;
 
   return (
     <div
@@ -79,13 +80,23 @@ const SortableItem = (props: {
       </div>
       <button
         onClick={() => props.onSelect(props.item.id)}
-        class={`w-full text-left pl-6 pr-2 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${isActive() ? 'bg-accentCyan/20 border border-accentCyan/30 text-white' : 'hover:bg-white/5 text-gray-300'}`}
+        class={`w-full text-left pl-6 pr-2 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${isActive()
+            ? 'bg-accentCyan/20 border border-accentCyan/30 text-white'
+            : isEmptyLeaf()
+              ? 'bg-amber-500/10 border border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+              : 'hover:bg-white/5 text-gray-300'
+          }`}
       >
         <div class="flex items-center gap-2 truncate">
-          <MapPin size={12} class={isActive() ? "text-accentCyan" : "text-gray-500"} />
+          <MapPin size={12} class={isActive() ? "text-accentCyan" : (isEmptyLeaf() ? "text-amber-400" : "text-gray-500")} />
           <span class="truncate">{props.item.name}</span>
           <Show when={hasChildren() && props.item.part_id}>
             <AlertTriangle size={12} class="text-amber-400 shrink-0" title="Warning: Node has both child locations and an assigned part." />
+          </Show>
+          <Show when={isEmptyLeaf()}>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 font-mono" title="Dangling Location: Location has no sub-locations and no assigned part.">
+              empty
+            </span>
           </Show>
         </div>
         <Show when={hasChildren()}>
@@ -309,50 +320,67 @@ export default function StorageColumns(props: {
                       <For each={Array.from({ length: capacity() })}>
                         {(_, i) => {
                           const idx = i();
-                          const item = items().find(it => it.index === idx);
-                          if (item) {
-                            const isActive = () => props.activePath.includes(item.id);
-                            const hasChildren = () => props.locations.some(l => l.parent_id === item.id);
-                            return (
-                              <button
-                                onClick={() => props.onSelect(item.id)}
-                                class={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-colors border ${isActive() ? 'bg-accentCyan/20 border-accentCyan/30 text-white' : 'border-transparent hover:bg-white/5 text-gray-300'}`}
-                              >
-                                <div class="flex items-center gap-2 truncate">
-                                  <div class="text-[9px] font-mono text-gray-500 w-4 text-right shrink-0">{idx + 1}</div>
-                                  <span class="truncate">{item.name}</span>
-                                </div>
-                                <Show when={hasChildren()}>
-                                  <ChevronRight size={14} class="text-gray-500" />
-                                </Show>
-                              </button>
-                            );
-                          } else {
-                            const isCreatingHere = () => props.isCreating && props.creatingParentId === parentId && props.creatingIndex === idx;
+                          const item = () => items().find(it => it.index === idx);
+                          const isCreatingHere = () => props.isCreating && props.creatingParentId === parentId && props.creatingIndex === idx;
 
-                            if (props.pickerMode) {
-                              return (
-                                <button
-                                  onClick={() => props.onPickerSelect?.(parentId, idx)}
-                                  class="w-full min-h-[32px] rounded-lg border border-dashed border-accentCyan/30 hover:border-accentCyan hover:bg-accentCyan/10 text-accentCyan flex items-center justify-center transition-colors"
-                                  title={`Move Location to Slot ${idx + 1}`}
+                          return (
+                            <Show
+                              when={item()}
+                              fallback={
+                                <Show
+                                  when={props.pickerMode}
+                                  fallback={
+                                    <button
+                                      onClick={() => props.onCreateChild(parentId, idx)}
+                                      class={`w-full min-h-[32px] rounded-lg border transition-colors flex items-center px-2 gap-2 group ${isCreatingHere() ? 'border-accentCyan bg-accentCyan/20 text-accentCyan' : 'border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan'}`}
+                                      title={`Create Location at Slot ${idx + 1}`}
+                                    >
+                                      <div class={`text-[9px] font-mono w-4 text-right shrink-0 ${isCreatingHere() ? 'text-accentCyan' : 'group-hover:text-accentCyan/50'}`}>{idx + 1}</div>
+                                      <Plus size={10} />
+                                    </button>
+                                  }
                                 >
-                                  <MapPin size={12} />
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <button
-                                onClick={() => props.onCreateChild(parentId, idx)}
-                                class={`w-full min-h-[32px] rounded-lg border transition-colors flex items-center px-2 gap-2 group ${isCreatingHere() ? 'border-accentCyan bg-accentCyan/20 text-accentCyan' : 'border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan'}`}
-                                title={`Create Location at Slot ${idx + 1}`}
-                              >
-                                <div class={`text-[9px] font-mono w-4 text-right shrink-0 ${isCreatingHere() ? 'text-accentCyan' : 'group-hover:text-accentCyan/50'}`}>{idx + 1}</div>
-                                <Plus size={10} />
-                              </button>
-                            );
-                          }
+                                  <button
+                                    onClick={() => props.onPickerSelect?.(parentId, idx)}
+                                    class="w-full min-h-[32px] rounded-lg border border-dashed border-accentCyan/30 hover:border-accentCyan hover:bg-accentCyan/10 text-accentCyan flex items-center justify-center transition-colors"
+                                    title={`Move Location to Slot ${idx + 1}`}
+                                  >
+                                    <MapPin size={12} />
+                                  </button>
+                                </Show>
+                              }
+                            >
+                              {(loc) => {
+                                const isActive = () => props.activePath.includes(loc().id);
+                                const hasChildren = () => props.locations.some(l => l.parent_id === loc().id);
+                                const isEmptyLeaf = () => !hasChildren() && !loc().part_id;
+                                return (
+                                  <button
+                                    onClick={() => props.onSelect(loc().id)}
+                                    class={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-colors border ${isActive()
+                                        ? 'bg-accentCyan/20 border-accentCyan/30 text-white'
+                                        : isEmptyLeaf()
+                                          ? 'bg-amber-500/10 border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                                          : 'border-transparent hover:bg-white/5 text-gray-300'
+                                      }`}
+                                  >
+                                    <div class="flex items-center gap-2 truncate">
+                                      <div class="text-[9px] font-mono text-gray-500 w-4 text-right shrink-0">{idx + 1}</div>
+                                      <span class="truncate">{loc().name}</span>
+                                      <Show when={isEmptyLeaf()}>
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 font-mono ml-auto mr-1" title="Dangling Location: Location has no sub-locations and no assigned part.">
+                                          empty
+                                        </span>
+                                      </Show>
+                                    </div>
+                                    <Show when={hasChildren()}>
+                                      <ChevronRight size={14} class="text-gray-500" />
+                                    </Show>
+                                  </button>
+                                );
+                              }}
+                            </Show>
+                          );
                         }}
                       </For>
                     </div>
@@ -367,43 +395,58 @@ export default function StorageColumns(props: {
                         {(_, i) => {
                           const idx = i();
                           const item = () => items().find(it => it.index === idx);
+                          const isCreatingHere = () => props.isCreating && props.creatingParentId === parentId && props.creatingIndex === idx;
 
-                          if (item()) {
-                            const isActive = () => props.activePath.includes(item()!.id);
-                            return (
-                              <button
-                                onClick={() => props.onSelect(item()!.id)}
-                                title={item()!.name}
-                                class={`aspect-square w-full rounded flex flex-col items-center justify-center transition-colors border p-1 ${isActive() ? 'bg-accentCyan/20 border-accentCyan/30 text-white shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300'}`}
-                              >
-                                <span class="truncate text-[9px] w-full text-center leading-tight font-medium">{item()!.name}</span>
-                              </button>
-                            );
-                          } else {
-                            const isCreatingHere = () => props.isCreating && props.creatingParentId === parentId && props.creatingIndex === idx;
-
-                            if (props.pickerMode) {
-                              return (
-                                <button
-                                  onClick={() => props.onPickerSelect?.(parentId, idx)}
-                                  class="aspect-square w-full rounded border border-dashed border-accentCyan/30 hover:border-accentCyan hover:bg-accentCyan/10 text-accentCyan flex items-center justify-center transition-colors"
-                                  title={`Move Location to Grid Index ${idx}`}
+                          return (
+                            <Show
+                              when={item()}
+                              fallback={
+                                <Show
+                                  when={props.pickerMode}
+                                  fallback={
+                                    <button
+                                      onClick={() => props.onCreateChild(parentId, idx)}
+                                      class={`aspect-square w-full rounded border transition-colors flex items-center justify-center ${isCreatingHere() ? 'border-accentCyan bg-accentCyan/20 text-accentCyan shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan'}`}
+                                      title={`Create Location at Grid Index ${idx}`}
+                                    >
+                                      <Plus size={10} />
+                                    </button>
+                                  }
                                 >
-                                  <MapPin size={12} />
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <button
-                                onClick={() => props.onCreateChild(parentId, idx)}
-                                class={`aspect-square w-full rounded border transition-colors flex items-center justify-center ${isCreatingHere() ? 'border-accentCyan bg-accentCyan/20 text-accentCyan shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan'}`}
-                                title={`Create Location at Grid Index ${idx}`}
-                              >
-                                <Plus size={10} />
-                              </button>
-                            );
-                          }
+                                  <button
+                                    onClick={() => props.onPickerSelect?.(parentId, idx)}
+                                    class="aspect-square w-full rounded border border-dashed border-accentCyan/30 hover:border-accentCyan hover:bg-accentCyan/10 text-accentCyan flex items-center justify-center transition-colors"
+                                    title={`Move Location to Grid Index ${idx}`}
+                                  >
+                                    <MapPin size={12} />
+                                  </button>
+                                </Show>
+                              }
+                            >
+                              {(loc) => {
+                                const isActive = () => props.activePath.includes(loc().id);
+                                const hasChildren = () => props.locations.some(l => l.parent_id === loc().id);
+                                const isEmptyLeaf = () => !hasChildren() && !loc().part_id;
+                                return (
+                                  <button
+                                    onClick={() => props.onSelect(loc().id)}
+                                    title={isEmptyLeaf() ? `${loc().name} (Dangling Location: No sub-locations or assigned part)` : loc().name}
+                                    class={`aspect-square w-full rounded flex flex-col items-center justify-center transition-colors border p-1 relative ${isActive()
+                                        ? 'bg-accentCyan/20 border-accentCyan/30 text-white shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                                        : isEmptyLeaf()
+                                          ? 'bg-amber-500/10 border-dashed border-amber-500/40 text-amber-300 hover:bg-amber-500/20'
+                                          : 'border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300'
+                                      }`}
+                                  >
+                                    <span class="break-words whitespace-normal line-clamp-3 text-[9px] w-full text-center leading-tight font-medium">{loc().name}</span>
+                                    <Show when={isEmptyLeaf() && !isActive()}>
+                                      <div class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.6)]" title="Dangling Location: Location has no sub-locations and no assigned part" />
+                                    </Show>
+                                  </button>
+                                );
+                              }}
+                            </Show>
+                          );
                         }}
                       </For>
                     </div>
