@@ -119,14 +119,7 @@ export default function StorageColumns(props: {
   };
 
   const pathSteps = () => {
-    return [null, ...props.activePath.filter(id => {
-      const parent = props.locations.find(l => l.id === id);
-      if (parent && parent.parent_id) {
-        const isRowContainer = props.locations.find(l => l.id === parent.parent_id)?.dimensions?.length === 2;
-        if (isRowContainer) return false;
-      }
-      return true;
-    })];
+    return [null, ...props.activePath];
   };
 
   let scrollRef: HTMLDivElement | undefined;
@@ -373,19 +366,13 @@ export default function StorageColumns(props: {
                       <For each={Array.from({ length: capacity() })}>
                         {(_, i) => {
                           const idx = i();
-                          const rowIdx = () => Math.floor(idx / dims()[0]);
-                          const colIdx = () => idx % dims()[0];
-                          const rowContainer = () => items().find(it => it.index === rowIdx());
-                          const item = () => rowContainer() ? props.locations.find(l => l.parent_id === rowContainer()!.id && l.index === colIdx()) : null;
+                          const item = () => items().find(it => it.index === idx);
 
                           if (item()) {
                             const isActive = () => props.activePath.includes(item()!.id);
                             return (
                               <button
-                                onClick={() => {
-                                  if (rowContainer()) props.onSelect(rowContainer()!.id);
-                                  props.onSelect(item()!.id);
-                                }}
+                                onClick={() => props.onSelect(item()!.id)}
                                 title={item()!.name}
                                 class={`aspect-square w-full rounded flex flex-col items-center justify-center transition-colors border p-1 ${isActive() ? 'bg-accentCyan/20 border-accentCyan/30 text-white shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300'}`}
                               >

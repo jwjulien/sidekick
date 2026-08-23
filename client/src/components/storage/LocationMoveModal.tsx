@@ -61,44 +61,13 @@ export default function LocationMoveModal(props: {
   const handlePickerSelect = async (parentId: string | null, index?: number) => {
     setSubmitting(true);
     try {
-      let finalParentId = parentId;
-      let finalIndex = index;
-
-      if (parentId != null && index != null) {
-        const parentLoc = props.allLocations.find((l: any) => l.id === parentId);
-        if (parentLoc && parentLoc.dimensions && parentLoc.dimensions.length === 2) {
-          const cols = parentLoc.dimensions[0];
-          const rowIdx = Math.floor(index / cols);
-          const colIdx = index % cols;
-
-          let rowContainer = props.allLocations.find((l: any) => l.parent_id === parentLoc.id && l.index === rowIdx);
-          
-          if (!rowContainer) {
-            const rowRes = await apiFetch("/locations", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: `Row ${rowIdx + 1}`,
-                description: `Row ${rowIdx + 1} Container`,
-                parent_id: parentLoc.id,
-                index: rowIdx
-              })
-            });
-            rowContainer = rowRes;
-          }
-
-          finalParentId = rowContainer.id;
-          finalIndex = colIdx;
-        }
-      }
-
       await apiFetch(`/locations/${props.location.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           set_parent: true,
-          parent_id: finalParentId,
-          index: finalIndex
+          parent_id: parentId,
+          index: index
         })
       });
       toast.success("Location moved successfully.");

@@ -121,43 +121,14 @@ export default function Storage() {
     e.preventDefault();
     if (!locName()) return;
     try {
-      let finalParentId = locParentId();
-      let finalIndex = locIndex();
-
-      const parentLoc = locations().find(l => l.id === locParentId());
-      if (parentLoc && parentLoc.dimensions && parentLoc.dimensions.length === 2) {
-        const cols = parentLoc.dimensions[0];
-        const rowIdx = Math.floor(locIndex() / cols);
-        const colIdx = locIndex() % cols;
-
-        let rowContainer = locations().find(l => l.parent_id === parentLoc.id && l.index === rowIdx);
-        
-        if (!rowContainer) {
-          const rowRes = await apiFetch("/locations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: `Row ${rowIdx + 1}`,
-              description: `Row ${rowIdx + 1} Container`,
-              parent_id: parentLoc.id,
-              index: rowIdx
-            })
-          });
-          rowContainer = rowRes;
-        }
-
-        finalParentId = rowContainer.id;
-        finalIndex = colIdx;
-      }
-
       await apiFetch("/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: locName(),
           description: locDesc(),
-          parent_id: finalParentId,
-          index: finalIndex
+          parent_id: locParentId(),
+          index: locIndex()
         })
       });
       
