@@ -1,6 +1,6 @@
 ---
 title: Bluetooth Scale Integration
-status: Draft
+status: In Progress
 target: 
   - Web
   - Windows
@@ -13,34 +13,70 @@ dependencies:
 # Feature: Bluetooth Scale Integration
 
 ## 1. Overview
-This feature integrates off-the-shelf Bluetooth Low Energy (BLE) kitchen/postal scales (e.g., Etekcity) directly into the Sidekick environment. By reading real-time GATT characteristic notifications, the app can stream live weight data to the UI. When combined with a Part's known unit weight, Sidekick can instantly calculate bulk inventory counts (e.g., weighing a bin of 500 screws instead of counting them manually).
+This feature integrates off-the-shelf Bluetooth Low Energy (BLE) kitchen/postal scales (e.g., Etekcity) directly into Sidekick. By reading real-time GATT characteristic notifications, the application streams live weight data to the UI. Combined with a Part's per-piece weight attribute, Sidekick calculates bulk inventory counts (e.g., weighing a bin of 500 screws instead of manual counting) and updates location stock quantities instantly.
 
-## 2. User Experience & UI
-* **Trigger:** Accessed via a "Connect Scale" button located in the Inventory Storage adjustment view or a global hardware settings menu.
-* **Interaction:** 1. The user clicks "Connect Scale", triggering the native OS Bluetooth pairing prompt.
-    2. Once connected, a persistent "Scale" widget appears in the UI showing the live `weight`, current `units` (oz, g, ml), and a `stable` status indicator.
-    3. **Counting Mode:** If the user is viewing a specific Part that has a `weight` attribute defined, the UI automatically divides the live scale weight by the unit weight to display a real-time "Estimated Count".
-    4. The user clicks "Commit Count" to instantly update the database via the `/api/storage/{id}/adjust` endpoint.
-* **Mobile Considerations:** The pairing prompt is handled natively by Android's Chrome webview. The live weight widget should be large, high-contrast, and easily readable from a distance while standing at the workbench.
+## 2. User Experience & UI Workflow
+
+### Trigger
+* A new **Scale / Weight** button (icon: `Scale`) is located on the storage location card header in `PartDetails.tsx` (positioned between the **Move** and **Print** buttons).
+
+### Modal Multi-Step State Machine
+
+1. **Step 1: Device Connection**
+   * Clicking the Scale button launches the `ScaleModal`.
+   * Displays a searching indicator ("Searching for compatible scale devices...").
+   * Triggers Web Bluetooth API (`navigator.bluetooth`) device selection / GATT connection.
+   * Includes a Developer/Simulator toggle mode for testing in desktop browsers without physical scale hardware.
+
+2. **Step 2: Calibration Check & Branching**
+   * Checks `part.weight` (per-piece weight in grams/oz) from the database:
+     * **If `part.weight` is NOT null:** Skips calibration phase and proceeds directly to **Step 4: Measurement / Counting Stage**.
+     * **If `part.weight` IS null:** Automatically enters **Step 3: Calibration Stage**.
+
+3. **Step 3: Calibration Stage**
+   * Displays the live scale weight reading and a **Tare** button to zero out container/ambient weight.
+   * User places a known integer quantity of parts on the scale.
+   * User specifies the count using an adjustable quantity control featuring `+/- 1` and `+/- 10` buttons or direct numeric input.
+   * Clicking **Confirm Calibration**:
+     * Calculates per-piece weight: `per_piece_weight = scale_weight / part_count`.
+     * Persists updated `weight` to backend DB via `PUT /api/parts/{part_id}`.
+     * Advances automatically to **Step 4: Measurement / Counting Stage**.
+
+4. **Step 4: Measurement / Counting Stage**
+   * Displays live scale weight, active tare status, configured per-piece weight, and computed part count (`Math.round(live_weight / per_piece_weight)`).
+   * Provides a **Re-calibrate Weight** option to return to Step 3 if re-zeroing or recalibrating is required.
+   * Clicking **Update Count**:
+     * Sets the exact part quantity for the selected storage location via `PUT /api/locations/{location_id}/count`.
+     * Closes the modal and updates `PartDetails` storage records in real time.
+
+---
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** * A global `ScaleProvider` Context component to maintain the BLE connection state across route changes.
-    * Utilizes Web Bluetooth API (`@mnlphlp/plugin-blec` or native `navigator.bluetooth`).
-    * **Data Parsing Engine:** Subscribes to GATT `CHAR_NOTIFY` (`0000FFF1-0000-1000-8000-00805F9B34FB`). Parses the 15+ byte array payload:
-        * Identifies `units` (Byte 13) and `liquid` mode (Byte 14).
-        * Calculates raw weight using bitwise shifting on Bytes 11 & 12 `(data[11] + (data[12] << 8))`.
-        * Applies scaling factors (`0.1` for Grams/ml, `0.01` for Ounces) and sign inversion (Byte 10).
-        * Freezes the UI value when the `stable` flag (Byte 15) resolves to true.
-* **Backend (FastAPI):** * No backend changes required for the hardware connection; the scale communicates entirely client-to-client.
+
+* **Frontend (`client` / SolidJS):**
+  * `ScaleContext` / `ScaleProvider`: Global SolidJS context providing scale connection state (`connecting`, `connected`, `disconnected`), live `weight`, `units`, `isStable`, `tare()`, `connect()`, and `mockMode` controls.
+  * GATT Notification Engine: Listens to characteristic `0000FFF1-0000-1000-8000-00805F9B34FB`. Parses 15-byte notification payloads:
+    * Weight payload shifting: `(data[11] + (data[12] << 8))`
+    * Scale factors (`0.1` for g/ml, `0.01` for oz) & sign inversion handling.
+    * Stability flag evaluation (`data[15]`).
+  * `ScaleModal.tsx`: Component managing the modal UI state machine (Connect -> Calibration -> Counting -> Commit).
+  * `PartDetails.tsx`: Added Scale button between Move and Print buttons in location card headers.
+
+* **Backend (`server` / FastAPI):**
+  * `PUT /api/parts/{part_id}` (updates `Part.weight`).
+  * `PUT /api/locations/{location_id}/count` (updates `Storage.quantity` and stamps `last_counted`).
+
+---
 
 ## 4. Out of Scope
-* Reverse-engineering encrypted BLE protocols for proprietary commercial scales. This phase assumes standard, unencrypted GATT notification broadcasts.
-* Multi-scale simultaneous connections (only one scale is actively paired at a time).
+* Reverse-engineering encrypted BLE protocols for proprietary commercial scales.
+* Multi-scale simultaneous connections (single scale active per session).
 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Integrate `ScaleProvider.tsx` into the root SolidJS application tree.
-- [ ] Build a floating/docked UI component to display live weight and stability status.
-- [ ] Create the "Counting Mode" UI math logic inside the Storage Adjustment modal.
-- [ ] Wire the final stable reading to the FastAPI stock adjustment endpoint.
+- [x] Implement `ScaleContext.tsx` with Web Bluetooth GATT subscriber & dev simulator mode.
+- [x] Create `ScaleModal.tsx` multi-step state machine (Connect -> Calibration -> Measurement).
+- [x] Add Scale button to `PartDetails.tsx` location card headers (single & multi-location drill down).
+- [x] Integrate API calls (`PUT /api/parts/{id}` for weight, `PUT /api/locations/{id}/count` for inventory update).
+- [ ] Add unit tests for GATT payload parser and scale math helpers.

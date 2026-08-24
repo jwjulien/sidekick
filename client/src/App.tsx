@@ -21,6 +21,7 @@ import Suppliers from "./pages/Suppliers";
 import Layout from "./components/Layout";
 import { Toaster } from "solid-toast";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
+import { ScaleProvider } from "./context/ScaleContext";
 
 export default function App() {
   // Try to authenticate session on startup
@@ -38,8 +39,9 @@ export default function App() {
         </div>
       }
     >
-      <ConfirmProvider>
-      <Router>
+      <ScaleProvider>
+        <ConfirmProvider>
+        <Router>
         {/* Unauthenticated public views */}
         <Route path="/login" component={Login} />
         <Route path="/auth-callback" component={AuthCallback} />
@@ -141,6 +143,7 @@ export default function App() {
       </Router>
       <Toaster position="bottom-right" />
     </ConfirmProvider>
+    </ScaleProvider>
     </Show>
   );
 }

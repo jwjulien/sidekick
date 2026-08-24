@@ -19,7 +19,8 @@ import {
   X,
   Link2,
   Printer,
-  Move
+  Move,
+  Scale
 } from "lucide-solid";
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -28,6 +29,7 @@ import StockController from "../components/StockController";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
+import ScaleModal from "../components/ScaleModal";
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -58,9 +60,13 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   const [moveDestLocationId, setMoveDestLocationId] = createSignal("");
   const [moveNewLocationName, setMoveNewLocationName] = createSignal("");
   const [moveNewLocationParentId, setMoveNewLocationParentId] = createSignal("");
-  const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(true);
   const [moveSourceLocation, setMoveSourceLocation] = createSignal<any>(null);
-  const [moveSubmitting, setMoveSubmitting] = createSignal(false);
+  const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(false);
+  const [movingParts, setMovingParts] = createSignal(false);
+
+  // Scale Modal State
+  const [showScaleModal, setShowScaleModal] = createSignal(false);
+  const [scaleTargetLocation, setScaleTargetLocation] = createSignal<any>(null);
   const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
 
   const activeDrillSlot = createMemo(() => {
@@ -1300,6 +1306,16 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                           <Move size={14} />
                         </button>
                         <button
+                          onClick={() => {
+                            setScaleTargetLocation(item().storage_records[0]);
+                            setShowScaleModal(true);
+                          }}
+                          class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 transition-colors"
+                          title="Count with Scale"
+                        >
+                          <Scale size={14} />
+                        </button>
+                        <button
                           onClick={() => setActivePrintLocation(item().storage_records[0])}
                           class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
                           title="Print Label"
@@ -1365,6 +1381,16 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                               title="Move Parts"
                             >
                               <Move size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setScaleTargetLocation(activeDrillSlot());
+                                setShowScaleModal(true);
+                              }}
+                              class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 transition-colors"
+                              title="Count with Scale"
+                            >
+                              <Scale size={14} />
                             </button>
                             <button
                               onClick={() => setActivePrintLocation(activeDrillSlot())}
@@ -1975,6 +2001,15 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
           onClose={() => setSelectedDocumentForView(null)}
         />
       </Show>
+
+      {/* Bluetooth Scale Integration Modal */}
+      <ScaleModal
+        isOpen={showScaleModal()}
+        onClose={() => setShowScaleModal(false)}
+        part={item()}
+        storageLocation={scaleTargetLocation()}
+        onSuccess={() => fetchItemDetails()}
+      />
     </div>
   );
 }
