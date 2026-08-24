@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, Show, For } from "solid-js";
 import { useScale } from "../context/ScaleContext";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -28,10 +28,32 @@ export default function ScaleModal(props: ScaleModalProps) {
   const [step, setStep] = createSignal<"connect" | "calibrate" | "measure">("connect");
   const [calibrationCount, setCalibrationCount] = createSignal<number>(10);
   const [isSubmitting, setIsSubmitting] = createSignal<boolean>(false);
+  const [tareWeights, setTareWeights] = createSignal<any[]>([]);
+  const [selectedTareId, setSelectedTareId] = createSignal<string | null>(null);
 
-  // Synchronize modal state on open
+  // Synchronize modal state on open & load tare weights
   createEffect(() => {
     if (props.isOpen) {
+      // Fetch tare weights
+      apiFetch("/tare-weights")
+        .then((data) => {
+          setTareWeights(data || []);
+          // Auto-select and apply initial tare if location has last_tare
+          const initTareId = props.storageLocation?.last_tare_id || props.storageLocation?.last_tare?.id || null;
+          if (initTareId) {
+            const match = (data || []).find((t: any) => t.id === initTareId);
+            if (match) {
+              setSelectedTareId(match.id);
+              scale.setTareOffset(match.weight);
+            } else {
+              setSelectedTareId(null);
+            }
+          } else {
+            setSelectedTareId(null);
+          }
+        })
+        .catch((err) => console.error("Failed to load tare weights:", err));
+
       // Auto attempt connection if disconnected
       if (scale.status() === "disconnected") {
         scale.connect();
@@ -49,6 +71,19 @@ export default function ScaleModal(props: ScaleModalProps) {
       }
     }
   });
+
+  const handleSelectTare = (tareId: string | null) => {
+    if (!tareId) {
+      setSelectedTareId(null);
+      scale.tare();
+    } else {
+      const match = tareWeights().find((t) => t.id === tareId);
+      if (match) {
+        setSelectedTareId(match.id);
+        scale.setTareOffset(match.weight);
+      }
+    }
+  };
 
   // Watch scale status changes
   createEffect(() => {
@@ -122,7 +157,11 @@ export default function ScaleModal(props: ScaleModalProps) {
       await apiFetch(`/locations/${props.storageLocation.id}/count`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: count }),
+        body: JSON.stringify({
+          quantity: count,
+          last_tare_id: selectedTareId(),
+          set_last_tare: true
+        }),
       });
 
       toast.success(`Updated stock at '${props.storageLocation.name}' to ${count} pcs.`);
@@ -214,7 +253,7 @@ export default function ScaleModal(props: ScaleModalProps) {
                   <div class="flex items-center justify-between text-xs text-gray-400">
                     <span>Live Scale Weight</span>
                     <button
-                      onClick={() => scale.tare()}
+                      onClick={() => handleSelectTare(null)}
                       class="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-200 transition-colors flex items-center gap-1"
                     >
                       <RotateCcw size={12} /> Tare Scale
@@ -303,12 +342,12 @@ export default function ScaleModal(props: ScaleModalProps) {
                   {/* Scale Weight */}
                   <div class="p-4 rounded-xl bg-black/40 border border-white/10 space-y-2 text-center">
                     <div class="flex items-center justify-between text-xs text-gray-400">
-                      <span>Scale Weight</span>
+                      <span>Net Weight</span>
                       <button
-                        onClick={() => scale.tare()}
+                        onClick={() => handleSelectTare(null)}
                         class="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-gray-300 transition-colors"
                       >
-                        Tare
+                        Tare Zero
                       </button>
                     </div>
                     <div class="text-2xl font-bold text-white">
@@ -324,6 +363,51 @@ export default function ScaleModal(props: ScaleModalProps) {
                     <div class="text-3xl font-black text-accentCyan">
                       {calculateEstimatedCount()} <span class="text-xs font-normal text-cyan-200">pcs</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Container Tare Weight Selection Bar */}
+                <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2 text-xs">
+                  <div class="flex items-center justify-between text-gray-400 font-semibold">
+                    <span class="flex items-center gap-1.5 text-gray-300">
+                      <Scale size={14} class="text-accentCyan" />
+                      Container Tare Weight:
+                    </span>
+                    <Show when={scale.tareOffset() > 0}>
+                      <span class="text-[11px] font-mono text-cyan-300 bg-accentCyan/10 px-2 py-0.5 rounded border border-accentCyan/20 font-bold">
+                        -{scale.tareOffset()} {scale.unit()}
+                      </span>
+                    </Show>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <select
+                      value={selectedTareId() || ""}
+                      onChange={(e) => {
+                        const val = e.currentTarget.value;
+                        handleSelectTare(val ? val : null);
+                      }}
+                      class="w-full bg-black/50 border border-white/10 rounded-lg py-2 px-3 text-white text-xs font-semibold focus:outline-none focus:border-accentCyan cursor-pointer"
+                    >
+                      <option value="">No Container / Tare to Zero (0 g)</option>
+                      <For each={tareWeights()}>
+                        {(t) => (
+                          <option value={t.id}>
+                            {t.name} ({t.weight} {scale.unit()})
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                    <button
+                      onClick={() => handleSelectTare(null)}
+                      class={`px-3 py-2 rounded-lg text-xs font-bold shrink-0 transition-colors ${
+                        !selectedTareId()
+                          ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/30"
+                          : "bg-white/5 text-gray-300 hover:bg-white/10"
+                      }`}
+                      title="Tare scale to live zero"
+                    >
+                      Tare Zero
+                    </button>
                   </div>
                 </div>
 
@@ -351,7 +435,7 @@ export default function ScaleModal(props: ScaleModalProps) {
                 {/* Actions */}
                 <div class="pt-2 flex items-center justify-between">
                   <button
-                    onClick={() => scale.tare()}
+                    onClick={() => handleSelectTare(null)}
                     class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold transition-colors flex items-center gap-1.5"
                   >
                     <RotateCcw size={14} /> Zero / Tare Scale

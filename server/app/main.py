@@ -7,7 +7,7 @@ import json
 
 from .database import engine, Base, get_db
 from . import models, auth
-from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products
+from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products, tares
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -43,6 +43,7 @@ app.include_router(uploads.router)
 app.include_router(suppliers.router)
 app.include_router(projects.router)
 app.include_router(products.router)
+app.include_router(tares.router)
 
 @app.get("/")
 def read_root():

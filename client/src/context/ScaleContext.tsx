@@ -21,8 +21,9 @@ export interface ScaleContextType {
   simulatedWeight: () => number;
   connect: () => Promise<void>;
   disconnect: () => void;
-  tare: () => void;
+  tare: (customOffset?: number) => void;
   resetTare: () => void;
+  setTareOffset: (val: number) => void;
   setMockMode: (val: boolean) => void;
   setSimulatedWeight: (val: number) => void;
   setUnit: (u: "g" | "oz" | "ml") => void;
@@ -140,9 +141,13 @@ export function ScaleProvider(props: { children: JSX.Element }) {
     setRawWeight(0);
   };
 
-  const tare = () => {
-    const current = mockMode() ? simulatedWeight() : rawWeight();
-    setTareOffset(current);
+  const tare = (customOffset?: number) => {
+    if (customOffset !== undefined) {
+      setTareOffset(customOffset);
+    } else {
+      const current = mockMode() ? simulatedWeight() : rawWeight();
+      setTareOffset(current);
+    }
   };
 
   const resetTare = () => {
@@ -163,6 +168,7 @@ export function ScaleProvider(props: { children: JSX.Element }) {
     disconnect,
     tare,
     resetTare,
+    setTareOffset,
     setMockMode: (val: boolean) => {
       setMockMode(val);
       if (val && status() === "disconnected") {

@@ -225,6 +225,25 @@ class ProjectDetailsOut(ProjectOut):
 
     model_config = ConfigDict(from_attributes=True)
 
+# ----------------- Tare Weight Schemas -----------------
+class TareWeightBase(BaseModel):
+    name: str
+    weight: float
+
+class TareWeightCreate(TareWeightBase):
+    pass
+
+class TareWeightUpdate(BaseModel):
+    name: Optional[str] = None
+    weight: Optional[float] = None
+
+class TareWeightOut(TareWeightBase):
+    id: str
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 # ----------------- Storage (Locations) Schemas -----------------
 class StorageBase(BaseModel):
     parent_id: Optional[str] = None
@@ -243,6 +262,7 @@ class StorageBase(BaseModel):
     size_x: float = 0.0
     size_y: float = 0.0
     size_z: float = 0.0
+    last_tare_id: Optional[str] = None
 
 class StorageCreate(StorageBase):
     pass
@@ -252,6 +272,7 @@ class StorageOut(StorageBase):
     created_on: datetime
     modified_on: Optional[datetime] = None
     part: Optional[PartOut] = None
+    last_tare: Optional[TareWeightOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 

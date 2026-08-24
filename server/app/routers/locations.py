@@ -189,6 +189,8 @@ class LocationLinkPayload(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     label_scheme: Optional[str] = None
+    last_tare_id: Optional[str] = None
+    set_last_tare: bool = False
 
 @router.patch("/{location_id}", response_model=schemas.StorageOut)
 def patch_location(
@@ -198,7 +200,7 @@ def patch_location(
     current_user: models.User = Depends(auth.require_stocker)
 ):
     """
-    Partial update for a storage location. Used to assign or unassign a part_id.
+    Partial update for a storage location. Used to assign or unassign a part_id, name, or last_tare_id.
     """
     storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
     if not storage:
@@ -217,6 +219,15 @@ def patch_location(
         storage.description = payload.description
     if payload.label_scheme is not None:
         storage.label_scheme = payload.label_scheme
+
+    if payload.set_last_tare or "last_tare_id" in payload.model_dump(exclude_unset=True):
+        if payload.last_tare_id is not None:
+            tare = db.query(models.TareWeight).filter(models.TareWeight.id == payload.last_tare_id).first()
+            if not tare:
+                raise HTTPException(status_code=404, detail="Specified tare weight not found.")
+            storage.last_tare_id = payload.last_tare_id
+        else:
+            storage.last_tare_id = None
 
     if payload.set_parent:
         if payload.parent_id is not None:
@@ -280,6 +291,8 @@ def touch_location(
 
 class CountPayload(BaseModel):
     quantity: int
+    last_tare_id: Optional[str] = None
+    set_last_tare: bool = False
 
 @router.put("/{location_id}/count", response_model=schemas.StorageOut)
 def count_location(
@@ -290,7 +303,8 @@ def count_location(
 ):
     """
     Set an exact quantity for a storage location and stamp last_counted = NOW.
-    Used by the StockController component for +/- and inline edit adjustments.
+    Optionally updates last_tare_id reference.
+    Used by the StockController component and ScaleModal.
     """
     storage = db.query(models.Storage).filter(models.Storage.id == location_id).first()
     if not storage:
@@ -299,6 +313,15 @@ def count_location(
         raise HTTPException(status_code=400, detail="Quantity cannot be negative.")
     storage.quantity = payload.quantity
     storage.last_counted = datetime.utcnow()
+
+    if payload.set_last_tare or "last_tare_id" in payload.model_dump(exclude_unset=True):
+        if payload.last_tare_id is not None:
+            tare = db.query(models.TareWeight).filter(models.TareWeight.id == payload.last_tare_id).first()
+            if not tare:
+                raise HTTPException(status_code=404, detail="Specified tare weight not found.")
+            storage.last_tare_id = payload.last_tare_id
+        else:
+            storage.last_tare_id = None
 
     # Write audit transaction for the owning part
     if storage.part_id:

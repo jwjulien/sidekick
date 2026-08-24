@@ -5,9 +5,11 @@ import {
   Plus, 
   Trash2, 
   ChevronRight, 
-  ChevronDown
+  ChevronDown,
+  Scale,
+  Edit2
 } from "lucide-solid";
-import { apiFetch, user } from "../hooks/useAuth";
+import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 
@@ -82,23 +84,31 @@ const CategoryNode = (props: {
 
 export default function Design() {
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = createSignal<"categories">("categories");
+  const [activeTab, setActiveTab] = createSignal<"categories" | "tares">("categories");
   const [categories, setCategories] = createSignal<any[]>([]);
+  const [tareWeights, setTareWeights] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
 
   // Category Form State
-  const [editCatId, setEditCatId] = createSignal<number | null>(null);
+  const [editCatId, setEditCatId] = createSignal<string | null>(null);
   const [catTitle, setCatTitle] = createSignal("");
   const [catDesignator, setCatDesignator] = createSignal("");
   const [catParentId, setCatParentId] = createSignal("");
 
+  // Tare Weight Form State
+  const [editTareId, setEditTareId] = createSignal<string | null>(null);
+  const [tareName, setTareName] = createSignal("");
+  const [tareWeight, setTareWeight] = createSignal<string>("");
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cats] = await Promise.all([
-        apiFetch("/categories")
+      const [cats, tares] = await Promise.all([
+        apiFetch("/categories"),
+        apiFetch("/tare-weights").catch(() => [])
       ]);
       setCategories(cats);
+      setTareWeights(tares || []);
     } catch (err) {
       console.error("Failed to load design structures:", err);
     } finally {
@@ -174,11 +184,73 @@ export default function Design() {
     }
   };
 
-  // Helper to resolve parents
-  const getParentCategoryName = (parentId: string | null) => {
-    if (!parentId) return "";
-    const parent = categories().find(c => c.id === parentId);
-    return parent ? parent.title : "";
+  // Tare Weight Handlers
+  const handleSaveTare = async (e: Event) => {
+    e.preventDefault();
+    if (!tareName() || tareWeight() === "") return;
+    const wtNum = parseFloat(tareWeight());
+    if (isNaN(wtNum) || wtNum < 0) {
+      toast.error("Please enter a valid non-negative tare weight.");
+      return;
+    }
+
+    try {
+      if (editTareId()) {
+        await apiFetch(`/tare-weights/${editTareId()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: tareName(),
+            weight: wtNum
+          })
+        });
+        toast.success("Tare weight updated successfully.");
+      } else {
+        await apiFetch("/tare-weights", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: tareName(),
+            weight: wtNum
+          })
+        });
+        toast.success("Tare weight created successfully.");
+      }
+      resetTareForm();
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save tare weight.");
+    }
+  };
+
+  const resetTareForm = () => {
+    setEditTareId(null);
+    setTareName("");
+    setTareWeight("");
+  };
+
+  const handleEditTareClick = (tare: any) => {
+    setEditTareId(tare.id);
+    setTareName(tare.name);
+    setTareWeight(String(tare.weight));
+  };
+
+  const handleDeleteTare = async (tareId: string) => {
+    const isConfirmed = await confirm({
+      title: "Delete Tare Weight",
+      message: "Are you sure you want to delete this tare weight container specification? Storage locations referencing it will revert to zero tare.",
+      confirmText: "Delete",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
+
+    try {
+      await apiFetch(`/tare-weights/${tareId}`, { method: "DELETE" });
+      toast.success("Tare weight deleted successfully.");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete tare weight.");
+    }
   };
 
   return (
@@ -189,18 +261,31 @@ export default function Design() {
           <FolderTree class="text-accentCyan" />
           Component Structure Designer
         </h2>
-        <p class="text-gray-400 text-sm">Define dynamic component categories, silkscreen designators, and storage drawers.</p>
+        <p class="text-gray-400 text-sm">Define dynamic component categories, silkscreen designators, and workshop tare weights.</p>
       </div>
 
       {/* Selector Tabs */}
       <div class="flex border-b border-white/5 space-x-6 text-sm font-semibold mb-6">
         <button
           onClick={() => setActiveTab("categories")}
-          class={`pb-3 border-b-2 px-1 transition-colors cursor-pointer border-accentCyan text-white`}
+          class={`pb-3 border-b-2 px-1 transition-colors cursor-pointer ${
+            activeTab() === "categories" ? "border-accentCyan text-white" : "border-transparent text-gray-400 hover:text-gray-200"
+          }`}
         >
           <span class="flex items-center gap-2">
             <Tag size={16} />
             Categories & Reference Designators
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("tares")}
+          class={`pb-3 border-b-2 px-1 transition-colors cursor-pointer ${
+            activeTab() === "tares" ? "border-accentCyan text-white" : "border-transparent text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <span class="flex items-center gap-2">
+            <Scale size={16} />
+            Container Tare Weights
           </span>
         </button>
       </div>
@@ -293,6 +378,105 @@ export default function Design() {
                         onDelete={handleDeleteCategory}
                         onEdit={handleEditCategoryClick}
                       />
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          {/* ----------------- TARE WEIGHTS PANEL ----------------- */}
+          <Show when={activeTab() === "tares"}>
+            {/* Left 1 Col: Tare Weight creation */}
+            <div class="glass-panel rounded-2xl p-6 border border-white/5 h-fit">
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <Plus size={16} class="text-accentCyan" />
+                {editTareId() ? "Edit Tare Container" : "Add Tare Container"}
+              </h3>
+
+              <form onSubmit={handleSaveTare} class="space-y-4 text-xs">
+                <div>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Container / Drawer Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={tareName()}
+                    onInput={(e) => setTareName(e.currentTarget.value)}
+                    placeholder="E.g. Small Blue Drawer, ESD Bin #2"
+                    class="glass-input w-full text-xs"
+                  />
+                </div>
+                <div>
+                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Tare Weight (grams)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={tareWeight()}
+                    onInput={(e) => setTareWeight(e.currentTarget.value)}
+                    placeholder="E.g. 25.5"
+                    class="glass-input w-full text-xs font-mono font-bold"
+                  />
+                </div>
+                <div class="flex gap-2">
+                  <button type="submit" class="btn-primary flex-1 py-2.5">
+                    {editTareId() ? "Update Tare Container" : "Save Tare Container"}
+                  </button>
+                  <Show when={editTareId()}>
+                    <button type="button" onClick={resetTareForm} class="bg-white/10 hover:bg-white/20 text-white flex-1 py-2.5 rounded-lg transition-colors font-bold">
+                      Cancel
+                    </button>
+                  </Show>
+                </div>
+              </form>
+            </div>
+
+            {/* Right 2 Cols: Tare Weight Listing */}
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Scale size={16} class="text-accentCyan" />
+                Known Drawer & Bin Tare Weights
+              </h3>
+
+              <Show when={tareWeights().length === 0}>
+                <div class="text-center py-10 text-xs text-gray-500">
+                  No tare containers registered yet. Add one on the left to start taring workshop containers directly.
+                </div>
+              </Show>
+
+              <Show when={tareWeights().length > 0}>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <For each={tareWeights()}>
+                    {(tare) => (
+                      <div class="glass-card p-4 rounded-xl border border-white/5 flex items-center justify-between gap-3">
+                        <div class="space-y-1">
+                          <div class="font-bold text-white text-sm flex items-center gap-2">
+                            <Scale size={14} class="text-accentCyan shrink-0" />
+                            {tare.name}
+                          </div>
+                          <div class="text-xs font-mono text-accentCyan font-semibold">
+                            Tare: {tare.weight} g
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditTareClick(tare)}
+                            class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                            title="Edit Container"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTare(tare.id)}
+                            class="p-1.5 text-gray-600 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                            title="Delete Container"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </For>
                 </div>

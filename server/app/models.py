@@ -154,10 +154,23 @@ class Storage(Base):
     size_x = Column(Float, default=0.0, nullable=False)
     size_y = Column(Float, default=0.0, nullable=False)
     size_z = Column(Float, default=0.0, nullable=False)
+    last_tare_id = Column(String(36), ForeignKey("tare_weights.id", ondelete="SET NULL"), nullable=True)
 
     parent = relationship("Storage", remote_side=[id], back_populates="children")
     children = relationship("Storage", back_populates="parent", cascade="all, delete-orphan")
     part = relationship("Part", back_populates="storage_records")
+    last_tare = relationship("TareWeight", back_populates="storage_records")
+
+class TareWeight(Base):
+    __tablename__ = "tare_weights"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid7()))
+    name = Column(String(100), nullable=False)
+    weight = Column(Float, nullable=False)
+    created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
+    modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    storage_records = relationship("Storage", back_populates="last_tare")
 
 class Image(Base):
     __tablename__ = "images"
