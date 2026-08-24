@@ -12,7 +12,7 @@ import {
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
-
+import { useScale } from "../context/ScaleContext";
 
 const CategoryNode = (props: {
   category: any;
@@ -83,6 +83,7 @@ const CategoryNode = (props: {
 };
 
 export default function Design() {
+  const scale = useScale();
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = createSignal<"categories" | "tares">("categories");
   const [categories, setCategories] = createSignal<any[]>([]);
@@ -407,17 +408,52 @@ export default function Design() {
                   />
                 </div>
                 <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Tare Weight (grams)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    value={tareWeight()}
-                    onInput={(e) => setTareWeight(e.currentTarget.value)}
-                    placeholder="E.g. 25.5"
-                    class="glass-input w-full text-xs font-mono font-bold"
-                  />
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="block font-semibold text-gray-400 uppercase">Tare Weight (grams)</label>
+                    <Show when={scale.status() === "connected"}>
+                      <span class="text-[10px] font-mono text-accentCyan font-bold">
+                        Live: {scale.netWeight()} {scale.unit()}
+                      </span>
+                    </Show>
+                  </div>
+                  <div class="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      value={tareWeight()}
+                      onInput={(e) => setTareWeight(e.currentTarget.value)}
+                      placeholder="E.g. 25.5"
+                      class="glass-input w-full text-xs font-mono font-bold"
+                    />
+                    <Show
+                      when={scale.status() === "connected"}
+                      fallback={
+                        <button
+                          type="button"
+                          onClick={() => scale.connect()}
+                          class="px-3 py-2 bg-white/5 hover:bg-white/10 text-accentCyan border border-accentCyan/30 rounded-lg text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-colors"
+                          title="Connect Bluetooth scale to measure live container weight"
+                        >
+                          <Scale size={14} /> Connect Scale
+                        </button>
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const live = scale.netWeight() > 0 ? scale.netWeight() : scale.rawWeight();
+                          setTareWeight(String(live));
+                          toast.success(`Captured ${live} ${scale.unit()} from scale.`);
+                        }}
+                        class="px-3 py-2 bg-accentCyan/20 hover:bg-accentCyan/30 text-accentCyan border border-accentCyan/40 rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5 transition-colors"
+                        title="Capture live scale reading"
+                      >
+                        <Scale size={14} /> Read Scale
+                      </button>
+                    </Show>
+                  </div>
                 </div>
                 <div class="flex gap-2">
                   <button type="submit" class="btn-primary flex-1 py-2.5">
