@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Parts from "./pages/Parts";
+import HomelessParts from "./pages/HomelessParts";
 import PartDetails from "./pages/PartDetails";
 import Scan from "./pages/Scan";
 import Design from "./pages/Design";
@@ -63,6 +64,26 @@ export default function App() {
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
                 <Parts />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/inventory/homeless-parts" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <HomelessParts />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/parts/homeless" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <HomelessParts />
               </Layout>
             </Show>
           )} 

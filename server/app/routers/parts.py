@@ -167,6 +167,70 @@ def get_recent_transactions(
     """
     return db.query(models.Transaction).order_by(models.Transaction.created_at.desc()).limit(limit).all()
 
+@router.get("/homeless", response_model=List[schemas.PartOut])
+def get_homeless_parts(
+    q: Optional[str] = Query(None, description="Search query"),
+    category_id: Optional[str] = Query(None, description="Filter by category ID"),
+    reason: Optional[str] = Query(None, description="Filter by reason: new_entry or location_deleted"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Retrieves all 'homeless' parts (parts with no assigned storage locations or total stored quantity of 0).
+    """
+    query = db.query(models.Part)
+    
+    if q:
+        search_filter = or_(
+            models.Part.value.ilike(f"%{q}%"),
+            models.Part.number.ilike(f"%{q}%"),
+            models.Part.package.ilike(f"%{q}%"),
+            models.Part.notes.ilike(f"%{q}%")
+        )
+        query = query.filter(search_filter)
+        
+    if category_id:
+        query = query.filter(models.Part.category_id == category_id)
+        
+    all_parts = query.all()
+    homeless_parts = []
+    
+    for p in all_parts:
+        total_qty = sum(s.quantity for s in p.storage_records) if p.storage_records else 0
+        has_locations = len(p.storage_records) > 0 if p.storage_records else False
+        
+        is_homeless = not has_locations or total_qty == 0
+        
+        if is_homeless:
+            if reason == "new_entry" and has_locations:
+                continue
+            elif reason == "location_deleted" and not has_locations:
+                continue
+                
+            p.total_quantity = total_qty
+            p.category = p.category
+            homeless_parts.append(p)
+            
+    return homeless_parts
+
+@router.get("/homeless/count")
+def get_homeless_parts_count(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Returns the total count of unassigned / homeless parts for UI badges.
+    """
+    all_parts = db.query(models.Part).all()
+    count = 0
+    for p in all_parts:
+        total_qty = sum(s.quantity for s in p.storage_records) if p.storage_records else 0
+        has_locations = len(p.storage_records) > 0 if p.storage_records else False
+        if not has_locations or total_qty == 0:
+            count += 1
+    return {"count": count}
+
+
 @router.get("/{part_id}", response_model=schemas.PartDetailsOut)
 def get_part(
     part_id: str,

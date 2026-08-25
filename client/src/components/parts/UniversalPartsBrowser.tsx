@@ -310,11 +310,11 @@ export default function UniversalPartsBrowser(props: UniversalPartsBrowserProps)
       {/* Search Input Bar */}
       <Show when={props.showToolbar !== false}>
         <div class="relative">
-          <Search size={16} class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={16} class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
             type="text"
             placeholder="Search parts by value, number, package, notes, attributes..."
-            class="w-full bg-black/30 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accentCyan transition-colors"
+            class="w-full bg-black/30 border border-white/10 rounded-xl !pl-11 pr-4 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accentCyan transition-colors"
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
           />

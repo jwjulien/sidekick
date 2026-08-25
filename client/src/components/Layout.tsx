@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   FolderGit2,
   Building2,
-  MapPin
+  MapPin,
+  PackageCheck
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 
@@ -27,19 +28,24 @@ export default function Layout(props: LayoutProps) {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = createSignal(false);
   const [lowStockCount, setLowStockCount] = createSignal(0);
+  const [homelessCount, setHomelessCount] = createSignal(0);
 
-  // Poll for low stock alerts periodically to show notifications
-  const checkLowStock = async () => {
+  // Poll for low stock alerts & homeless count periodically to show notifications
+  const checkCounts = async () => {
     try {
       const items = await apiFetch("/parts?low_stock=true");
       setLowStockCount(items.length);
+    } catch (_) {}
+    try {
+      const res = await apiFetch("/parts/homeless/count");
+      setHomelessCount(res?.count || 0);
     } catch (_) {}
   };
 
   createEffect(() => {
     if (user()) {
-      checkLowStock();
-      const interval = setInterval(checkLowStock, 30000); // 30s
+      checkCounts();
+      const interval = setInterval(checkCounts, 30000); // 30s
       return () => clearInterval(interval);
     }
   });
@@ -52,6 +58,7 @@ export default function Layout(props: LayoutProps) {
   const navItems = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "Parts Catalog", path: "/parts", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "Homeless Parts", path: "/inventory/homeless-parts", icon: PackageCheck, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },
@@ -140,6 +147,11 @@ export default function Layout(props: LayoutProps) {
               <Show when={item.name === "Dashboard" && lowStockCount() > 0}>
                 <span class="ml-auto bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
                   {lowStockCount()} Alerts
+                </span>
+              </Show>
+              <Show when={item.name === "Homeless Parts" && homelessCount() > 0}>
+                <span class="ml-auto bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  {homelessCount()}
                 </span>
               </Show>
             </A>

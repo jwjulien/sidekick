@@ -142,7 +142,7 @@ class Storage(Base):
     dimensions = Column(JSON, nullable=True)
     span = Column(JSON, nullable=True)
     label_scheme = Column(String(10), nullable=True)
-    part_id = Column(String(36), ForeignKey("parts.id", ondelete="SET NULL"), nullable=True)
+    part_id = Column(String(36), ForeignKey("parts.id", ondelete="SET NULL"), nullable=True, index=True)
     quantity = Column(Integer, default=0, nullable=False)
     last_counted = Column(DateTime, nullable=True)
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)

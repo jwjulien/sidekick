@@ -337,3 +337,118 @@ def count_location(
     db.commit()
     db.refresh(storage)
     return storage
+
+
+class AssignPartPayload(BaseModel):
+    part_id: str
+    location_id: str
+    quantity: Optional[int] = 0
+    notes: Optional[str] = None
+
+
+class BulkAssignPartsPayload(BaseModel):
+    part_ids: List[str]
+    location_id: str
+    quantity: Optional[int] = 0
+    notes: Optional[str] = None
+
+
+@router.post("/assign", response_model=schemas.StorageOut, status_code=status.HTTP_200_OK)
+def assign_part_location(
+    payload: AssignPartPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Transactionally assigns a homeless part component to a target physical storage location.
+    Logs an audit Transaction record.
+    """
+    part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part component not found.")
+
+    storage = db.query(models.Storage).filter(models.Storage.id == payload.location_id).first()
+    if not storage:
+        raise HTTPException(status_code=404, detail="Target storage location not found.")
+
+    if storage.part_id is None or storage.part_id == part.id:
+        storage.part_id = part.id
+        if payload.quantity is not None and payload.quantity >= 0:
+            storage.quantity = payload.quantity
+        target_storage = storage
+    else:
+        # If bin already assigned to another component, create a sub-bin inside this location
+        target_storage = models.Storage(
+            name=f"{part.value}",
+            parent_id=storage.id,
+            part_id=part.id,
+            quantity=payload.quantity or 0,
+            description=f"Assigned homeless part {part.value} ({part.number})"
+        )
+        db.add(target_storage)
+        db.commit()
+        db.refresh(target_storage)
+
+    db_tx = models.Transaction(
+        part_id=part.id,
+        user_id=current_user.id,
+        action_type="assign_location",
+        quantity_change=target_storage.quantity,
+        notes=payload.notes or f"Assigned location '{target_storage.name}' to part {part.value}."
+    )
+    db.add(db_tx)
+    db.commit()
+    db.refresh(target_storage)
+
+    return target_storage
+
+
+@router.post("/bulk-assign", status_code=status.HTTP_200_OK)
+def bulk_assign_parts_location(
+    payload: BulkAssignPartsPayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Transactionally assigns multiple selected parts to a target storage location or container.
+    """
+    location = db.query(models.Storage).filter(models.Storage.id == payload.location_id).first()
+    if not location:
+        raise HTTPException(status_code=404, detail="Target storage location not found.")
+
+    assigned_count = 0
+    for part_id in payload.part_ids:
+        part = db.query(models.Part).filter(models.Part.id == part_id).first()
+        if not part:
+            continue
+
+        if location.part_id is None and assigned_count == 0:
+            location.part_id = part.id
+            if payload.quantity is not None and payload.quantity >= 0:
+                location.quantity = payload.quantity
+            target_storage = location
+        else:
+            sub_bin = models.Storage(
+                name=f"{part.value}",
+                parent_id=location.id,
+                part_id=part.id,
+                quantity=payload.quantity or (part.threshold or 0),
+                description=f"Batch assigned to '{location.name}'"
+            )
+            db.add(sub_bin)
+            db.flush()
+            target_storage = sub_bin
+
+        db_tx = models.Transaction(
+            part_id=part.id,
+            user_id=current_user.id,
+            action_type="assign_location",
+            quantity_change=target_storage.quantity,
+            notes=payload.notes or f"Batch assigned to container '{location.name}'."
+        )
+        db.add(db_tx)
+        assigned_count += 1
+
+    db.commit()
+    return {"status": "success", "assigned_count": assigned_count, "location_id": location.id}
+

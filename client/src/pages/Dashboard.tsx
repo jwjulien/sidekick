@@ -11,7 +11,8 @@ import {
   Plus, 
   Minus,
   Search,
-  RefreshCw
+  RefreshCw,
+  PackageCheck
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -24,7 +25,8 @@ export default function Dashboard() {
     totalItems: 0,
     categories: 0,
     locations: 0,
-    lowStock: 0
+    lowStock: 0,
+    homelessCount: 0
   });
   
   const [lowStockItems, setLowStockItems] = createSignal<any[]>([]);
@@ -38,19 +40,21 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [items, categories, locations, alerts, txs] = await Promise.all([
+      const [items, categories, locations, alerts, txs, homelessRes] = await Promise.all([
         apiFetch("/parts"),
         apiFetch("/categories"),
         apiFetch("/locations?flat=true"),
         apiFetch("/parts?low_stock=true"),
-        apiFetch("/parts/transactions?limit=8")
+        apiFetch("/parts/transactions?limit=8"),
+        apiFetch("/parts/homeless/count")
       ]);
       
       setStats({
         totalItems: items.length,
         categories: categories.length,
         locations: locations.length,
-        lowStock: alerts.length
+        lowStock: alerts.length,
+        homelessCount: homelessRes?.count || 0
       });
       setLowStockItems(alerts);
       setRecentTx(txs);
@@ -139,6 +143,34 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Homeless Parts Alert Banner */}
+      <Show when={stats().homelessCount > 0}>
+        <div class="glass-card p-4 rounded-2xl border border-amber-500/30 bg-amber-500/[0.03] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <PackageCheck size={20} />
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white text-sm">Unassigned Homeless Parts</span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {stats().homelessCount} Requiring Triage
+                </span>
+              </div>
+              <p class="text-xs text-gray-400 mt-0.5">
+                You have {stats().homelessCount} part record{stats().homelessCount === 1 ? "" : "s"} with no physical storage assignment.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/inventory/homeless-parts")}
+            class="btn-primary py-2 px-4 text-xs flex items-center gap-2 shrink-0 font-bold"
+          >
+            Triage Homeless Parts ➔
+          </button>
+        </div>
+      </Show>
 
       {/* Grid of Stats Cards */}
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
