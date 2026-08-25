@@ -1,5 +1,6 @@
 import { createSignal, createEffect, on, For, Show } from "solid-js";
-import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, Move, FolderMinus } from "lucide-solid";
+import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, FolderMinus } from "lucide-solid";
+import LocationCard from "./LocationCard";
 import {
   DragDropProvider,
   DragDropSensors,
@@ -124,6 +125,10 @@ export default function StorageColumns(props: {
   onPickerSelect?: (parentId: string | null, index?: number) => void;
   onMoveParts?: (location: any) => void;
   onCollapseToParent?: (childLocation: any, parentLocation: any) => void;
+  onStorageChanged?: (locationId: string, newQty: number, newLastCounted: string) => void;
+  onScale?: (location: any) => void;
+  onPrint?: (location: any) => void;
+  onDeleteLocation?: (location: any) => void;
 }) {
   const [filterText, setFilterText] = createSignal("");
 
@@ -258,17 +263,23 @@ export default function StorageColumns(props: {
                           </Show>
                         </div>
                       </div>
-                      <div class="px-4 py-2 bg-white/10 rounded-xl text-sm font-mono border border-white/20 text-gray-300">
-                        Stock Qty: <span class="text-white font-bold text-base">{parentLoc()!.quantity}</span>
-                      </div>
                       <Show when={!props.pickerMode}>
-                        <button
-                          onClick={() => props.onMoveParts?.(parentLoc()!)}
-                          class="mt-2 btn-secondary text-xs flex items-center gap-1.5 px-3.5 py-2 bg-accentCyan/10 border-accentCyan/30 text-accentCyan hover:bg-accentCyan/20 transition-all rounded-xl font-semibold shadow-lg hover:shadow-accentCyan/10"
-                          title="Re-home or move parts stored at this location"
-                        >
-                          <Move size={14} /> Re-home Parts
-                        </button>
+                        <div class="w-full max-w-xs bg-white/5 p-4 rounded-2xl border border-white/10 text-left shadow-lg">
+                          <LocationCard
+                            location={parentLoc()!}
+                            hideTitle={true}
+                            onMove={props.onMoveParts ? (loc) => props.onMoveParts!(loc) : undefined}
+                            onScale={props.onScale ? (loc) => props.onScale!(loc) : undefined}
+                            onPrint={props.onPrint ? (loc) => props.onPrint!(loc) : undefined}
+                            onDelete={props.onDeleteLocation ? (loc) => props.onDeleteLocation!(loc) : undefined}
+                            onChanged={(qty, ts) => props.onStorageChanged?.(String(parentLoc()!.id), qty, ts)}
+                          />
+                        </div>
+                      </Show>
+                      <Show when={props.pickerMode}>
+                        <div class="px-4 py-2 bg-white/10 rounded-xl text-sm font-mono border border-white/20 text-gray-300">
+                          Stock Qty: <span class="text-white font-bold text-base">{parentLoc()!.quantity}</span>
+                        </div>
                       </Show>
 
                       <Show when={!props.pickerMode && parentLoc() && (() => {

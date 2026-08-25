@@ -53,11 +53,11 @@ export default function ConfirmCountWidget(props: ConfirmCountWidgetProps) {
   };
 
   return (
-    <div class="flex items-center gap-2">
+    <div class="flex flex-col items-center gap-1.5 w-full">
       <button
         onClick={handleConfirmCount}
         disabled={confirming()}
-        class={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all duration-300 ${
+        class={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold border transition-all duration-300 ${
           confirmed()
             ? "bg-green-500/20 border-green-500/40 text-green-400"
             : "bg-white/[0.03] border-white/10 text-gray-400 hover:text-white hover:bg-white/10 hover:border-white/20"
@@ -68,7 +68,7 @@ export default function ConfirmCountWidget(props: ConfirmCountWidgetProps) {
       </button>
 
       <div
-        class="flex items-center gap-1 text-[10px] text-gray-600 shrink-0 cursor-help"
+        class="flex items-center justify-center gap-1 text-[10px] text-gray-400 cursor-help"
         title={getTooltip()}
       >
         <Clock size={10} />

@@ -9,6 +9,7 @@ import LocationMoveModal from "../components/storage/LocationMoveModal";
 import MovePartModal from "../components/storage/MovePartModal";
 import PartsBrowser from "../components/storage/PartsBrowser";
 import PartDetails from "./PartDetails";
+import ScaleModal from "../components/ScaleModal";
 import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Storage() {
@@ -41,6 +42,23 @@ export default function Storage() {
   
   // Printing Reference Tags
   const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
+
+  // Scale Modal State
+  const [showScaleModal, setShowScaleModal] = createSignal(false);
+  const [scaleTargetLocation, setScaleTargetLocation] = createSignal<any | null>(null);
+  const [scalePart, setScalePart] = createSignal<any | null>(null);
+
+  const handleScaleLocation = async (loc: any) => {
+    if (!loc || !loc.part_id) return;
+    try {
+      const fullPart = await apiFetch(`/parts/${loc.part_id}`);
+      setScalePart(fullPart);
+    } catch (_) {
+      setScalePart(loc.part || { id: loc.part_id });
+    }
+    setScaleTargetLocation(loc);
+    setShowScaleModal(true);
+  };
 
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -287,6 +305,10 @@ export default function Storage() {
             onReorder={handleReorderLocation}
             onMoveParts={(loc) => setMovePartLocation(loc)}
             onCollapseToParent={handleCollapseToParent}
+            onStorageChanged={() => loadData(true)}
+            onPrint={(loc) => setActivePrintLocation(loc)}
+            onScale={handleScaleLocation}
+            onDeleteLocation={(loc) => handleDeleteLocation(String(loc.id))}
           />
         </div>
         
@@ -423,6 +445,20 @@ export default function Storage() {
         location={activePrintLocation()}
         onClose={() => setActivePrintLocation(null)}
       />
+
+      {/* Scale Counting Modal */}
+      <Show when={showScaleModal()}>
+        <ScaleModal
+          isOpen={showScaleModal()}
+          onClose={() => setShowScaleModal(false)}
+          part={scalePart()}
+          storageLocation={scaleTargetLocation()}
+          onSuccess={() => {
+            setShowScaleModal(false);
+            loadData(true);
+          }}
+        />
+      </Show>
     </div>
   );
 }

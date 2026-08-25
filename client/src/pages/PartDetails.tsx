@@ -25,7 +25,7 @@ import {
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
-import StockController from "../components/StockController";
+import LocationCard from "../components/storage/LocationCard";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
@@ -1206,64 +1206,19 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                       <span class="text-[10px] text-gray-500 mt-2 block">Threshold: {item().threshold || 0}</span>
                     </div>
 
-                    {/* Location label */}
-                    <div class="flex items-center justify-between px-1">
-                      <div class="flex items-center gap-2 min-w-0">
-                        <MapPin size={13} class="text-accentCyan shrink-0" />
-                        <span class="text-xs text-gray-300 font-medium truncate">{item().storage_records[0]?.name}</span>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            const rec = item().storage_records[0];
-                            setMoveSourceLocation(rec);
-                            setMoveQuantity(rec.quantity);
-                            setMoveDestMode("create");
-                            setMoveDestLocationId("");
-                            setMoveNewLocationName("");
-                            setMoveNewLocationParentId("");
-                            setDeleteSourceAfterMove(true);
-                            setShowMoveModal(true);
-                          }}
-                          disabled={item().storage_records[0]?.quantity === 0}
-                          class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                          title="Move Parts"
-                        >
-                          <Move size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setScaleTargetLocation(item().storage_records[0]);
-                            setShowScaleModal(true);
-                          }}
-                          class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 transition-colors"
-                          title="Count with Scale"
-                        >
-                          <Scale size={14} />
-                        </button>
-                        <button
-                          onClick={() => setActivePrintLocation(item().storage_records[0])}
-                          class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
-                          title="Print Label"
-                        >
-                          <Printer size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLocation(item().storage_records[0])}
-                          disabled={item().storage_records[0]?.quantity > 0}
-                          class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                          title="Delete Location"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* StockController */}
-                    <StockController
-                      storageId={item().storage_records[0]?.id}
-                      currentQty={item().storage_records[0]?.quantity}
-                      lastCounted={item().storage_records[0]?.last_counted}
+                    {/* Location card */}
+                    <LocationCard
+                      location={item().storage_records[0]}
+                      onMove={(rec) => {
+                        setMoveSourceLocation(rec);
+                        setShowMoveModal(true);
+                      }}
+                      onScale={(rec) => {
+                        setScaleTargetLocation(rec);
+                        setShowScaleModal(true);
+                      }}
+                      onPrint={(rec) => setActivePrintLocation(rec)}
+                      onDelete={(rec) => handleDeleteLocation(rec)}
                       onChanged={(qty, ts) => handleStorageChanged(item().storage_records[0]?.id, qty, ts)}
                     />
                   </div>
@@ -1277,64 +1232,31 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                   {() => (
                     <div class="space-y-4">
                       {/* Header with back arrow */}
-                      <div class="flex items-center gap-2">
+                      <div class="flex items-start gap-2">
                         <button
                           onClick={() => setDrillTarget(null)}
-                          class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                          class="p-1.5 mt-0.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors shrink-0"
+                          title="Back to location list"
                         >
                           <ArrowLeft size={15} />
                         </button>
-                        <div class="flex items-center justify-between w-full min-w-0">
-                          <div class="flex items-center gap-2 min-w-0">
-                            <MapPin size={13} class="text-accentCyan shrink-0" />
-                            <span class="text-sm font-bold text-white truncate">{activeDrillSlot()?.name}</span>
-                          </div>
-                          <div class="flex items-center gap-1">
-                            <button
-                              onClick={() => {
-                                setMoveSourceLocation(activeDrillSlot());
-                                setShowMoveModal(true);
-                              }}
-                              disabled={activeDrillSlot()?.quantity === 0}
-                              class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                              title="Move Parts"
-                            >
-                              <Move size={14} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setScaleTargetLocation(activeDrillSlot());
-                                setShowScaleModal(true);
-                              }}
-                              class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 transition-colors"
-                              title="Count with Scale"
-                            >
-                              <Scale size={14} />
-                            </button>
-                            <button
-                              onClick={() => setActivePrintLocation(activeDrillSlot())}
-                              class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors"
-                              title="Print Label"
-                            >
-                              <Printer size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteLocation(activeDrillSlot())}
-                              disabled={activeDrillSlot()?.quantity > 0}
-                              class="p-1.5 rounded-lg bg-white/5 text-rose-400 hover:text-rose-300 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
-                              title="Delete Location"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                        <div class="flex-1 min-w-0">
+                          <LocationCard
+                            location={activeDrillSlot()}
+                            onMove={(rec) => {
+                              setMoveSourceLocation(rec);
+                              setShowMoveModal(true);
+                            }}
+                            onScale={(rec) => {
+                              setScaleTargetLocation(rec);
+                              setShowScaleModal(true);
+                            }}
+                            onPrint={(rec) => setActivePrintLocation(rec)}
+                            onDelete={(rec) => handleDeleteLocation(rec)}
+                            onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id, qty, ts)}
+                          />
                         </div>
                       </div>
-                      <StockController
-                        storageId={activeDrillSlot()?.id || 0}
-                        currentQty={activeDrillSlot()?.quantity || 0}
-                        lastCounted={activeDrillSlot()?.last_counted}
-                        onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id || 0, qty, ts)}
-                      />
                     </div>
                   )}
                 </Show>
