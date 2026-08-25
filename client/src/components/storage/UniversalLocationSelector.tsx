@@ -33,6 +33,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   
   // Inline creation state for Miller Column level or search
   const [addingUnderParentId, setAddingUnderParentId] = createSignal<string | null>(null);
+  const [addingIndex, setAddingIndex] = createSignal<number>(0);
 
   // Dynamic view mode: true when search input has text, false when empty (Miller Columns)
   const isSearching = createMemo(() => searchTerm().trim() !== "");
@@ -50,10 +51,31 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     }
   });
 
+  // Helper to build ancestor ID chain
+  const getAncestorChain = (locId: string, allLocs: any[]): string[] => {
+    const chain: string[] = [];
+    let curr = allLocs.find((l) => String(l.id) === String(locId));
+    const visited = new Set<string>();
+    while (curr && !visited.has(curr.id)) {
+      visited.add(curr.id);
+      chain.unshift(curr.id);
+      if (curr.parent_id) {
+        curr = allLocs.find((l) => String(l.id) === String(curr.parent_id));
+      } else {
+        curr = null;
+      }
+    }
+    return chain;
+  };
+
   // Sync prop changes for selectedLocationId
   createEffect(() => {
     if (props.selectedLocationId) {
       setSelectedId(props.selectedLocationId);
+      const chain = getAncestorChain(props.selectedLocationId, allLocations());
+      if (chain.length > 0) {
+        setMillerPath(chain);
+      }
     }
   });
 
@@ -91,7 +113,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
 
   // Active selected location object
   const selectedLocation = createMemo(() => {
-    return allLocations().find((l) => l.id === selectedId()) || null;
+    return allLocations().find((l) => String(l.id) === String(selectedId())) || null;
   });
 
   // Calculate Miller Columns array: [[rootNodes], [childNodes1], [childNodes2], ...]
@@ -102,14 +124,12 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     const roots = locationsByParent().get(null) || [];
     cols.push({ parentId: null, items: roots });
 
-    // Subsequent columns driven by millerPath()
-    const path = millerPath();
-    for (let i = 0; i < path.length; i++) {
-      const currentParentId = path[i];
+    // Subsequent columns driven by valid millerPath()
+    const validPath = millerPath().filter((id) => allLocations().some((l) => String(l.id) === String(id)));
+    for (let i = 0; i < validPath.length; i++) {
+      const currentParentId = validPath[i];
       const children = locationsByParent().get(currentParentId) || [];
-      if (children.length > 0) {
-        cols.push({ parentId: currentParentId, items: children });
-      }
+      cols.push({ parentId: currentParentId, items: children });
     }
 
     return cols;
@@ -118,13 +138,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   // Calculate breadcrumb trail for selected location
   const breadcrumbs = createMemo(() => {
     if (!selectedId()) return [];
-    const trail: any[] = [];
-    let curr = allLocations().find((l) => l.id === selectedId());
-    while (curr) {
-      trail.unshift(curr);
-      curr = curr.parent_id ? allLocations().find((l) => l.id === curr.parent_id) : null;
-    }
-    return trail;
+    return getAncestorChain(selectedId(), allLocations()).map(id => allLocations().find(l => String(l.id) === String(id))).filter(Boolean);
   });
 
   // Filtered list for Search Mode
@@ -145,21 +159,34 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     // Update Miller path up to columnIndex
     const newPath = millerPath().slice(0, columnIndex);
     
-    // Check if node has children to expand
+    // Check if node has children or dimensions (1D/2D) to expand
     const hasChildren = (locationsByParent().get(node.id) || []).length > 0;
-    if (hasChildren) {
+    const hasDimensions = Array.isArray(node.dimensions) && node.dimensions.length > 0;
+    if (hasChildren || hasDimensions) {
       newPath.push(node.id);
     }
     setMillerPath(newPath);
   };
 
   const handleLocationCreatedInline = (newLoc: any) => {
+    let updatedLocs: any[] = [];
     if (props.locations === undefined) {
-      setRemoteLocations([...remoteLocations(), newLoc]);
+      updatedLocs = [...remoteLocations(), newLoc];
+      setRemoteLocations(updatedLocs);
+    } else {
+      updatedLocs = [...props.locations, newLoc];
     }
     setSelectedId(newLoc.id);
     props.onSelectLocation(newLoc);
+
+    // Build and set ancestor chain for new location
+    const chain = getAncestorChain(newLoc.id, updatedLocs);
+    if (chain.length > 0) {
+      setMillerPath(chain);
+    }
+
     setAddingUnderParentId(null);
+    setAddingIndex(0);
   };
 
   // Smart default bin name suggestion based on component value
@@ -257,85 +284,269 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
         <div class="overflow-x-auto pb-2 scroll-smooth" ref={millerContainerRef}>
           <div class="flex items-start gap-3 min-w-max">
             <For each={millerColumns()}>
-              {(col, colIdx) => (
-                <div class="w-56 sm:w-64 bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col max-h-52 sm:max-h-60 space-y-2 shrink-0">
-                  <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 pb-1 border-b border-white/5">
-                    <span class="truncate">
-                      {col.parentId
-                        ? allLocations().find((l) => l.id === col.parentId)?.name || "Sub-Location"
-                        : "Root Storage Units"}
-                    </span>
-                    <span class="text-[10px] text-gray-500 font-mono">({col.items.length})</span>
-                  </div>
+              {(col, colIdx) => {
+                const parentLoc = () => (col.parentId ? allLocations().find((l) => l.id === col.parentId) : null);
+                const layoutType = () => {
+                  const p = parentLoc();
+                  if (p && p.dimensions) {
+                    if (p.dimensions.length === 1) return "linear";
+                    if (p.dimensions.length === 2) return "grid";
+                  }
+                  return "default";
+                };
 
-                  <div class="overflow-y-auto space-y-1 pr-1 flex-1">
-                    <For each={col.items}>
-                      {(item) => {
-                        const isSelected = selectedId() === item.id;
-                        const isPathSelected = millerPath().includes(item.id);
-                        const hasChildren = (locationsByParent().get(item.id) || []).length > 0;
+                const dims = () => {
+                  const p = parentLoc();
+                  return p && p.dimensions ? p.dimensions : [];
+                };
 
-                        return (
-                          <div
-                            onClick={() => handleSelectNode(item, colIdx())}
-                            class={`p-2 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors ${
-                              isSelected
-                                ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/40 font-bold"
-                                : isPathSelected
-                                ? "bg-white/10 text-white border border-white/10 font-semibold"
-                                : "hover:bg-white/5 text-gray-300 border border-transparent"
-                            }`}
-                          >
-                            <div class="flex items-center gap-2 truncate">
-                              {hasChildren ? (
-                                <Folder size={14} class="text-accentCyan shrink-0" />
-                              ) : (
-                                <MapPin size={14} class="text-gray-400 shrink-0" />
-                              )}
-                              <span class="truncate">{item.name}</span>
-                            </div>
-                            <div class="flex items-center gap-1">
-                              <Show when={isSelected}>
-                                <CheckCircle size={14} class="text-accentCyan" />
-                              </Show>
-                              <Show when={hasChildren}>
-                                <ChevronRight size={14} class="text-gray-500" />
-                              </Show>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    </For>
-                  </div>
+                const capacity = () =>
+                  layoutType() === "linear"
+                    ? dims()[0]
+                    : layoutType() === "grid"
+                    ? dims()[0] * dims()[1]
+                    : 0;
 
-                  {/* Add Bin Inline under this column */}
-                  <Show when={props.showInlineCreate !== false}>
-                    <Show
-                      when={addingUnderParentId() === (col.parentId || "root")}
-                      fallback={
-                        <button
-                          type="button"
-                          onClick={() => setAddingUnderParentId(col.parentId || "root")}
-                          class="w-full py-1.5 px-2 text-[11px] text-accentCyan hover:text-white bg-accentCyan/10 hover:bg-accentCyan/20 rounded-lg font-medium border border-accentCyan/20 transition-colors flex items-center justify-center gap-1 mt-1"
+                const colWidth = () =>
+                  layoutType() === "grid" ? Math.max(224, dims()[0] * 45) : 224;
+
+                return (
+                  <div
+                    class="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col max-h-52 sm:max-h-60 space-y-2 shrink-0"
+                    style={{ width: `${colWidth()}px`, "min-width": `${colWidth()}px` }}
+                  >
+                    <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 pb-1 border-b border-white/5">
+                      <span class="truncate">
+                        {parentLoc() ? parentLoc()!.name : "Root Storage Units"}
+                      </span>
+                      <span class="text-[10px] text-gray-500 font-mono">({col.items.length})</span>
+                    </div>
+
+                    <div class="overflow-y-auto pr-1 flex-1">
+                      {/* LAYOUT 1: DEFAULT LIST */}
+                      <Show when={layoutType() === "default"}>
+                        <div class="space-y-1">
+                          <For each={col.items.slice().sort((a, b) => (a.index ?? 0) - (b.index ?? 0))}>
+                            {(item) => {
+                              const isSelected = selectedId() === item.id;
+                              const isPathSelected = millerPath().includes(item.id);
+                              const hasChildren = (locationsByParent().get(item.id) || []).length > 0;
+                              const hasDimensions = Array.isArray(item.dimensions) && item.dimensions.length > 0;
+
+                              return (
+                                <div
+                                  onClick={() => handleSelectNode(item, colIdx())}
+                                  class={`p-2 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                                    isSelected
+                                      ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/40 font-bold"
+                                      : isPathSelected
+                                      ? "bg-white/10 text-white border border-white/10 font-semibold"
+                                      : "hover:bg-white/5 text-gray-300 border border-transparent"
+                                  }`}
+                                >
+                                  <div class="flex items-center gap-2 truncate">
+                                    {hasChildren || hasDimensions ? (
+                                      <Folder size={14} class="text-accentCyan shrink-0" />
+                                    ) : (
+                                      <MapPin size={14} class="text-gray-400 shrink-0" />
+                                    )}
+                                    <span class="truncate">{item.name}</span>
+                                  </div>
+                                  <div class="flex items-center gap-1">
+                                    <Show when={isSelected}>
+                                      <CheckCircle size={14} class="text-accentCyan" />
+                                    </Show>
+                                    <Show when={hasChildren || hasDimensions}>
+                                      <ChevronRight size={14} class="text-gray-500" />
+                                    </Show>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          </For>
+                          <Show when={col.items.length === 0}>
+                            <div class="text-[10px] text-gray-500 text-center p-4">No sub-locations</div>
+                          </Show>
+                        </div>
+                      </Show>
+
+                      {/* LAYOUT 2: LINEAR (1D SLOT LIST) */}
+                      <Show when={layoutType() === "linear"}>
+                        <div class="flex flex-col gap-1">
+                          <For each={Array.from({ length: capacity() })}>
+                            {(_, i) => {
+                              const idx = i();
+                              const item = () => col.items.find((it) => it.index === idx);
+
+                              return (
+                                <Show
+                                  when={item()}
+                                  fallback={
+                                    <Show when={props.showInlineCreate !== false}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAddingUnderParentId(col.parentId || "root");
+                                          setAddingIndex(idx);
+                                        }}
+                                        class={`w-full min-h-[30px] rounded-lg border transition-colors flex items-center px-2 gap-2 group ${
+                                          addingUnderParentId() === (col.parentId || "root") && addingIndex() === idx
+                                            ? "border-accentCyan bg-accentCyan/20 text-accentCyan"
+                                            : "border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan"
+                                        }`}
+                                        title={`Create Location at Slot ${idx + 1}`}
+                                      >
+                                        <div class="text-[9px] font-mono w-4 text-right shrink-0 group-hover:text-accentCyan/50">
+                                          {idx + 1}
+                                        </div>
+                                        <Plus size={10} />
+                                      </button>
+                                    </Show>
+                                  }
+                                >
+                                  {(loc) => {
+                                    const isSelected = selectedId() === loc().id;
+                                    const isPathSelected = millerPath().includes(loc().id);
+                                    const hasChildren = (locationsByParent().get(loc().id) || []).length > 0;
+                                    const hasDimensions = Array.isArray(loc().dimensions) && loc().dimensions.length > 0;
+
+                                    return (
+                                      <div
+                                        onClick={() => handleSelectNode(loc(), colIdx())}
+                                        class={`w-full p-2 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors border ${
+                                          isSelected
+                                            ? "bg-accentCyan/20 text-accentCyan border-accentCyan/40 font-bold"
+                                            : isPathSelected
+                                            ? "bg-white/10 text-white border-white/10 font-semibold"
+                                            : "border-transparent hover:bg-white/5 text-gray-300"
+                                        }`}
+                                      >
+                                        <div class="flex items-center gap-2 truncate">
+                                          <div class="text-[9px] font-mono text-gray-500 w-4 text-right shrink-0">
+                                            {idx + 1}
+                                          </div>
+                                          <span class="truncate">{loc().name}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                          <Show when={isSelected}>
+                                            <CheckCircle size={14} class="text-accentCyan" />
+                                          </Show>
+                                          <Show when={hasChildren || hasDimensions}>
+                                            <ChevronRight size={14} class="text-gray-500" />
+                                          </Show>
+                                        </div>
+                                      </div>
+                                    );
+                                  }}
+                                </Show>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
+
+                      {/* LAYOUT 3: GRID (2D MATRIX) */}
+                      <Show when={layoutType() === "grid"}>
+                        <div
+                          class="grid gap-1"
+                          style={{ "grid-template-columns": `repeat(${dims()[0]}, minmax(0, 1fr))` }}
                         >
-                          <Plus size={12} />
-                          Add Bin Here
-                        </button>
-                      }
-                    >
-                      <div class="mt-2">
-                        <InlineLocationCreator
-                          locations={allLocations()}
-                          initialName={suggestedBinName()}
-                          defaultParentId={col.parentId || ""}
-                          onCreated={handleLocationCreatedInline}
-                          onCancel={() => setAddingUnderParentId(null)}
-                        />
-                      </div>
+                          <For each={Array.from({ length: capacity() })}>
+                            {(_, i) => {
+                              const idx = i();
+                              const item = () => col.items.find((it) => it.index === idx);
+
+                              return (
+                                <Show
+                                  when={item()}
+                                  fallback={
+                                    <Show when={props.showInlineCreate !== false}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAddingUnderParentId(col.parentId || "root");
+                                          setAddingIndex(idx);
+                                        }}
+                                        class={`aspect-square w-full rounded border transition-colors flex items-center justify-center ${
+                                          addingUnderParentId() === (col.parentId || "root") && addingIndex() === idx
+                                            ? "border-accentCyan bg-accentCyan/20 text-accentCyan shadow-[0_0_10px_rgba(34,211,238,0.2)]"
+                                            : "border-dashed border-white/10 hover:border-accentCyan/50 hover:bg-accentCyan/10 text-gray-600 hover:text-accentCyan"
+                                        }`}
+                                        title={`Create Location at Grid Index ${idx}`}
+                                      >
+                                        <Plus size={10} />
+                                      </button>
+                                    </Show>
+                                  }
+                                >
+                                  {(loc) => {
+                                    const isSelected = selectedId() === loc().id;
+                                    const isPathSelected = millerPath().includes(loc().id);
+
+                                    return (
+                                      <div
+                                        onClick={() => handleSelectNode(loc(), colIdx())}
+                                        title={loc().name}
+                                        class={`aspect-square w-full rounded flex flex-col items-center justify-center transition-colors border p-1 relative cursor-pointer ${
+                                          isSelected
+                                            ? "bg-accentCyan/20 border-accentCyan/40 text-accentCyan font-bold shadow-[0_0_10px_rgba(34,211,238,0.2)]"
+                                            : isPathSelected
+                                            ? "bg-white/10 border-white/20 text-white font-semibold"
+                                            : "border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300"
+                                        }`}
+                                      >
+                                        <span class="break-words whitespace-normal line-clamp-3 text-[9px] w-full text-center leading-tight font-medium">
+                                          {loc().name}
+                                        </span>
+                                      </div>
+                                    );
+                                  }}
+                                </Show>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
+
+                    {/* Add Bin Inline under this column */}
+                    <Show when={props.showInlineCreate !== false}>
+                      <Show
+                        when={addingUnderParentId() === (col.parentId || "root")}
+                        fallback={
+                          <Show when={layoutType() === "default"}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddingUnderParentId(col.parentId || "root");
+                                setAddingIndex(col.items.length);
+                              }}
+                              class="w-full py-1.5 px-2 text-[11px] text-accentCyan hover:text-white bg-accentCyan/10 hover:bg-accentCyan/20 rounded-lg font-medium border border-accentCyan/20 transition-colors flex items-center justify-center gap-1 mt-1"
+                            >
+                              <Plus size={12} />
+                              Add Bin Here
+                            </button>
+                          </Show>
+                        }
+                      >
+                        <div class="mt-2">
+                          <InlineLocationCreator
+                            locations={allLocations()}
+                            initialName={suggestedBinName()}
+                            defaultParentId={col.parentId || ""}
+                            defaultIndex={addingIndex()}
+                            onCreated={handleLocationCreatedInline}
+                            onCancel={() => {
+                              setAddingUnderParentId(null);
+                              setAddingIndex(0);
+                            }}
+                          />
+                        </div>
+                      </Show>
                     </Show>
-                  </Show>
-                </div>
-              )}
+                  </div>
+                );
+              }}
             </For>
           </div>
         </div>

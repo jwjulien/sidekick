@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createEffect, For, Show } from "solid-js";
 import { Plus, X, FolderPlus } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import toast from "solid-toast";
@@ -7,15 +7,34 @@ interface InlineLocationCreatorProps {
   locations: any[];
   initialName?: string;
   defaultParentId?: string;
+  defaultIndex?: number;
   onCreated: (location: any) => void;
   onCancel?: () => void;
 }
 
 export default function InlineLocationCreator(props: InlineLocationCreatorProps) {
+  const isValidParent = (id?: string) => {
+    if (!id) return false;
+    return (props.locations || []).some((l) => String(l.id) === String(id));
+  };
+
+  const initialParentId = () => {
+    if (props.defaultParentId && isValidParent(props.defaultParentId)) {
+      return props.defaultParentId;
+    }
+    return "";
+  };
+
   const [name, setName] = createSignal(props.initialName || "");
-  const [parentId, setParentId] = createSignal(props.defaultParentId || "");
+  const [parentId, setParentId] = createSignal(initialParentId());
   const [description, setDescription] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
+
+  createEffect(() => {
+    if (props.defaultParentId !== undefined) {
+      setParentId(isValidParent(props.defaultParentId) ? props.defaultParentId : "");
+    }
+  });
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -29,7 +48,8 @@ export default function InlineLocationCreator(props: InlineLocationCreatorProps)
       const payload = {
         name: name().trim(),
         parent_id: parentId() || null,
-        description: description().trim() || null
+        description: description().trim() || null,
+        index: props.defaultIndex ?? 0
       };
 
       const newLoc = await apiFetch("/locations", {

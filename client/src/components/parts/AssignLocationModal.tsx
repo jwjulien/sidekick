@@ -67,7 +67,13 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
       props.onAssigned();
       props.onClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to assign location.");
+      if (err.message && err.message.includes("Part component not found")) {
+        toast.error("Part component not found in database. The list has been refreshed.");
+        props.onAssigned();
+        props.onClose();
+      } else {
+        toast.error(err.message || "Failed to assign location.");
+      }
     } finally {
       setSubmitting(false);
     }
