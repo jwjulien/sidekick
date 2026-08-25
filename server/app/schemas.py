@@ -338,6 +338,41 @@ class PartDetailsOut(PartOut):
 
     model_config = ConfigDict(from_attributes=True)
 
+# ----------------- Audit Log Schemas -----------------
+class AuditLogBase(BaseModel):
+    entity_type: str
+    entity_id: str
+    action_type: str
+    reason_code: Optional[str] = None
+    quantity_change: float = 0.0
+    previous_state: Optional[Dict[str, Any]] = None
+    new_state: Optional[Dict[str, Any]] = None
+    method: str = "manual"
+    notes: Optional[str] = None
+
+class AuditLogOut(AuditLogBase):
+    id: str
+    part_id: Optional[str] = None
+    location_id: Optional[str] = None
+    project_id: Optional[str] = None
+    user_id: Optional[str] = None
+    created_at: datetime
+
+    part_name: Optional[str] = None
+    part_number: Optional[str] = None
+    location_name: Optional[str] = None
+    project_name: Optional[str] = None
+    user_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AuditLogStatsOut(BaseModel):
+    total_events_30d: int
+    discrepancy_count_30d: int
+    scale_reconciliations_30d: int
+    reason_breakdown: Dict[str, int]
+    action_breakdown: Dict[str, int]
+
 # Self reference resolution for hierarchical category and storage
 CategoryDetailsOut = CategoryOut
 class CategoryDetailsOut(CategoryOut):
@@ -346,3 +381,4 @@ class CategoryDetailsOut(CategoryOut):
 
 CategoryDetailsOut.model_rebuild()
 StorageDetailsOut.model_rebuild()
+

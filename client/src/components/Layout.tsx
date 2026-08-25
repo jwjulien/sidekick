@@ -15,7 +15,8 @@ import {
   FolderGit2,
   Building2,
   MapPin,
-  PackageCheck
+  PackageCheck,
+  History
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 
@@ -59,12 +60,14 @@ export default function Layout(props: LayoutProps) {
     { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "Parts Catalog", path: "/parts", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Homeless Parts", path: "/inventory/homeless-parts", icon: PackageCheck, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "Audit Log", path: "/audit", icon: History, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },
     { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] },
     { name: "Storage Locations", path: "/storage", icon: MapPin, roles: ["admin", "designer", "stocker", "puller"] }
   ];
+
 
   // Helper check
   const hasAccess = (itemRoles: string[]) => {

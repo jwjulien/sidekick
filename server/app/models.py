@@ -211,3 +211,31 @@ class Transaction(Base):
 
     part = relationship("Part", back_populates="transactions")
     user = relationship("User", back_populates="transactions")
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid7()))
+    part_id = Column(String(36), ForeignKey("parts.id", ondelete="SET NULL"), nullable=True, index=True)
+    location_id = Column(String(36), ForeignKey("storage.id", ondelete="SET NULL"), nullable=True, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    entity_type = Column(String, nullable=False, index=True)  # part, storage_location, project, scale, cycle_count
+    entity_id = Column(String, nullable=False, index=True)
+    action_type = Column(String, nullable=False, index=True)  # create, check_in, check_out, count_update, relocation, tare_calibration, lost_tagged, found_tagged, homeless_assigned, bom_consumed
+    reason_code = Column(String, nullable=True, index=True)  # initial_stocking, supplier_receiving, assembly_build, cycle_count_adjustment, tare_drift, scrap_damage, triage, other
+
+    quantity_change = Column(Float, default=0.0)
+    previous_state = Column(JSON, nullable=True)
+    new_state = Column(JSON, nullable=True)
+    method = Column(String, default="manual")  # manual, scale, scanner, cycle_count, nfc, csv_import
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    part = relationship("Part")
+    user = relationship("User")
+    location = relationship("Storage")
+    project = relationship("Project")
+
+

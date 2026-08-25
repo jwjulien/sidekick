@@ -289,10 +289,15 @@ def touch_location(
     db.refresh(storage)
     return storage
 
+from .audit import log_audit_event
+
 class CountPayload(BaseModel):
     quantity: int
     last_tare_id: Optional[str] = None
     set_last_tare: bool = False
+    reason_code: Optional[str] = None
+    method: Optional[str] = "manual"
+    notes: Optional[str] = None
 
 @router.put("/{location_id}/count", response_model=schemas.StorageOut)
 def count_location(
@@ -311,6 +316,8 @@ def count_location(
         raise HTTPException(status_code=404, detail="Storage location not found.")
     if payload.quantity < 0:
         raise HTTPException(status_code=400, detail="Quantity cannot be negative.")
+    
+    prev_qty = float(storage.quantity or 0)
     storage.quantity = payload.quantity
     storage.last_counted = datetime.utcnow()
 
@@ -330,13 +337,30 @@ def count_location(
             user_id=current_user.id,
             action_type="count",
             quantity_change=payload.quantity,
-            notes=f"Count confirmed at '{storage.name}'."
+            notes=payload.notes or f"Count confirmed at '{storage.name}'."
         )
         db.add(db_tx)
+
+    log_audit_event(
+        db=db,
+        entity_type="storage_location",
+        entity_id=storage.id,
+        action_type="count_update",
+        user_id=current_user.id,
+        part_id=storage.part_id,
+        location_id=storage.id,
+        reason_code=payload.reason_code or "cycle_count_adjustment",
+        quantity_change=float(payload.quantity) - prev_qty,
+        previous_state={"quantity": prev_qty, "name": storage.name},
+        new_state={"quantity": payload.quantity, "name": storage.name},
+        method=payload.method or "manual",
+        notes=payload.notes or f"Count updated for '{storage.name}'."
+    )
 
     db.commit()
     db.refresh(storage)
     return storage
+
 
 
 class AssignPartPayload(BaseModel):

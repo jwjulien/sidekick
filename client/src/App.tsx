@@ -19,6 +19,7 @@ import Storage from "./pages/Storage";
 import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
 import Suppliers from "./pages/Suppliers";
+import AuditLog from "./pages/AuditLog";
 import Layout from "./components/Layout";
 import { Toaster } from "solid-toast";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -144,6 +145,16 @@ export default function App() {
             <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
               <Layout>
                 <Suppliers />
+              </Layout>
+            </Show>
+          )} 
+        />
+        <Route 
+          path="/audit" 
+          component={() => (
+            <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+              <Layout>
+                <AuditLog />
               </Layout>
             </Show>
           )} 
