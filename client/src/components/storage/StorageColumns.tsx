@@ -1,5 +1,5 @@
 import { createSignal, createEffect, on, For, Show } from "solid-js";
-import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X } from "lucide-solid";
+import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, Move } from "lucide-solid";
 import {
   DragDropProvider,
   DragDropSensors,
@@ -91,7 +91,9 @@ const SortableItem = (props: {
           <MapPin size={12} class={isActive() ? "text-accentCyan" : (isEmptyLeaf() ? "text-amber-400" : "text-gray-500")} />
           <span class="truncate">{props.item.name}</span>
           <Show when={hasChildren() && props.item.part_id}>
-            <AlertTriangle size={12} class="text-amber-400 shrink-0" title="Warning: Node has both child locations and an assigned part." />
+            <div title="Warning: Node has both child locations and an assigned part.">
+              <AlertTriangle size={12} class="text-amber-400 shrink-0" />
+            </div>
           </Show>
           <Show when={isEmptyLeaf()}>
             <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 font-mono" title="Dangling Location: Location has no sub-locations and no assigned part.">
@@ -120,6 +122,7 @@ export default function StorageColumns(props: {
   isCreating?: boolean;
   pickerMode?: boolean;
   onPickerSelect?: (parentId: string | null, index?: number) => void;
+  onMoveParts?: (location: any) => void;
 }) {
   const [filterText, setFilterText] = createSignal("");
 
@@ -257,6 +260,15 @@ export default function StorageColumns(props: {
                       <div class="px-4 py-2 bg-white/10 rounded-xl text-sm font-mono border border-white/20 text-gray-300">
                         Stock Qty: <span class="text-white font-bold text-base">{parentLoc()!.quantity}</span>
                       </div>
+                      <Show when={!props.pickerMode}>
+                        <button
+                          onClick={() => props.onMoveParts?.(parentLoc()!)}
+                          class="mt-2 btn-secondary text-xs flex items-center gap-1.5 px-3.5 py-2 bg-accentCyan/10 border-accentCyan/30 text-accentCyan hover:bg-accentCyan/20 transition-all rounded-xl font-semibold shadow-lg hover:shadow-accentCyan/10"
+                          title="Re-home or move parts stored at this location"
+                        >
+                          <Move size={14} /> Re-home Parts
+                        </button>
+                      </Show>
                       <Show when={props.pickerMode}>
                         <div class="mt-4 text-xs text-red-400 font-bold px-3 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
                           Cannot move into a location with parts

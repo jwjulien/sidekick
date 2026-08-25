@@ -31,6 +31,7 @@ import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
 import ScaleModal from "../components/ScaleModal";
 import PartWeightCalibrationModal from "../components/PartWeightCalibrationModal";
+import MovePartModal from "../components/storage/MovePartModal";
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -56,14 +57,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
 
   // Move Parts Dialog State
   const [showMoveModal, setShowMoveModal] = createSignal(false);
-  const [moveQuantity, setMoveQuantity] = createSignal(0);
-  const [moveDestMode, setMoveDestMode] = createSignal<"link" | "create">("link");
-  const [moveDestLocationId, setMoveDestLocationId] = createSignal("");
-  const [moveNewLocationName, setMoveNewLocationName] = createSignal("");
-  const [moveNewLocationParentId, setMoveNewLocationParentId] = createSignal("");
   const [moveSourceLocation, setMoveSourceLocation] = createSignal<any>(null);
-  const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(false);
-  const [movingParts, setMovingParts] = createSignal(false);
 
   // Scale Modal State
   const [showScaleModal, setShowScaleModal] = createSignal(false);
@@ -682,86 +676,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
     }
   };
 
-  const handleMoveParts = async (e: Event) => {
-    e.preventDefault();
-    const source = moveSourceLocation();
-    if (!source) return;
 
-    const qtyToMove = moveQuantity();
-    if (qtyToMove <= 0 || qtyToMove > source.quantity) {
-      toast.error("Invalid quantity to move.");
-      return;
-    }
-
-    setMoveSubmitting(true);
-    try {
-      let destId = 0;
-      if (moveDestMode() === "create") {
-        if (!moveNewLocationName()) {
-          toast.error("Please enter a destination location name.");
-          setMoveSubmitting(false);
-          return;
-        }
-        const parentIdVal = moveNewLocationParentId();
-        if (parentIdVal) {
-          await splitParentIfNeeded(parentIdVal);
-        }
-        const created = await apiFetch("/locations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: moveNewLocationName(),
-            parent_id: parentIdVal ? parentIdVal : null,
-            part_id: itemId,
-            quantity: 0
-          })
-        });
-        destId = created.id;
-      } else {
-        if (!moveDestLocationId()) {
-          toast.error("Please select a destination location.");
-          setMoveSubmitting(false);
-          return;
-        }
-        destId = moveDestLocationId();
-        await apiFetch(`/locations/${destId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ part_id: itemId })
-        });
-      }
-
-      const destDetails = await apiFetch(`/locations/${destId}`);
-      const destCurrentQty = destDetails.quantity || 0;
-
-      await apiFetch(`/locations/${destId}/count`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: destCurrentQty + qtyToMove })
-      });
-
-      const remainingQty = source.quantity - qtyToMove;
-      await apiFetch(`/locations/${source.id}/count`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: remainingQty })
-      });
-
-      if (remainingQty === 0 && deleteSourceAfterMove()) {
-        await apiFetch(`/locations/${source.id}`, { method: "DELETE" });
-      }
-
-      toast.success("Parts moved successfully.");
-      setShowMoveModal(false);
-      setDrillTarget(null);
-      fetchItemDetails();
-      fetchMetadata();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to move parts.");
-    } finally {
-      setMoveSubmitting(false);
-    }
-  };
 
   const handleDeleteLocation = async (loc: any) => {
     if (!loc) return;
@@ -1377,14 +1292,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                           <div class="flex items-center gap-1">
                             <button
                               onClick={() => {
-                                const rec = activeDrillSlot();
-                                setMoveSourceLocation(rec);
-                                setMoveQuantity(rec.quantity);
-                                setMoveDestMode("link");
-                                setMoveDestLocationId("");
-                                setMoveNewLocationName("");
-                                setMoveNewLocationParentId("");
-                                setDeleteSourceAfterMove(true);
+                                setMoveSourceLocation(activeDrillSlot());
                                 setShowMoveModal(true);
                               }}
                               disabled={activeDrillSlot()?.quantity === 0}
@@ -1762,175 +1670,18 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
       </Show>
 
       {/* ----------------- MOVE PARTS DIALOG MODAL ----------------- */}
-      <Show when={showMoveModal()}>
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative my-8">
-            <button
-              onClick={() => setShowMoveModal(false)}
-              class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-
-            <h3 class="text-lg font-bold text-white mb-2 uppercase tracking-wider">
-              Move Parts
-            </h3>
-            <p class="text-xs text-gray-400 mb-6">
-              Transfer units of <span class="text-white font-semibold">{item()?.value}</span> from <span class="text-white font-semibold">{moveSourceLocation()?.name}</span> to another storage location.
-            </p>
-
-            <form onSubmit={handleMoveParts} class="space-y-5 text-xs">
-              {/* Quantity Spinbox Selector */}
-              <div>
-                <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Quantity to Move</label>
-                <div class="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setMoveQuantity(prev => Math.max(1, prev - 1))}
-                    disabled={moveQuantity() <= 1}
-                    class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 flex items-center justify-center text-gray-300 hover:text-white transition-all disabled:opacity-40"
-                  >
-                    <Minus size={16} />
-                  </button>
-
-                  <input
-                    type="number"
-                    min="1"
-                    max={moveSourceLocation()?.quantity || 1}
-                    value={moveQuantity()}
-                    onInput={(e) => {
-                      const val = parseInt(e.currentTarget.value);
-                      if (!isNaN(val)) {
-                        setMoveQuantity(Math.max(1, Math.min(moveSourceLocation()?.quantity || 1, val)));
-                      }
-                    }}
-                    class="glass-input flex-grow text-center text-xl font-bold py-1.5"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setMoveQuantity(prev => Math.min(moveSourceLocation()?.quantity || 1, prev + 1))}
-                    disabled={moveQuantity() >= (moveSourceLocation()?.quantity || 1)}
-                    class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 flex items-center justify-center text-gray-300 hover:text-white transition-all disabled:opacity-40"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-                <span class="text-[10px] text-gray-500 mt-1 block text-right">Available: {moveSourceLocation()?.quantity || 0} units</span>
-              </div>
-              {/* Destination Mode Tabs */}
-              <div class="space-y-3">
-                <label class="block font-semibold text-gray-400 uppercase">Destination Location</label>
-                <div class="flex rounded-lg overflow-hidden border border-white/10 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setMoveDestMode("link")}
-                    disabled={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id).length === 0}
-                    class={`flex-1 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${moveDestMode() === "link" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
-                  >
-                    Combine Stock
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMoveDestMode("create")}
-                    class={`flex-1 py-1.5 transition-colors ${moveDestMode() === "create" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
-                  >
-                    Create New
-                  </button>
-                </div>
-
-                {/* Combine Stock / Quick Selects */}
-                <Show when={moveDestMode() === "link"}>
-                  <div class="space-y-2">
-                    <Show
-                      when={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id).length > 0}
-                      fallback={<p class="text-xs text-gray-500 italic">No other locations currently store this part. Use "Create New" to place stock in a new bin.</p>}
-                    >
-                      <div class="grid grid-cols-1 gap-2">
-                        <For each={item().storage_records?.filter((r: any) => r.id !== moveSourceLocation()?.id)}>
-                          {(loc: any) => (
-                            <button
-                              type="button"
-                              onClick={() => setMoveDestLocationId(String(loc.id))}
-                              class={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${moveDestLocationId() === String(loc.id)
-                                ? "bg-accentCyan/15 border-accentCyan text-white"
-                                : "bg-white/[0.02] border-white/5 hover:border-white/10 text-gray-300"
-                                }`}
-                            >
-                              <div class="flex items-center gap-2">
-                                <MapPin size={13} class={moveDestLocationId() === String(loc.id) ? "text-accentCyan" : "text-gray-500"} />
-                                <span class="text-xs font-semibold">{loc.name}</span>
-                              </div>
-                              <span class="text-xs font-bold text-cyan-400">{loc.quantity} units</span>
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  </div>
-                </Show>
-
-                {/* Create New */}
-                <Show when={moveDestMode() === "create"}>
-                  <div class="space-y-3">
-                    <input
-                      type="text"
-                      value={moveNewLocationName()}
-                      onInput={(e) => setMoveNewLocationName(e.currentTarget.value)}
-                      placeholder="Location name (e.g. Drawer B3)"
-                      class="glass-input w-full text-xs"
-                      required
-                    />
-                    <select
-                      value={moveNewLocationParentId()}
-                      onChange={(e) => setMoveNewLocationParentId(e.currentTarget.value)}
-                      class="glass-input w-full text-xs"
-                    >
-                      <option value="">No parent (top-level)</option>
-                      <For each={parentLocations()}>
-                        {(loc: any) => <option value={loc.id}>{loc.name}</option>}
-                      </For>
-                    </select>
-                  </div>
-                </Show>
-              </div>
-
-              {/* Conditional Delete Checkbox */}
-              <Show when={moveQuantity() === moveSourceLocation()?.quantity}>
-                <div class="flex items-center gap-2 pt-2">
-                  <input
-                    type="checkbox"
-                    id="delete-source-checkbox"
-                    checked={deleteSourceAfterMove()}
-                    onChange={(e) => setDeleteSourceAfterMove(e.currentTarget.checked)}
-                    class="rounded border-white/10 bg-white/5 text-accentCyan focus:ring-0 focus:ring-offset-0"
-                  />
-                  <label for="delete-source-checkbox" class="text-gray-300 select-none cursor-pointer">
-                    Delete source location from database (no parts remaining)
-                  </label>
-                </div>
-              </Show>
-
-              {/* Actions */}
-              <div class="flex gap-3 pt-4 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setShowMoveModal(false)}
-                  class="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={moveSubmitting()}
-                  class="btn-primary flex-1 disabled:opacity-50"
-                >
-                  {moveSubmitting() ? "Moving..." : "Confirm Move"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      <Show when={showMoveModal() && moveSourceLocation()}>
+        <MovePartModal
+          location={{ ...moveSourceLocation(), part: item() }}
+          allLocations={allLocations()}
+          onClose={() => setShowMoveModal(false)}
+          onMoved={() => {
+            setShowMoveModal(false);
+            setDrillTarget(null);
+            fetchItemDetails();
+            fetchMetadata();
+          }}
+        />
       </Show>
 
       {/* Add Image Modal */}

@@ -6,6 +6,7 @@ import LabelPreviewModal from "../components/LabelPreviewModal";
 import StorageColumns from "../components/storage/StorageColumns";
 import LocationEditModal from "../components/storage/LocationEditModal";
 import LocationMoveModal from "../components/storage/LocationMoveModal";
+import MovePartModal from "../components/storage/MovePartModal";
 import PartsBrowser from "../components/storage/PartsBrowser";
 import PartDetails from "./PartDetails";
 
@@ -25,6 +26,9 @@ export default function Storage() {
   
   // Move Location Modal State
   const [moveLocation, setMoveLocation] = createSignal<any | null>(null);
+
+  // Move Part Modal State (Re-home parts at location)
+  const [movePartLocation, setMovePartLocation] = createSignal<any | null>(null);
 
   // Navigation State
   const [activePath, setActivePath] = createSignal<string[]>([]);
@@ -237,6 +241,7 @@ export default function Storage() {
             creatingIndex={locIndex()}
             isCreating={showCreateForm()}
             onReorder={handleReorderLocation}
+            onMoveParts={(loc) => setMovePartLocation(loc)}
           />
         </div>
         
@@ -350,6 +355,19 @@ export default function Storage() {
               }
             }
             setMoveLocation(null);
+            loadData(true);
+          }}
+        />
+      </Show>
+
+      {/* Re-Home / Move Part Modal */}
+      <Show when={movePartLocation()}>
+        <MovePartModal
+          location={movePartLocation()}
+          allLocations={locations()}
+          onClose={() => setMovePartLocation(null)}
+          onMoved={() => {
+            setMovePartLocation(null);
             loadData(true);
           }}
         />
