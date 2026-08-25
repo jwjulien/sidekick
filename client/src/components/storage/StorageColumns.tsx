@@ -1,5 +1,5 @@
 import { createSignal, createEffect, on, For, Show } from "solid-js";
-import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, Move } from "lucide-solid";
+import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, Move, FolderMinus } from "lucide-solid";
 import {
   DragDropProvider,
   DragDropSensors,
@@ -123,6 +123,7 @@ export default function StorageColumns(props: {
   pickerMode?: boolean;
   onPickerSelect?: (parentId: string | null, index?: number) => void;
   onMoveParts?: (location: any) => void;
+  onCollapseToParent?: (childLocation: any, parentLocation: any) => void;
 }) {
   const [filterText, setFilterText] = createSignal("");
 
@@ -184,10 +185,10 @@ export default function StorageColumns(props: {
         <div ref={scrollRef} class="flex overflow-x-auto gap-4 pb-4 snap-x items-start">
           <For each={pathSteps()}>
             {(parentId) => {
-              const parentLoc = () => parentId ? props.locations.find(l => l.id === parentId) : null;
+              const parentLoc = () => parentId ? props.locations.find(l => String(l.id) === String(parentId)) : null;
               const title = () => parentLoc() ? parentLoc()!.name : "Root Locations";
               const items = () => props.locations
-                .filter(l => l.parent_id === parentId)
+                .filter(l => String(l.parent_id || "") === String(parentId || ""))
                 .sort((a, b) => a.index - b.index);
 
               const layoutType = () => {
@@ -268,6 +269,28 @@ export default function StorageColumns(props: {
                         >
                           <Move size={14} /> Re-home Parts
                         </button>
+                      </Show>
+
+                      <Show when={!props.pickerMode && parentLoc() && (() => {
+                        const loc = parentLoc();
+                        if (!loc || !loc.part_id || !loc.parent_id) return false;
+                        const childCount = props.locations.filter((l: any) => String(l.parent_id) === String(loc.id)).length;
+                        if (childCount > 0) return false;
+                        const siblingCount = props.locations.filter((l: any) => String(l.parent_id) === String(loc.parent_id)).length;
+                        return siblingCount === 1;
+                      })()}>
+                        {(() => {
+                          const pLoc = props.locations.find((l: any) => String(l.id) === String(parentLoc()?.parent_id));
+                          return pLoc ? (
+                            <button
+                              onClick={() => props.onCollapseToParent?.(parentLoc()!, pLoc)}
+                              class="mt-1 text-xs flex items-center gap-1.5 px-3.5 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all rounded-xl font-semibold shadow-lg hover:shadow-amber-500/10"
+                              title={`Promote part to '${pLoc.name}' and remove intermediate location '${parentLoc()?.name}'`}
+                            >
+                              <FolderMinus size={14} /> Promote to {pLoc.name}
+                            </button>
+                          ) : null;
+                        })()}
                       </Show>
                       <Show when={props.pickerMode}>
                         <div class="mt-4 text-xs text-red-400 font-bold px-3 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">

@@ -271,6 +271,79 @@ def patch_location(
     db.refresh(storage)
     return storage
 
+@router.post("/{location_id}/collapse", response_model=schemas.StorageOut)
+def collapse_location_to_parent(
+    location_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_stocker)
+):
+    """
+    Collapse an intermediate leaf location node into its parent container:
+    1. Promotes the assigned part and stock quantity to the parent location.
+    2. Removes the intermediate child location node.
+    Requires location_id to be a leaf node and the sole child of its parent.
+    """
+    child = db.query(models.Storage).filter(models.Storage.id == location_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Storage location not found.")
+
+    if not child.parent_id:
+        raise HTTPException(status_code=400, detail="Cannot collapse a root location.")
+
+    parent = db.query(models.Storage).filter(models.Storage.id == child.parent_id).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent storage location not found.")
+
+    has_sub_children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).first() is not None
+    if has_sub_children:
+        raise HTTPException(status_code=400, detail="Cannot collapse a location that contains sub-locations.")
+
+    siblings = db.query(models.Storage).filter(models.Storage.parent_id == child.parent_id).all()
+    if len(siblings) > 1:
+        raise HTTPException(status_code=400, detail="Cannot collapse a location that has sibling locations under the same parent.")
+
+    if not child.part_id:
+        raise HTTPException(status_code=400, detail="Location has no part assigned to promote.")
+
+    part_id = child.part_id
+    transferred_qty = child.quantity or 0
+    child_name = child.name
+    parent_name = parent.name
+
+    parent.part_id = part_id
+    parent.quantity = (parent.quantity or 0) + transferred_qty
+
+    if current_user:
+        db_tx = models.Transaction(
+            part_id=part_id,
+            user_id=current_user.id,
+            action_type="count",
+            quantity_change=transferred_qty,
+            notes=f"Promoted {transferred_qty} units from collapsed location '{child_name}' into '{parent_name}'."
+        )
+        db.add(db_tx)
+
+        log_audit_event(
+            db=db,
+            entity_type="storage_location",
+            entity_id=parent.id,
+            action_type="count_update",
+            user_id=current_user.id,
+            part_id=part_id,
+            location_id=parent.id,
+            reason_code="location_collapse",
+            quantity_change=float(transferred_qty),
+            previous_state={"quantity": (parent.quantity or 0) - transferred_qty, "name": parent_name},
+            new_state={"quantity": parent.quantity, "name": parent_name},
+            method="manual",
+            notes=f"Collapsed intermediate location '{child_name}' into '{parent_name}'."
+        )
+
+    db.delete(child)
+    db.commit()
+    db.refresh(parent)
+    return parent
+
 @router.put("/{location_id}/touch", response_model=schemas.StorageOut)
 def touch_location(
     location_id: str,

@@ -9,8 +9,10 @@ import LocationMoveModal from "../components/storage/LocationMoveModal";
 import MovePartModal from "../components/storage/MovePartModal";
 import PartsBrowser from "../components/storage/PartsBrowser";
 import PartDetails from "./PartDetails";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Storage() {
+  const { confirm } = useConfirm();
   const [locations, setLocations] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   
@@ -199,6 +201,48 @@ export default function Storage() {
     }
   };
 
+  const handleCollapseToParent = async (childLoc: any, parentLoc: any) => {
+    if (!childLoc || !childLoc.id || !parentLoc || !parentLoc.id) {
+      toast.error("Invalid storage location selected for promotion.");
+      return;
+    }
+
+    const childId = String(childLoc.id);
+    const parentId = String(parentLoc.id);
+    const partName = childLoc.part?.value || "part";
+
+    const isConfirmed = await confirm({
+      title: "Promote Part to Parent Container",
+      message: `Promote '${partName}' directly to '${parentLoc.name}' and remove intermediate location '${childLoc.name}'?`,
+      confirmText: "Promote & Clean Up",
+      type: "warning"
+    });
+    if (!isConfirmed) return;
+
+    try {
+      await apiFetch(`/locations/${childId}/collapse`, {
+        method: "POST"
+      });
+
+      toast.success(`Promoted '${partName}' to '${parentLoc.name}' and removed '${childLoc.name}'!`);
+
+      const freshLocs = await apiFetch("/locations?flat=true");
+      setLocations(freshLocs);
+
+      const parentChain = getAncestorChain(parentId, freshLocs);
+      setActivePath(parentChain);
+      updateUrlHistory(parentChain);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to promote part.");
+      try {
+        const freshLocs = await apiFetch("/locations?flat=true");
+        setLocations(freshLocs);
+        const parentChain = getAncestorChain(parentId, freshLocs);
+        setActivePath(parentChain);
+      } catch (_) {}
+    }
+  };
+
   const activeNode = () => {
     const path = activePath();
     if (path.length === 0) return null;
@@ -242,6 +286,7 @@ export default function Storage() {
             isCreating={showCreateForm()}
             onReorder={handleReorderLocation}
             onMoveParts={(loc) => setMovePartLocation(loc)}
+            onCollapseToParent={handleCollapseToParent}
           />
         </div>
         

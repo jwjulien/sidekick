@@ -86,3 +86,34 @@ def test_delete_location_zero_quantity_part():
     del_ok = client.delete(f"/locations/{loc_id}", headers=admin_headers)
     assert del_ok.status_code == 204
 
+def test_collapse_location_to_parent():
+    # 1. Create parent location (Grandparent / Drawer)
+    parent_res = client.post("/locations", json={"name": "Parent Drawer"}, headers=admin_headers)
+    assert parent_res.status_code == 201
+    parent_id = parent_res.json()["id"]
+
+    # 2. Create category and part
+    cat_res = client.post("/categories", json={"title": "Collapse Cat", "designator": "CC"}, headers=admin_headers)
+    cat_id = cat_res.json()["id"]
+
+    part_res = client.post("/parts", json={"category_id": cat_id, "value": "10k Res", "number": "RES-10K"}, headers=admin_headers)
+    part_id = part_res.json()["id"]
+
+    # 3. Create child location under parent with assigned part and quantity = 25
+    child_res = client.post("/locations", json={"name": "Divider A", "parent_id": parent_id, "part_id": part_id, "quantity": 25}, headers=admin_headers)
+    assert child_res.status_code == 201
+    child_id = child_res.json()["id"]
+
+    # 4. Perform collapse via POST /locations/{child_id}/collapse
+    collapse_res = client.post(f"/locations/{child_id}/collapse", headers=admin_headers)
+    assert collapse_res.status_code == 200
+    updated_parent = collapse_res.json()
+    assert updated_parent["id"] == parent_id
+    assert updated_parent["part_id"] == part_id
+    assert updated_parent["quantity"] == 25
+
+    # Verify child location was deleted
+    get_child = client.get(f"/locations/{child_id}", headers=admin_headers)
+    assert get_child.status_code == 404
+
+

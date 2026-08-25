@@ -77,29 +77,39 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   if (currentToken) {
     headers.set("Authorization", `Bearer ${currentToken}`);
   }
-  
-  const res = await fetch(url, {
-    ...options,
-    headers
-  });
-  
-  if (res.status === 401) {
-    // Session expired / invalid
-    logout();
-    throw new Error("Authentication session expired.");
+
+  if (options.body && typeof options.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
   
-  if (!res.ok) {
-    let errorDetail = "Server request failed.";
-    try {
-      const errJson = await res.json();
-      errorDetail = errJson.detail || errorDetail;
-    } catch (_) {}
-    throw new Error(errorDetail);
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers
+    });
+    
+    if (res.status === 401) {
+      logout();
+      throw new Error("Authentication session expired.");
+    }
+    
+    if (!res.ok) {
+      let errorDetail = "Server request failed.";
+      try {
+        const errJson = await res.json();
+        errorDetail = errJson.detail || errorDetail;
+      } catch (_) {}
+      throw new Error(errorDetail);
+    }
+    
+    if (res.status === 204) return null;
+    return res.json();
+  } catch (err: any) {
+    if (err.name === "TypeError" && err.message === "Failed to fetch") {
+      throw new Error(`Cannot connect to backend server at ${backendUrl()}. Check server status or CORS configuration.`);
+    }
+    throw err;
   }
-  
-  if (res.status === 204) return null;
-  return res.json();
 }
 
 // ----------------- Auth Operations -----------------

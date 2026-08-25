@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show } from "solid-js";
-import { X, Move, MapPin, Package, Minus, Plus, Trash2 } from "lucide-solid";
+import { X, Move, MapPin, Package, Minus, Plus, Trash2, FolderMinus } from "lucide-solid";
 import toast from "solid-toast";
 import { apiFetch } from "../../hooks/useAuth";
 import UniversalLocationSelector from "./UniversalLocationSelector";
@@ -27,6 +27,41 @@ export default function MovePartModal(props: MovePartModalProps) {
 
   const part = () => props.location?.part || null;
   const maxQty = () => props.location?.quantity || 1;
+
+  const parentLocationObj = () => {
+    const pId = props.location?.parent_id;
+    if (!pId || !props.allLocations) return null;
+    return props.allLocations.find((l: any) => String(l.id) === String(pId)) || null;
+  };
+
+  const isSoleChild = () => {
+    const p = parentLocationObj();
+    if (!p || !props.allLocations) return false;
+    const childCount = props.allLocations.filter((l: any) => String(l.parent_id) === String(props.location?.id)).length;
+    if (childCount > 0) return false;
+    const siblingCount = props.allLocations.filter((l: any) => String(l.parent_id) === String(p.id)).length;
+    return siblingCount === 1;
+  };
+
+  const handleQuickPromote = async () => {
+    const p = parentLocationObj();
+    const source = props.location;
+    if (!p || !source) return;
+
+    setSubmitting(true);
+    try {
+      await apiFetch(`/locations/${source.id}/collapse`, {
+        method: "POST"
+      });
+      toast.success(`Promoted to '${p.name}' and removed '${source.name}'!`);
+      props.onMoved();
+      props.onClose();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to promote part.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -213,6 +248,25 @@ export default function MovePartModal(props: MovePartModalProps) {
 
           {/* Target Location Selector */}
           <div class="space-y-2">
+            <Show when={isSoleChild() && parentLocationObj()}>
+              <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+                <div class="flex items-center gap-2">
+                  <FolderMinus size={16} class="text-amber-400 shrink-0" />
+                  <div>
+                    <span class="font-bold text-white">Single-Child Clean Up</span>
+                    <div class="text-[11px] text-amber-300">'{props.location?.name}' is the only child of '{parentLocationObj()?.name}'.</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleQuickPromote}
+                  class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold border border-amber-500/40 shrink-0 transition-colors"
+                >
+                  Promote to {parentLocationObj()?.name}
+                </button>
+              </div>
+            </Show>
+
             <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
               Select Target Location
             </label>
