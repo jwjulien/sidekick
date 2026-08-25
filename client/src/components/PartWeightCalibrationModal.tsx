@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, Show, untrack } from "solid-js";
 import { useScale } from "../context/ScaleContext";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -27,10 +27,22 @@ export default function PartWeightCalibrationModal(props: PartWeightCalibrationM
   const [calibrationCount, setCalibrationCount] = createSignal<number>(10);
   const [isSubmitting, setIsSubmitting] = createSignal<boolean>(false);
 
+  let autoConnectAttempted = false;
+
   // Auto connect if disconnected when modal opens
   createEffect(() => {
-    if (props.isOpen && scale.status() === "disconnected") {
-      scale.connect();
+    if (props.isOpen) {
+      const currentStatus = untrack(() => scale.status());
+      if (!autoConnectAttempted && currentStatus === "disconnected") {
+        autoConnectAttempted = true;
+        scale.connect().then((success) => {
+          if (!success && props.isOpen) {
+            props.onClose();
+          }
+        });
+      }
+    } else {
+      autoConnectAttempted = false;
     }
   });
 
@@ -122,7 +134,12 @@ export default function PartWeightCalibrationModal(props: PartWeightCalibrationM
                   Connect your scale or use Dev Simulator mode to calibrate.
                 </p>
                 <button
-                  onClick={() => scale.connect()}
+                  onClick={async () => {
+                    const success = await scale.connect();
+                    if (!success && props.isOpen) {
+                      props.onClose();
+                    }
+                  }}
                   class="px-4 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors inline-flex items-center gap-2"
                 >
                   <RefreshCw size={14} /> Connect Scale

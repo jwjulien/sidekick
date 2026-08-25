@@ -19,7 +19,7 @@ export interface ScaleContextType {
   tareOffset: () => number;
   mockMode: () => boolean;
   simulatedWeight: () => number;
-  connect: () => Promise<void>;
+  connect: () => Promise<boolean>;
   disconnect: () => void;
   tare: (customOffset?: number) => void;
   resetTare: () => void;
@@ -62,7 +62,9 @@ export function ScaleProvider(props: { children: JSX.Element }) {
     setIsStable(parsed.isStable);
   };
 
-  const connect = async () => {
+  const connect = async (): Promise<boolean> => {
+    if (status() === "connecting") return false;
+
     setErrorMessage(null);
     setStatus("connecting");
 
@@ -71,11 +73,13 @@ export function ScaleProvider(props: { children: JSX.Element }) {
       if (!navigator.bluetooth) {
         setMockMode(true);
       }
-      setTimeout(() => {
-        setStatus("connected");
-        setIsStable(true);
-      }, 600);
-      return;
+      return new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          setStatus("connected");
+          setIsStable(true);
+          resolve(true);
+        }, 600);
+      });
     }
 
     try {
@@ -108,6 +112,7 @@ export function ScaleProvider(props: { children: JSX.Element }) {
       );
 
       setStatus("connected");
+      return true;
     } catch (err: any) {
       console.warn("Bluetooth connection failed or cancelled:", err);
       // Fallback option for developer/browser testing: auto-switch to mock mode on error
@@ -118,6 +123,7 @@ export function ScaleProvider(props: { children: JSX.Element }) {
         setErrorMessage(err.message || "Failed to connect to BLE device.");
         setStatus("error");
       }
+      return false;
     }
   };
 

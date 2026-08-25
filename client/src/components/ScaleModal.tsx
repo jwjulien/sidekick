@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, Show, untrack } from "solid-js";
 import { useScale } from "../context/ScaleContext";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -32,6 +32,8 @@ export default function ScaleModal(props: ScaleModalProps) {
   const [tareWeights, setTareWeights] = createSignal<any[]>([]);
   const [selectedTareId, setSelectedTareId] = createSignal<string | null>(null);
 
+  let autoConnectAttempted = false;
+
   // Synchronize modal state on open & load container tare profiles
   createEffect(() => {
     if (props.isOpen) {
@@ -55,13 +57,15 @@ export default function ScaleModal(props: ScaleModalProps) {
         })
         .catch((err) => console.error("Failed to load tare weights:", err));
 
+      const currentStatus = untrack(() => scale.status());
       // Auto attempt connection if disconnected
-      if (scale.status() === "disconnected") {
+      if (!autoConnectAttempted && currentStatus === "disconnected") {
+        autoConnectAttempted = true;
         scale.connect();
       }
 
       // Check if scale connected & whether unit weight exists
-      if (scale.status() === "connected") {
+      if (currentStatus === "connected") {
         if (!props.part || !props.part.weight || props.part.weight <= 0) {
           setShowCalibrationModal(true);
         } else {
@@ -70,6 +74,8 @@ export default function ScaleModal(props: ScaleModalProps) {
       } else {
         setStep("connect");
       }
+    } else {
+      autoConnectAttempted = false;
     }
   });
 
