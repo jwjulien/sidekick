@@ -116,4 +116,52 @@ def test_collapse_location_to_parent():
     get_child = client.get(f"/locations/{child_id}", headers=admin_headers)
     assert get_child.status_code == 404
 
+def test_assign_part_to_occupied_location_splits_into_leaves():
+    # 1. Create category and two parts
+    cat_res = client.post("/categories", json={"title": "Split Cat", "designator": "SC"}, headers=admin_headers)
+    cat_id = cat_res.json()["id"]
+
+    part1_res = client.post("/parts", json={"category_id": cat_id, "value": "100uF Cap", "number": "CAP-100U"}, headers=admin_headers)
+    part1_id = part1_res.json()["id"]
+
+    part2_res = client.post("/parts", json={"category_id": cat_id, "value": "220uF Cap", "number": "CAP-220U"}, headers=admin_headers)
+    part2_id = part2_res.json()["id"]
+
+    # 2. Create location L with part1 assigned and quantity = 50
+    loc_res = client.post("/locations", json={"name": "Bin 1", "part_id": part1_id, "quantity": 50}, headers=admin_headers)
+    assert loc_res.status_code == 201
+    loc_id = loc_res.json()["id"]
+    assert loc_res.json()["part_id"] == part1_id
+    assert loc_res.json()["quantity"] == 50
+
+    # 3. Assign part2 to the occupied location L
+    assign_res = client.post("/locations/assign", json={"location_id": loc_id, "part_id": part2_id, "quantity": 15}, headers=admin_headers)
+    assert assign_res.status_code == 200
+    target = assign_res.json()
+
+    # Target storage should be a new sub-bin created under loc_id
+    assert target["parent_id"] == loc_id
+    assert target["part_id"] == part2_id
+    assert target["quantity"] == 15
+
+    # Parent location loc_id should now have part_id = None and quantity = 0
+    parent_check = client.get(f"/locations/{loc_id}", headers=admin_headers).json()
+    assert parent_check["part_id"] is None
+    assert parent_check["quantity"] == 0
+
+    # Fetch all children of loc_id to verify both sub-locations exist as leaves
+    all_locs = client.get("/locations?flat=true", headers=admin_headers).json()
+    children = [l for l in all_locs if l.get("parent_id") == loc_id]
+    assert len(children) == 2
+
+    # Check child 1 (Original Part)
+    orig_child = next(c for c in children if c["part_id"] == part1_id)
+    assert orig_child["name"] == "100uF Cap"
+    assert orig_child["quantity"] == 50
+
+    # Check child 2 (New Part)
+    new_child = next(c for c in children if c["part_id"] == part2_id)
+    assert new_child["name"] == "220uF Cap"
+    assert new_child["quantity"] == 15
+
 

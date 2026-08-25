@@ -29,7 +29,8 @@ def log_audit_event(
     previous_state: Optional[dict] = None,
     new_state: Optional[dict] = None,
     method: str = "manual",
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
+    commit: bool = True
 ) -> models.AuditLog:
     """
     Centralized service function to append an immutable AuditLog record to the SQLite ledger.
@@ -51,8 +52,9 @@ def log_audit_event(
         created_at=datetime.utcnow()
     )
     db.add(log_entry)
-    db.commit()
-    db.refresh(log_entry)
+    if commit:
+        db.commit()
+        db.refresh(log_entry)
     return log_entry
 
 def _enrich_log_out(log: models.AuditLog, db: Session) -> schemas.AuditLogOut:

@@ -211,6 +211,11 @@ def patch_location(
         part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
         if not part:
             raise HTTPException(status_code=404, detail="Part not found.")
+
+        # Verify storage location does not have child locations
+        has_children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).first() is not None
+        if has_children:
+            raise HTTPException(status_code=400, detail="Cannot assign a part to a location that contains child locations.")
         storage.part_id = payload.part_id
 
     if payload.name is not None:
@@ -309,10 +314,16 @@ def collapse_location_to_parent(
     transferred_qty = child.quantity or 0
     child_name = child.name
     parent_name = parent.name
+    prev_parent_qty = parent.quantity or 0
 
+    # 1. Update parent location
     parent.part_id = part_id
-    parent.quantity = (parent.quantity or 0) + transferred_qty
+    parent.quantity = prev_parent_qty + transferred_qty
 
+    # 2. Delete intermediate child location
+    db.delete(child)
+
+    # 3. Create transaction record and audit log
     if current_user:
         db_tx = models.Transaction(
             part_id=part_id,
@@ -333,13 +344,14 @@ def collapse_location_to_parent(
             location_id=parent.id,
             reason_code="location_collapse",
             quantity_change=float(transferred_qty),
-            previous_state={"quantity": (parent.quantity or 0) - transferred_qty, "name": parent_name},
+            previous_state={"quantity": prev_parent_qty, "name": parent_name},
             new_state={"quantity": parent.quantity, "name": parent_name},
             method="manual",
-            notes=f"Collapsed intermediate location '{child_name}' into '{parent_name}'."
+            notes=f"Collapsed intermediate location '{child_name}' into '{parent_name}'.",
+            commit=False
         )
 
-    db.delete(child)
+    # 4. Commit all changes atomically
     db.commit()
     db.refresh(parent)
     return parent
@@ -474,17 +486,37 @@ def assign_part_location(
             storage.quantity = payload.quantity
         target_storage = storage
     else:
-        # If bin already assigned to another component, create a sub-bin inside this location
-        target_storage = models.Storage(
+        # If target location already has a part assigned (PartOrig), split it into 2 child leaf sub-locations:
+        # Sub-location 1: PartOrig (with existing stock quantity)
+        # Sub-location 2: PartNew (with new quantity)
+        existing_part = db.query(models.Part).filter(models.Part.id == storage.part_id).first()
+        orig_name = existing_part.value if existing_part else "Original Part"
+        
+        orig_sub_bin = models.Storage(
+            name=orig_name,
+            parent_id=storage.id,
+            part_id=storage.part_id,
+            quantity=storage.quantity or 0,
+            description=f"Auto-split sub-location for {orig_name}"
+        )
+        db.add(orig_sub_bin)
+
+        # Clear parent container part_id and quantity so it remains a clean parent container node
+        storage.part_id = None
+        storage.quantity = 0
+
+        # Sub-location 2 for new part
+        new_sub_bin = models.Storage(
             name=f"{part.value}",
             parent_id=storage.id,
             part_id=part.id,
             quantity=payload.quantity or 0,
-            description=f"Assigned homeless part {part.value} ({part.number})"
+            description=f"Assigned part {part.value} ({part.number})"
         )
-        db.add(target_storage)
+        db.add(new_sub_bin)
         db.commit()
-        db.refresh(target_storage)
+        db.refresh(new_sub_bin)
+        target_storage = new_sub_bin
 
     db_tx = models.Transaction(
         part_id=part.id,
@@ -514,27 +546,37 @@ def bulk_assign_parts_location(
         raise HTTPException(status_code=404, detail="Target storage location not found.")
 
     assigned_count = 0
+
+    # If target container already has a part assigned (PartOrig), split PartOrig into a sub-location first
+    if location.part_id is not None:
+        existing_part = db.query(models.Part).filter(models.Part.id == location.part_id).first()
+        orig_name = existing_part.value if existing_part else "Original Part"
+        orig_sub_bin = models.Storage(
+            name=orig_name,
+            parent_id=location.id,
+            part_id=location.part_id,
+            quantity=location.quantity or 0,
+            description=f"Auto-split sub-location for {orig_name}"
+        )
+        db.add(orig_sub_bin)
+        location.part_id = None
+        location.quantity = 0
+
     for part_id in payload.part_ids:
         part = db.query(models.Part).filter(models.Part.id == part_id).first()
         if not part:
             continue
 
-        if location.part_id is None and assigned_count == 0:
-            location.part_id = part.id
-            if payload.quantity is not None and payload.quantity >= 0:
-                location.quantity = payload.quantity
-            target_storage = location
-        else:
-            sub_bin = models.Storage(
-                name=f"{part.value}",
-                parent_id=location.id,
-                part_id=part.id,
-                quantity=payload.quantity or (part.threshold or 0),
-                description=f"Batch assigned to '{location.name}'"
-            )
-            db.add(sub_bin)
-            db.flush()
-            target_storage = sub_bin
+        sub_bin = models.Storage(
+            name=f"{part.value}",
+            parent_id=location.id,
+            part_id=part.id,
+            quantity=payload.quantity or (part.threshold or 0),
+            description=f"Batch assigned to '{location.name}'"
+        )
+        db.add(sub_bin)
+        db.flush()
+        target_storage = sub_bin
 
         db_tx = models.Transaction(
             part_id=part.id,
