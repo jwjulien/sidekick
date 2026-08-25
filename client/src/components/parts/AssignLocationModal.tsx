@@ -74,16 +74,16 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
   };
 
   return (
-    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 border border-white/10 relative my-8 space-y-6">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+      <div class="glass-panel max-w-2xl w-full max-h-[90vh] rounded-2xl p-4 sm:p-6 border border-white/10 relative my-auto flex flex-col space-y-4 overflow-hidden shadow-2xl">
         {/* Header */}
-        <div class="flex items-start justify-between">
+        <div class="flex items-start justify-between shrink-0">
           <div>
-            <h3 class="text-xl font-bold text-white flex items-center gap-2">
+            <h3 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
               <MapPin class="text-accentCyan" size={22} />
               {isBulk() ? `Bulk Assign ${props.parts.length} Parts` : "Assign Storage Location"}
             </h3>
-            <p class="text-xs text-gray-400 mt-1">
+            <p class="text-xs text-gray-400 mt-0.5">
               Select or create a physical bin/container to triage unassigned components.
             </p>
           </div>
@@ -95,41 +95,42 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
           </button>
         </div>
 
-        {/* Selected Part(s) Summary */}
-        <div class="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-2">
-          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-            Target Component{isBulk() ? "s" : ""}
-          </span>
-          <Show
-            when={!isBulk()}
-            fallback={
-              <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                <For each={props.parts}>
-                  {(p) => (
-                    <span class="px-2.5 py-1 rounded-lg text-xs bg-accentCyan/10 text-accentCyan border border-accentCyan/20 flex items-center gap-1 font-semibold">
-                      <Package size={12} /> {p.value} ({p.number || p.package || "Part"})
-                    </span>
-                  )}
-                </For>
-              </div>
-            }
-          >
-            <div class="flex justify-between items-center text-sm">
-              <div class="flex flex-col">
-                <span class="font-bold text-white">{singlePart()?.value}</span>
-                <span class="text-xs text-gray-400 font-mono">
-                  {singlePart()?.number || singlePart()?.package || "No MPN"}
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} class="flex-1 overflow-y-auto space-y-4 pr-1">
+          {/* Selected Part(s) Summary */}
+          <div class="bg-black/30 p-3 rounded-xl border border-white/5 space-y-1.5 shrink-0">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Target Component{isBulk() ? "s" : ""}
+            </span>
+            <Show
+              when={!isBulk()}
+              fallback={
+                <div class="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                  <For each={props.parts}>
+                    {(p) => (
+                      <span class="px-2.5 py-1 rounded-lg text-xs bg-accentCyan/10 text-accentCyan border border-accentCyan/20 flex items-center gap-1 font-semibold">
+                        <Package size={12} /> {p.value} ({p.number || p.package || "Part"})
+                      </span>
+                    )}
+                  </For>
+                </div>
+              }
+            >
+              <div class="flex justify-between items-center text-xs sm:text-sm">
+                <div class="flex flex-col">
+                  <span class="font-bold text-white">{singlePart()?.value}</span>
+                  <span class="text-xs text-gray-400 font-mono">
+                    {singlePart()?.number || singlePart()?.package || "No MPN"}
+                  </span>
+                </div>
+                <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-accentCyan/10 text-accentCyan border border-accentCyan/20 font-semibold">
+                  Category: {singlePart()?.category?.title || singlePart()?.category?.name || "Uncategorized"}
                 </span>
               </div>
-              <span class="text-xs px-2.5 py-1 rounded-full bg-accentCyan/10 text-accentCyan border border-accentCyan/20 font-semibold">
-                Category: {singlePart()?.category?.title || singlePart()?.category?.name || "Uncategorized"}
-              </span>
-            </div>
-          </Show>
-        </div>
+            </Show>
+          </div>
 
-        {/* Universal Location Selector (Miller Columns + Search + Smart Naming) */}
-        <form onSubmit={handleSubmit} class="space-y-4">
+          {/* Universal Location Selector (Miller Columns + Search + Smart Naming) */}
           <UniversalLocationSelector
             selectedLocationId={selectedLocationId()}
             part={singlePart()}
@@ -139,9 +140,9 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
           />
 
           {/* Initial Stock Quantity Input */}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block text-[10px] font-semibold text-gray-400 mb-1.5 uppercase">
+              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase">
                 Initial Stock Quantity
               </label>
               <input
@@ -153,7 +154,7 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
               />
             </div>
             <div>
-              <label class="block text-[10px] font-semibold text-gray-400 mb-1.5 uppercase">
+              <label class="block text-[10px] font-semibold text-gray-400 mb-1 uppercase">
                 Audit Transaction Notes
               </label>
               <input
@@ -166,8 +167,8 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
             </div>
           </div>
 
-          {/* Actions */}
-          <div class="flex justify-end pt-4 border-t border-white/10 gap-3">
+          {/* Sticky/Fixed Actions Footer */}
+          <div class="flex justify-end pt-3 border-t border-white/10 gap-3 shrink-0">
             <button
               type="button"
               onClick={props.onClose}

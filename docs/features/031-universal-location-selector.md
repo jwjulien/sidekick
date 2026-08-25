@@ -1,6 +1,6 @@
 ---
 title: Universal Storage Location Selector Component
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows

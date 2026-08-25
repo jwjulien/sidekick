@@ -29,12 +29,26 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
 
   // Miller Columns path array of node IDs: [level0SelectedId, level1SelectedId, ...]
   const [millerPath, setMillerPath] = createSignal<string[]>([]);
+  let millerContainerRef: HTMLDivElement | undefined;
   
   // Inline creation state for Miller Column level or search
   const [addingUnderParentId, setAddingUnderParentId] = createSignal<string | null>(null);
 
   // Dynamic view mode: true when search input has text, false when empty (Miller Columns)
   const isSearching = createMemo(() => searchTerm().trim() !== "");
+
+  // Auto-scroll Miller Columns container to the right when path expands
+  createEffect(() => {
+    millerPath();
+    if (millerContainerRef) {
+      setTimeout(() => {
+        millerContainerRef?.scrollTo({
+          left: millerContainerRef.scrollWidth,
+          behavior: "smooth"
+        });
+      }, 50);
+    }
+  });
 
   // Sync prop changes for selectedLocationId
   createEffect(() => {
@@ -240,11 +254,11 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
 
       {/* VIEW 1: MILLER COLUMNS MODE (Active when search input is empty) */}
       <Show when={!loading() && !isSearching()}>
-        <div class="overflow-x-auto pb-2">
+        <div class="overflow-x-auto pb-2 scroll-smooth" ref={millerContainerRef}>
           <div class="flex items-start gap-3 min-w-max">
             <For each={millerColumns()}>
               {(col, colIdx) => (
-                <div class="w-64 bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col max-h-64 space-y-2 shrink-0">
+                <div class="w-56 sm:w-64 bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col max-h-52 sm:max-h-60 space-y-2 shrink-0">
                   <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 pb-1 border-b border-white/5">
                     <span class="truncate">
                       {col.parentId
