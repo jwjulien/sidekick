@@ -88,8 +88,8 @@ def delete_location(
     if has_children:
         raise HTTPException(status_code=400, detail="Cannot delete a location that contains child locations.")
         
-    if storage.part_id is not None:
-        raise HTTPException(status_code=400, detail="Cannot delete a location that has a part assigned.")
+    if storage.part_id is not None and (storage.quantity or 0) > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete a location that contains active part stock (quantity > 0).")
         
     db.delete(storage)
     db.commit()

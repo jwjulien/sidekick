@@ -23,6 +23,12 @@ export default function LocationEditModal(props: {
     return false;
   };
 
+  const cannotDeleteReason = () => {
+    if (hasChildren()) return "Cannot delete a location that contains child locations";
+    if (props.location?.part_id && (props.location?.quantity || 0) > 0) return "Cannot delete a location with active part stock (quantity > 0)";
+    return null;
+  };
+
   const [layoutType, setLayoutType] = createSignal(
     !props.location.dimensions ? "default" : (props.location.dimensions.length === 1 ? "linear" : "grid")
   );
@@ -134,10 +140,10 @@ export default function LocationEditModal(props: {
             <button type="button" onClick={() => props.onMove(props.location)} class="flex-1 bg-accentCyan/10 text-accentCyan hover:bg-accentCyan/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
               <MapPin size={16} /> Move
             </button>
-            <div title={hasChildren() ? "Cannot delete a location that contains child locations" : "Delete location"} class="flex-1">
+            <div title={cannotDeleteReason() || "Delete location"} class="flex-1">
               <button 
                 type="button" 
-                disabled={hasChildren()}
+                disabled={cannotDeleteReason() !== null}
                 onClick={() => props.onDelete(props.location.id)} 
                 class="w-full h-full bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors"
               >

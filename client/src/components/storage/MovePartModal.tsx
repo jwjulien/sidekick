@@ -220,6 +220,7 @@ export default function MovePartModal(props: MovePartModalProps) {
             <UniversalLocationSelector
               locations={props.allLocations}
               selectedLocationId={selectedTargetLocation()?.id || ""}
+              initialLocationId={props.location?.id}
               part={part()}
               onSelectLocation={(loc) => setSelectedTargetLocation(loc)}
               initialMode="miller"

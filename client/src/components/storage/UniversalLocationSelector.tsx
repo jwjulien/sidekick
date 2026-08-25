@@ -13,6 +13,7 @@ import InlineLocationCreator from "../parts/InlineLocationCreator";
 export interface UniversalLocationSelectorProps {
   locations?: any[];
   selectedLocationId?: string;
+  initialLocationId?: string;
   part?: any; // Optional part context for smart default location naming
   onSelectLocation: (location: any) => void;
   initialMode?: "miller" | "search";
@@ -68,13 +69,25 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     return chain;
   };
 
-  // Sync prop changes for selectedLocationId
+  // Track whether initial path has been set from initialLocationId
+  const [initialPathSet, setInitialPathSet] = createSignal(false);
+
+  // Sync prop changes for selectedLocationId or initialLocationId
   createEffect(() => {
+    const locs = allLocations();
+    if (locs.length === 0) return;
+
     if (props.selectedLocationId) {
       setSelectedId(props.selectedLocationId);
-      const chain = getAncestorChain(props.selectedLocationId, allLocations());
+      const chain = getAncestorChain(props.selectedLocationId, locs);
       if (chain.length > 0) {
         setMillerPath(chain);
+      }
+    } else if (props.initialLocationId && !initialPathSet()) {
+      const chain = getAncestorChain(props.initialLocationId, locs);
+      if (chain.length > 0) {
+        setMillerPath(chain);
+        setInitialPathSet(true);
       }
     }
   });
