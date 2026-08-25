@@ -1,8 +1,8 @@
 import { createSignal, onMount, For, Show } from "solid-js";
-import { X, MapPin, Search, Plus, CheckCircle, Package } from "lucide-solid";
+import { X, MapPin, Package } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import toast from "solid-toast";
-import InlineLocationCreator from "./InlineLocationCreator";
+import UniversalLocationSelector from "../storage/UniversalLocationSelector";
 
 interface AssignLocationModalProps {
   parts: any[];
@@ -11,56 +11,20 @@ interface AssignLocationModalProps {
 }
 
 export default function AssignLocationModal(props: AssignLocationModalProps) {
-  const [locations, setLocations] = createSignal<any[]>([]);
   const [selectedLocationId, setSelectedLocationId] = createSignal("");
-  const [searchLocation, setSearchLocation] = createSignal("");
   const [quantity, setQuantity] = createSignal(1);
   const [notes, setNotes] = createSignal("");
-  const [showInlineCreate, setShowInlineCreate] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
-  const [loadingLocs, setLoadingLocs] = createSignal(true);
 
   const isBulk = () => props.parts.length > 1;
   const singlePart = () => (props.parts.length === 1 ? props.parts[0] : null);
 
-  const fetchLocations = async () => {
-    setLoadingLocs(true);
-    try {
-      const data = await apiFetch("/locations?flat=true");
-      setLocations(data || []);
-      
-      // Default quantity for single part
-      const p = singlePart();
-      if (p) {
-        setQuantity(p.threshold && p.threshold > 0 ? p.threshold : 1);
-      }
-    } catch (err) {
-      console.error("Failed to fetch locations:", err);
-      toast.error("Failed to load storage locations.");
-    } finally {
-      setLoadingLocs(false);
-    }
-  };
-
   onMount(() => {
-    fetchLocations();
+    const p = singlePart();
+    if (p) {
+      setQuantity(p.threshold && p.threshold > 0 ? p.threshold : 1);
+    }
   });
-
-  const filteredLocations = () => {
-    const term = searchLocation().trim().toLowerCase();
-    if (!term) return locations();
-    return locations().filter(
-      (l) =>
-        l.name.toLowerCase().includes(term) ||
-        (l.description && l.description.toLowerCase().includes(term))
-    );
-  };
-
-  const handleLocationCreatedInline = (newLoc: any) => {
-    setLocations([...locations(), newLoc]);
-    setSelectedLocationId(newLoc.id);
-    setShowInlineCreate(false);
-  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -111,7 +75,7 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
 
   return (
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div class="glass-panel max-w-xl w-full rounded-2xl p-6 border border-white/10 relative my-8 space-y-6">
+      <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 border border-white/10 relative my-8 space-y-6">
         {/* Header */}
         <div class="flex items-start justify-between">
           <div>
@@ -164,97 +128,15 @@ export default function AssignLocationModal(props: AssignLocationModalProps) {
           </Show>
         </div>
 
-        {/* Location Selection & Form */}
+        {/* Universal Location Selector (Miller Columns + Search + Smart Naming) */}
         <form onSubmit={handleSubmit} class="space-y-4">
-          <div>
-            <div class="flex justify-between items-center mb-1.5">
-              <label class="block text-[10px] font-semibold text-gray-400 uppercase">
-                Destination Storage Location *
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowInlineCreate(!showInlineCreate())}
-                class="text-xs text-accentCyan hover:text-white flex items-center gap-1 font-medium"
-              >
-                <Plus size={14} />
-                {showInlineCreate() ? "Hide New Bin Form" : "Create Bin Inline"}
-              </button>
-            </div>
-
-            {/* Inline Location Creator Form */}
-            <Show when={showInlineCreate()}>
-              <div class="mb-4">
-                <InlineLocationCreator
-                  locations={locations()}
-                  onCreated={handleLocationCreatedInline}
-                  onCancel={() => setShowInlineCreate(false)}
-                />
-              </div>
-            </Show>
-
-            {/* Search Location Input & Dropdown */}
-            <Show when={!showInlineCreate()}>
-              <div class="space-y-2">
-                <div class="relative">
-                  <Search size={16} class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search locations by name..."
-                    value={searchLocation()}
-                    onInput={(e) => setSearchLocation(e.currentTarget.value)}
-                    class="glass-input w-full !pl-11 text-xs"
-                  />
-                </div>
-
-                <Show when={loadingLocs()}>
-                  <div class="py-6 flex items-center justify-center">
-                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-accentCyan"></div>
-                  </div>
-                </Show>
-
-                <Show when={!loadingLocs()}>
-                  <div class="max-h-48 overflow-y-auto space-y-1 pr-1 bg-black/20 p-2 rounded-xl border border-white/5">
-                    <Show
-                      when={filteredLocations().length > 0}
-                      fallback={
-                        <div class="p-4 text-center text-xs text-gray-500">
-                          No matching storage locations found.
-                        </div>
-                      }
-                    >
-                      <For each={filteredLocations()}>
-                        {(loc) => (
-                          <div
-                            onClick={() => setSelectedLocationId(loc.id)}
-                            class={`p-2.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors ${
-                              selectedLocationId() === loc.id
-                                ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/40 font-bold"
-                                : "hover:bg-white/5 text-gray-300 border border-transparent"
-                            }`}
-                          >
-                            <div class="flex items-center gap-2">
-                              <MapPin size={14} class="shrink-0 text-accentCyan" />
-                              <div class="flex flex-col">
-                                <span>{loc.name}</span>
-                                <Show when={loc.description}>
-                                  <span class="text-[10px] text-gray-500 font-normal">
-                                    {loc.description}
-                                  </span>
-                                </Show>
-                              </div>
-                            </div>
-                            <Show when={selectedLocationId() === loc.id}>
-                              <CheckCircle size={16} class="text-accentCyan" />
-                            </Show>
-                          </div>
-                        )}
-                      </For>
-                    </Show>
-                  </div>
-                </Show>
-              </div>
-            </Show>
-          </div>
+          <UniversalLocationSelector
+            selectedLocationId={selectedLocationId()}
+            part={singlePart()}
+            onSelectLocation={(loc) => setSelectedLocationId(loc.id)}
+            initialMode="miller"
+            showInlineCreate={true}
+          />
 
           {/* Initial Stock Quantity Input */}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

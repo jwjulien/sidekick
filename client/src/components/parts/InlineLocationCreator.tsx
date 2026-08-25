@@ -5,13 +5,15 @@ import toast from "solid-toast";
 
 interface InlineLocationCreatorProps {
   locations: any[];
+  initialName?: string;
+  defaultParentId?: string;
   onCreated: (location: any) => void;
   onCancel?: () => void;
 }
 
 export default function InlineLocationCreator(props: InlineLocationCreatorProps) {
-  const [name, setName] = createSignal("");
-  const [parentId, setParentId] = createSignal("");
+  const [name, setName] = createSignal(props.initialName || "");
+  const [parentId, setParentId] = createSignal(props.defaultParentId || "");
   const [description, setDescription] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
 
