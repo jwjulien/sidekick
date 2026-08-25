@@ -202,7 +202,7 @@ export default function Storage() {
   };
 
   return (
-    <div class="space-y-6 h-[calc(100vh-100px)] flex flex-col">
+    <div class="space-y-6 flex flex-col">
       {/* Page Header */}
       <div>
         <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function Storage() {
 
       <Show when={!loading()}>
         {/* Top: Miller Columns */}
-        <div class="h-[400px] shrink-0 overflow-hidden relative">
+        <div class="relative w-full">
           <StorageColumns 
             locations={locations()} 
             activePath={activePath()}
@@ -283,7 +283,7 @@ export default function Storage() {
         </Show>
 
         {/* Bottom: Aggregated Parts Browser or Inline Details */}
-        <div class="flex-1 overflow-y-auto">
+        <div class="w-full">
           <Show when={activeNode() && !inlinePartId()}>
             <PartsBrowser 
               locationId={activeNode().id}

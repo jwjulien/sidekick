@@ -81,10 +81,10 @@ const SortableItem = (props: {
       <button
         onClick={() => props.onSelect(props.item.id)}
         class={`w-full text-left pl-6 pr-2 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${isActive()
-            ? 'bg-accentCyan/20 border border-accentCyan/30 text-white'
-            : isEmptyLeaf()
-              ? 'bg-amber-500/10 border border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-              : 'hover:bg-white/5 text-gray-300'
+          ? 'bg-accentCyan/20 border border-accentCyan/30 text-white'
+          : isEmptyLeaf()
+            ? 'bg-amber-500/10 border border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+            : 'hover:bg-white/5 text-gray-300'
           }`}
       >
         <div class="flex items-center gap-2 truncate">
@@ -144,7 +144,7 @@ export default function StorageColumns(props: {
   }));
 
   return (
-    <div class="flex flex-col h-full gap-3">
+    <div class="flex flex-col gap-3">
       <style>{`
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(30px); }
@@ -178,7 +178,7 @@ export default function StorageColumns(props: {
 
       {/* View Switcher: Global Search List vs. Miller Columns */}
       <Show when={filterText().trim() !== ""} fallback={
-        <div ref={scrollRef} class="flex overflow-x-auto gap-4 pb-4 snap-x h-full flex-1">
+        <div ref={scrollRef} class="flex overflow-x-auto gap-4 pb-4 snap-x items-start">
           <For each={pathSteps()}>
             {(parentId) => {
               const parentLoc = () => parentId ? props.locations.find(l => l.id === parentId) : null;
@@ -206,7 +206,7 @@ export default function StorageColumns(props: {
 
               return (
                 <div
-                  class="flex-shrink-0 glass-panel border border-white/10 rounded-xl overflow-hidden snap-start flex flex-col h-[500px] animate-slide-in"
+                  class="flex-shrink-0 glass-panel border border-white/10 rounded-xl overflow-hidden snap-start flex flex-col min-h-[260px] h-fit animate-slide-in"
                   style={{ width: `${colWidth()}px`, "min-width": `${colWidth()}px` }}
                 >
                   <div class="p-3 bg-white/5 border-b border-white/10 flex justify-between items-start text-white">
@@ -268,10 +268,12 @@ export default function StorageColumns(props: {
                   <Show when={layoutType() === "default" && !parentLoc()?.part_id}>
                     <DragDropProvider
                       onDragEnd={(event) => {
-                        if (event.droppable && event.draggable && event.droppable.id !== event.draggable.id) {
+                        const droppable = event.droppable;
+                        const draggable = event.draggable;
+                        if (droppable && draggable && droppable.id !== draggable.id) {
                           const currentItems = items();
-                          const oldIndex = currentItems.findIndex(i => i.id === event.draggable.id);
-                          const newIndex = currentItems.findIndex(i => i.id === event.droppable.id);
+                          const oldIndex = currentItems.findIndex(i => i.id === draggable.id);
+                          const newIndex = currentItems.findIndex(i => i.id === droppable.id);
                           if (oldIndex !== -1 && newIndex !== -1) {
                             const newItems = [...currentItems];
                             const [moved] = newItems.splice(oldIndex, 1);
@@ -287,7 +289,7 @@ export default function StorageColumns(props: {
                       collisionDetector={closestCenter}
                     >
                       <DragDropSensors />
-                      <div class="p-2 overflow-y-auto flex-1 space-y-1">
+                      <div class="p-2 space-y-1">
                         <SortableProvider ids={items().map(i => i.id)}>
                           <For each={items()}>
                             {(item) => (
@@ -316,7 +318,7 @@ export default function StorageColumns(props: {
                   </Show>
 
                   <Show when={layoutType() === "linear" && !parentLoc()?.part_id}>
-                    <div class="p-2 overflow-y-auto flex-1 flex flex-col gap-1">
+                    <div class="p-2 flex flex-col gap-1">
                       <For each={Array.from({ length: capacity() })}>
                         {(_, i) => {
                           const idx = i();
@@ -358,10 +360,10 @@ export default function StorageColumns(props: {
                                   <button
                                     onClick={() => props.onSelect(loc().id)}
                                     class={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-colors border ${isActive()
-                                        ? 'bg-accentCyan/20 border-accentCyan/30 text-white'
-                                        : isEmptyLeaf()
-                                          ? 'bg-amber-500/10 border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                                          : 'border-transparent hover:bg-white/5 text-gray-300'
+                                      ? 'bg-accentCyan/20 border-accentCyan/30 text-white'
+                                      : isEmptyLeaf()
+                                        ? 'bg-amber-500/10 border-dashed border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                                        : 'border-transparent hover:bg-white/5 text-gray-300'
                                       }`}
                                   >
                                     <div class="flex items-center gap-2 truncate">
@@ -388,7 +390,7 @@ export default function StorageColumns(props: {
 
                   <Show when={layoutType() === "grid" && !parentLoc()?.part_id}>
                     <div
-                      class="p-2 overflow-y-auto flex-1 grid gap-1"
+                      class="p-2 grid gap-1"
                       style={{ "grid-template-columns": `repeat(${dims()[0]}, minmax(0, 1fr))` }}
                     >
                       <For each={Array.from({ length: capacity() })}>
@@ -432,10 +434,10 @@ export default function StorageColumns(props: {
                                     onClick={() => props.onSelect(loc().id)}
                                     title={isEmptyLeaf() ? `${loc().name} (Dangling Location: No sub-locations or assigned part)` : loc().name}
                                     class={`aspect-square w-full rounded flex flex-col items-center justify-center transition-colors border p-1 relative ${isActive()
-                                        ? 'bg-accentCyan/20 border-accentCyan/30 text-white shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                                        : isEmptyLeaf()
-                                          ? 'bg-amber-500/10 border-dashed border-amber-500/40 text-amber-300 hover:bg-amber-500/20'
-                                          : 'border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300'
+                                      ? 'bg-accentCyan/20 border-accentCyan/30 text-white shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                                      : isEmptyLeaf()
+                                        ? 'bg-amber-500/10 border-dashed border-amber-500/40 text-amber-300 hover:bg-amber-500/20'
+                                        : 'border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 text-gray-300'
                                       }`}
                                   >
                                     <span class="break-words whitespace-normal line-clamp-3 text-[9px] w-full text-center leading-tight font-medium">{loc().name}</span>
@@ -459,7 +461,7 @@ export default function StorageColumns(props: {
         </div>
       }>
         {/* Global Search Results Panel */}
-        <div class="glass-panel border border-white/10 rounded-xl p-4 flex-1 overflow-y-auto space-y-2 max-h-[380px]">
+        <div class="glass-panel border border-white/10 rounded-xl p-4 space-y-2">
           <div class="text-xs text-gray-400 font-semibold mb-3 flex items-center justify-between">
             <span>Matching Locations for "{filterText()}"</span>
             <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 font-mono text-[10px]">

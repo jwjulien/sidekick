@@ -98,7 +98,7 @@ export default function LocationMoveModal(props: {
             Navigate to the new parent location for <span class="font-bold text-white">{props.location.name}</span>. Click an empty slot to complete the move!
           </p>
           
-          <div class="flex-1 overflow-hidden relative">
+          <div class="flex-1 overflow-auto relative">
             <StorageColumns 
               locations={validLocations()} 
               activePath={movePath()} 
