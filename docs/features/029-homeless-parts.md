@@ -1,6 +1,6 @@
 ---
 title: Homeless Parts Browsing & Organization
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -50,8 +50,8 @@ This feature introduces a dedicated view and workflow ("Homeless Parts Browser &
 * **Backend (FastAPI):** 
   * `GET /api/parts/homeless` - Retrieves all parts where `id NOT IN (SELECT part_id FROM storage WHERE part_id IS NOT NULL)` (with search, category filter, and pagination).
   * `GET /api/parts/homeless/count` - Returns the total count of unassigned parts for UI badges.
-  * `POST /api/storage/assign` - Transactionally assigns a `part_id` to a target `storage_id` with a specified `quantity`.
-  * `POST /api/storage/bulk-assign` - Transactionally assigns multiple `part_ids` to a specified location or set of locations.
+  * `POST /api/locations/assign` - Transactionally assigns a `part_id` to a target `storage_id` with a specified `quantity`.
+  * `POST /api/locations/bulk-assign` - Transactionally assigns multiple `part_ids` to a specified location or set of locations.
 * **Database Schema:** 
   * Utilizes existing `Part`, `Storage`, and `Transaction` models in SQLAlchemy ([`server/app/models.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/models.py)).
   * Add database index on `Storage.part_id` to optimize unassigned part queries.
@@ -65,11 +65,11 @@ This feature introduces a dedicated view and workflow ("Homeless Parts Browser &
 ---
 
 ## 5. Implementation Tasks
-- [ ] Add `GET /api/parts/homeless` and `GET /api/parts/homeless/count` endpoints in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py).
-- [ ] Add transactional assignment endpoints (`POST /api/storage/assign` and `POST /api/storage/bulk-assign`) in [`server/app/routers/locations.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/locations.py).
-- [ ] Add DB index on `storage.part_id` for fast unassigned part filtering.
-- [ ] Create `client/src/pages/HomelessParts.tsx` view with search, filtering, and bulk selection.
-- [ ] Create `AssignLocationModal.tsx` component with location search tree and inline bin creation.
-- [ ] Add "Homeless Parts" badge counter to main navigation sidebar and dashboard summary.
-- [ ] Integrate barcode scanner event listener on the Homeless Parts view to support scan-to-assign on mobile.
-- [ ] Write unit tests for API endpoints (`test_homeless_parts.py`).
+- [x] Add `GET /api/parts/homeless` and `GET /api/parts/homeless/count` endpoints in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py).
+- [x] Add transactional assignment endpoints (`POST /api/locations/assign` and `POST /api/locations/bulk-assign`) in [`server/app/routers/locations.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/locations.py).
+- [x] Add DB index on `storage.part_id` for fast unassigned part filtering.
+- [x] Create `client/src/pages/HomelessParts.tsx` view with search, filtering, and bulk selection.
+- [x] Create `AssignLocationModal.tsx` component with location search tree and inline bin creation.
+- [x] Add "Homeless Parts" badge counter to main navigation sidebar and dashboard summary.
+- [x] Integrate barcode scanner event listener on the Homeless Parts view to support scan-to-assign on mobile.
+- [x] Write unit tests for API endpoints (`test_homeless_parts.py`).
