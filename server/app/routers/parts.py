@@ -13,9 +13,13 @@ router = APIRouter(prefix="/parts", tags=["parts"])
 def get_parts(
     request: Request,
     q: Optional[str] = Query(None, description="Search term for part value, number, package, or notes"),
-    category_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None, description="Search term alias"),
+    category_id: Optional[str] = Query(None),
     location_id: Optional[str] = Query(None),
+    is_unassigned: Optional[bool] = Query(None),
     low_stock: Optional[bool] = Query(None, description="Filter parts falling below alert threshold"),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query("asc"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -25,12 +29,13 @@ def get_parts(
     """
     query = db.query(models.Part)
     
-    if q:
+    term = search or q
+    if term:
         search_filter = or_(
-            models.Part.value.ilike(f"%{q}%"),
-            models.Part.number.ilike(f"%{q}%"),
-            models.Part.package.ilike(f"%{q}%"),
-            models.Part.notes.ilike(f"%{q}%")
+            models.Part.value.ilike(f"%{term}%"),
+            models.Part.number.ilike(f"%{term}%"),
+            models.Part.package.ilike(f"%{term}%"),
+            models.Part.notes.ilike(f"%{term}%")
         )
         query = query.filter(search_filter)
         

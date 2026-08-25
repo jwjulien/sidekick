@@ -1,6 +1,6 @@
 ---
 title: Universal Parts Browser & Filter Engine
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -90,5 +90,5 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
 - [x] Build [`client/src/components/parts/UniversalPartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/parts/UniversalPartsBrowser.tsx) accepting an optional `parts` input property, supporting `table`, `grid`, and `picker` layout modes, live multi-term search, category filtering, low-stock toggles, and column sorting.
 - [x] Refactor [`client/src/pages/Parts.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Parts.tsx) to use the new `UniversalPartsBrowser` component.
 - [x] Refactor [`client/src/components/storage/PartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/storage/PartsBrowser.tsx) in [`Storage.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Storage.tsx) to leverage `UniversalPartsBrowser` with location scoping.
-- [ ] Integrate `UniversalPartsBrowser` into the Homeless Parts view ([`029-homeless-parts.md`](file:///c:/Hobbies/Inventory/Sidekick/docs/features/029-homeless-parts.md)).
-- [ ] Write unit tests for enhanced `GET /api/parts` query parameters in `server/tests/test_parts_browser.py`.
+- [x] Integrate `UniversalPartsBrowser` into the Homeless Parts view ([`029-homeless-parts.md`](file:///c:/Hobbies/Inventory/Sidekick/docs/features/029-homeless-parts.md)).
+- [x] Write unit tests for enhanced `GET /api/parts` query parameters in `server/tests/test_parts_browser.py`.
