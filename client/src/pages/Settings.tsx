@@ -16,6 +16,7 @@ export default function Settings() {
   const [localClientId, setLocalClientId] = createSignal(oidcClientId());
   
   const [seeding, setSeeding] = createSignal(false);
+  const [savingReference, setSavingReference] = createSignal(false);
   const [seedResult, setSeedResult] = createSignal<string | null>(null);
   
   const [users, setUsers] = createSignal<any[]>([]);
@@ -46,15 +47,49 @@ export default function Settings() {
     toast.success("Connection configurations saved successfully! Please refresh or re-login if you modified modes.");
   };
 
-  const handleSeedDatabase = async () => {
+  const handleRestoreReferenceDatabase = async () => {
     setSeeding(true);
     setSeedResult(null);
     try {
-      const res = await apiFetch("/dev/seed", { method: "POST" });
-      setSeedResult(res.message || "Seeding complete!");
+      const res = await apiFetch("/dev/seed?mode=reference", { method: "POST" });
+      setSeedResult(res.message || "Reference database restored successfully!");
+      toast.success("Reference database restored successfully!");
       fetchUsers();
     } catch (err: any) {
       setSeedResult(`Error: ${err.message}`);
+      toast.error(`Restoration failed: ${err.message}`);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const handleSaveCurrentAsReference = async () => {
+    setSavingReference(true);
+    setSeedResult(null);
+    try {
+      const res = await apiFetch("/dev/seed/save-reference", { method: "POST" });
+      setSeedResult(res.message || "Reference seed dataset updated!");
+      toast.success("Current database captured as reference seed dataset!");
+    } catch (err: any) {
+      setSeedResult(`Error: ${err.message}`);
+      toast.error(`Save failed: ${err.message}`);
+    } finally {
+      setSavingReference(false);
+    }
+  };
+
+  const handleSeedMockDatabase = async () => {
+    if (!confirm("Are you sure you want to replace your database with synthetic 3-part test data?")) return;
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const res = await apiFetch("/dev/seed?mode=mock", { method: "POST" });
+      setSeedResult(res.message || "Synthetic mock seeding complete!");
+      toast.success("Synthetic mock data seeded.");
+      fetchUsers();
+    } catch (err: any) {
+      setSeedResult(`Error: ${err.message}`);
+      toast.error(`Seeding failed: ${err.message}`);
     } finally {
       setSeeding(false);
     }
@@ -159,12 +194,12 @@ export default function Settings() {
         <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
           <h3 class="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-3">
             <RefreshCw size={18} class="text-accentPurple" />
-            Sandbox Seeding Utility
+            Database Reference & Seeding Utilities
           </h3>
           
           <div class="space-y-4">
             <p class="text-gray-400 text-sm leading-relaxed">
-              If running in Developer Sandbox mode, you can recreate database tables and inject a mock set of categories, nested locations, custom fields, items, and log records.
+              Manage your reference dataset snapshots and sandbox environments.
             </p>
             
             <Show when={seedResult()}>
@@ -176,17 +211,39 @@ export default function Settings() {
                 {seedResult()}
               </div>
             </Show>
+
+            <div class="space-y-3">
+              <button
+                onClick={handleRestoreReferenceDatabase}
+                disabled={seeding() || savingReference()}
+                class="btn-primary w-full flex items-center justify-center gap-2 py-3"
+              >
+                <RefreshCw size={16} class={seeding() ? "animate-spin" : ""} />
+                {seeding() ? "Restoring..." : "Restore Full Reference Database"}
+              </button>
+
+              <button
+                onClick={handleSaveCurrentAsReference}
+                disabled={seeding() || savingReference()}
+                class="btn-secondary w-full flex items-center justify-center gap-2 py-2.5 text-xs"
+              >
+                <RefreshCw size={14} class={savingReference() ? "animate-spin" : ""} />
+                {savingReference() ? "Saving Snapshot..." : "Save Current Database as New Reference"}
+              </button>
+            </div>
+
+            <div class="border-t border-white/5 pt-3">
+              <button
+                onClick={handleSeedMockDatabase}
+                disabled={seeding() || savingReference()}
+                class="text-xs text-gray-400 hover:text-red-400 underline transition-colors block mx-auto text-center"
+              >
+                Seed Minimal Synthetic Mock Data
+              </button>
+            </div>
             
-            <button
-              onClick={handleSeedDatabase}
-              disabled={seeding()}
-              class="btn-accent w-full flex items-center justify-center gap-2 py-3"
-            >
-              <RefreshCw size={16} class={seeding() ? "animate-spin" : ""} />
-              {seeding() ? "Resetting and Seeding..." : "Reset and Seed Mock Database"}
-            </button>
             <p class="text-[10px] text-gray-500">
-              ⚠️ WARNING: Seeding deletes all current tables in SQLite and creates fresh mock entries.
+              💡 NOTE: Automatic migrations upgrade your active database in-place. Restoring from reference snapshot resets active data to your master dataset.
             </p>
           </div>
         </div>

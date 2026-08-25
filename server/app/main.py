@@ -1,15 +1,30 @@
 import os
+import shutil
+import sys
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 import json
+from alembic.config import Config
+from alembic import command
 
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, SIDEKICK_DB_PATH, REFERENCE_DB_PATH, BASE_DIR
 from . import models, auth
 from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products, tares
 
-# Create all database tables on startup
+# Helper to run Alembic migrations programmatically
+def run_startup_migrations():
+    try:
+        alembic_ini = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "alembic.ini")
+        if os.path.exists(alembic_ini):
+            alembic_cfg = Config(alembic_ini)
+            command.upgrade(alembic_cfg, "head")
+    except Exception as e:
+        print(f"Startup Alembic migration warning: {e}")
+
+# Run migrations automatically on startup and ensure missing tables are created
+run_startup_migrations()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -54,12 +69,13 @@ def read_root():
         "oidc_issuer": auth.OIDC_ISSUER_URL
     }
 
-# ----------------- Development Seeding Route -----------------
+# ----------------- Development Seeding Routes -----------------
 @app.post("/dev/seed", tags=["development"])
-def seed_database(db: Session = Depends(get_db)):
+def seed_database(mode: str = "reference", db: Session = Depends(get_db)):
     """
-    Reset and seed the SQLite database with electronics parts, storage locations,
-    suppliers, and PCB projects.
+    Reset and seed the SQLite database.
+    - mode="reference" (default): Restores the database from data/sidekick_reference.db (full real dataset) and runs Alembic migrations.
+    - mode="mock": Resets and injects minimal synthetic test dataset.
     Only executable if DEV_MODE=True.
     """
     if not auth.DEV_MODE:
@@ -68,6 +84,28 @@ def seed_database(db: Session = Depends(get_db)):
             detail="Seeding endpoint is only available in DEV_MODE."
         )
         
+    if mode == "reference":
+        if not os.path.exists(REFERENCE_DB_PATH):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Reference database file not found at {REFERENCE_DB_PATH}."
+            )
+        try:
+            db.close()
+            engine.dispose()
+            shutil.copy2(REFERENCE_DB_PATH, SIDEKICK_DB_PATH)
+            run_startup_migrations()
+            return {
+                "status": "success",
+                "message": "Database restored successfully from master reference dataset snapshot.",
+                "mode": "reference"
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Restoring reference database failed: {str(e)}"
+            )
+
     try:
         # Recreate tables to ensure schema is fully clean and updated
         Base.metadata.drop_all(bind=engine)
@@ -266,7 +304,7 @@ def seed_database(db: Session = Depends(get_db)):
         db.add_all([tx_res, tx_cap, tx_mcu])
         db.commit()
         
-        return {"status": "success", "message": "Database seeded with default mock inventory."}
+        return {"status": "success", "message": "Database seeded with synthetic test inventory.", "mode": "mock"}
         
     except Exception as e:
         db.rollback()
@@ -274,3 +312,35 @@ def seed_database(db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Seeding failed: {str(e)}"
         )
+
+
+@app.post("/dev/seed/save-reference", tags=["development"])
+def save_reference_seed(db: Session = Depends(get_db)):
+    """
+    Save current active database (sidekick.db) as the master reference seed dataset (sidekick_reference.db).
+    Only executable if DEV_MODE=True.
+    """
+    if not auth.DEV_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Saving reference endpoint is only available in DEV_MODE."
+        )
+        
+    try:
+        if BASE_DIR not in sys.path:
+            sys.path.insert(0, BASE_DIR)
+        from data.update_reference_seed import update_reference_seed
+        
+        db.close()
+        engine.dispose()
+        update_reference_seed()
+        return {
+            "status": "success",
+            "message": "Successfully saved current active database as master reference seed dataset."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save reference dataset: {str(e)}"
+        )
+

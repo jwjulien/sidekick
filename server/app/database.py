@@ -7,8 +7,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Resolve SQLite file path inside the data directory
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{os.path.join(DATA_DIR, 'sidekick.db')}")
+# Resolve SQLite file paths inside the data directory
+SIDEKICK_DB_PATH = os.path.join(DATA_DIR, 'sidekick.db')
+REFERENCE_DB_PATH = os.path.join(DATA_DIR, 'sidekick_reference.db')
+
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{SIDEKICK_DB_PATH}")
 
 # Enable check_same_thread=False for SQLite multithreaded requests
 connect_args = {}
