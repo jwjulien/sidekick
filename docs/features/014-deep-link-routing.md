@@ -1,6 +1,6 @@
 ---
 title: Deep Link Routing
-status: Draft
+status: Completed
 target: 
   - Web
   - Windows
@@ -32,7 +32,7 @@ This feature registers a custom OS-level URI scheme (`fuse://`) for the Sidekick
 ---
 
 ## 5. Implementation Tasks
-- [ ] Install and configure `tauri-plugin-deep-link`.
-- [ ] Update `tauri.conf.json` and Android Manifest to declare the `fuse` scheme.
-- [ ] Create SolidJS global listener to intercept deep links and bridge them to the internal router.
-- [ ] **Retroactive Update:** Update `011-storage-labels.md` to ensure the generated DataMatrix encodes the `fuse://location/{id}` format instead of just the raw UUID.
+- [x] Install and configure `tauri-plugin-deep-link`.
+- [x] Update `tauri.conf.json` and Android Manifest to declare the `fuse` scheme.
+- [x] Create SolidJS global listener to intercept deep links and bridge them to the internal router.
+- [x] **Retroactive Update:** Update `011-storage-labels.md` to ensure the generated DataMatrix encodes the `fuse://location/{id}` format instead of just the raw UUID.

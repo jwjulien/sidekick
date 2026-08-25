@@ -24,6 +24,12 @@ import Layout from "./components/Layout";
 import { Toaster } from "solid-toast";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ScaleProvider } from "./context/ScaleContext";
+import { useDeepLink } from "./hooks/useDeepLink";
+
+function DeepLinkHandler() {
+  useDeepLink();
+  return null;
+}
 
 export default function App() {
   // Try to authenticate session on startup
@@ -44,7 +50,8 @@ export default function App() {
       <ScaleProvider>
         <ConfirmProvider>
         <Router>
-        {/* Unauthenticated public views */}
+          <DeepLinkHandler />
+          {/* Unauthenticated public views */}
         <Route path="/login" component={Login} />
         <Route path="/auth-callback" component={AuthCallback} />
         
