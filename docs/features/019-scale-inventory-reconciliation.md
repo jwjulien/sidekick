@@ -1,6 +1,6 @@
 ---
 title: Scale Inventory Reconciliation
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -33,18 +33,18 @@ This feature combines live scale readings, software/container tare offsets, and 
         * **Calculated Quantity:** `floor(Net Weight / Unit Weight)`.
     2. Once the scale reading stabilizes (`stable == true`), the "Commit Quantity" button highlights.
     3. `+` and `-` buttons to allow manual tuning of the computed value also become active.
-    4. Clicking "Commit Quantity" submits the new total directly to `/api/storage/{id}/adjust`.
+    4. Clicking "Commit Quantity" submits the new total directly to `/api/locations/{location_id}/count`.
 * **Mobile Considerations:** Display the calculated quantity in extra-large typography (e.g., 36pt font) so it is easily read from a distance at the workbench.
 
 ## 3. Technical Implementation
 * **Frontend (SolidJS / Tauri):**
-    * Uses conditionally rendered components to swap between the `<ReconciliationView />` and the `<CalibrationWizard />` based on `Part.weight == null` or if the user clicks the "Recalibrate" button.
+    * Uses conditionally rendered components to swap between `<ScaleModal />` reconciliation view and `<PartWeightCalibrationModal />` based on `Part.weight == null` or if the user clicks the "Re-calibrate" button.
     * Reactively combines signals:
       $$\text{Net Weight} = \text{Scale Gross Weight} - \text{Container Tare}$$
       $$\text{Estimated Count} = \left\lfloor \frac{\text{Net Weight}}{\text{Part Unit Weight}} \right\rfloor$$
-    * Validates that both `Part.weight > 0` and `Net Weight >= 0` before enabling the commit button.
+    * Validates that both `Part.weight > 0`, `Net Weight >= 0`, and `scale.isStable() == true` before enabling the commit button.
 * **Backend (FastAPI):**
-    * Uses the `/api/storage/{id}/adjust` endpoint (defined in `010-inventory-storage.md`) to write the updated physical count to SQLite.
+    * Uses `PUT /api/locations/{id}/count` endpoint to update the storage location stock quantity and stamp `last_counted`.
 
 ## 4. Out of Scope
 * Automatic discrepancy logging/historical audit logging (the new count simply overwrites or adjusts the current stock value).
@@ -52,9 +52,9 @@ This feature combines live scale readings, software/container tare offsets, and 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Create SolidJS `ScaleReconciliationView` component.
-- [ ] Implement conditional rendering/routing to embed the `017` Calibration Wizard if `Part.weight` is missing.
-- [ ] Add the "Recalibrate Weight" button to the standard counting view to trigger the wizard manually.
-- [ ] Connect reactive calculation pipeline (Gross, Tare, Net, Unit Weight, Calculated Count).
-- [ ] Add visual stability indicator based on `ScaleProvider.stable()`.
-- [ ] Wire the final commit button to the backend adjustment endpoint.
+- [x] Create SolidJS `ScaleModal.tsx` reconciliation view component.
+- [x] Implement conditional rendering/routing to embed the `017` Calibration Wizard if `Part.weight` is missing.
+- [x] Add the "Re-calibrate Weight" button to the standard counting view to trigger the wizard manually.
+- [x] Connect reactive calculation pipeline (Gross, Tare, Net, Unit Weight, Calculated Count).
+- [x] Add visual stability indicator based on `ScaleProvider.isStable()`.
+- [x] Wire the final commit button to the backend location count update endpoint (`PUT /api/locations/{id}/count`).

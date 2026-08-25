@@ -30,6 +30,7 @@ import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
 import ScaleModal from "../components/ScaleModal";
+import PartWeightCalibrationModal from "../components/PartWeightCalibrationModal";
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -66,6 +67,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
 
   // Scale Modal State
   const [showScaleModal, setShowScaleModal] = createSignal(false);
+  const [showCalibrationModal, setShowCalibrationModal] = createSignal(false);
   const [scaleTargetLocation, setScaleTargetLocation] = createSignal<any>(null);
   const [activePrintLocation, setActivePrintLocation] = createSignal<any | null>(null);
 
@@ -859,7 +861,16 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                   </span>
                 </div>
                 <div>
-                  <span class="text-gray-500 uppercase block font-semibold">Weight</span>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500 uppercase block font-semibold">Weight</span>
+                    <button
+                      onClick={() => setShowCalibrationModal(true)}
+                      class="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 transition-colors"
+                      title="Calibrate Part Weight with Scale"
+                    >
+                      <Scale size={11} /> Calibrate
+                    </button>
+                  </div>
                   <span class="text-white font-medium block mt-1 truncate">
                     {item().weight !== null ? `${item().weight}g` : "N/A"}
                   </span>
@@ -1683,7 +1694,17 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                 </div>
 
                 <div>
-                  <label class="block font-semibold text-gray-400 mb-1.5 uppercase">Weight (grams)</label>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="block font-semibold text-gray-400 uppercase text-xs">Weight (grams)</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCalibrationModal(true)}
+                      class="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
+                      title="Calibrate Weight with Scale"
+                    >
+                      <Scale size={11} /> Calibrate
+                    </button>
+                  </div>
                   <input
                     type="number"
                     step="0.001"
@@ -2009,6 +2030,17 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
         part={item()}
         storageLocation={scaleTargetLocation()}
         onSuccess={() => fetchItemDetails()}
+      />
+
+      {/* Part Weight Calibration Modal (Feature 017) */}
+      <PartWeightCalibrationModal
+        isOpen={showCalibrationModal()}
+        onClose={() => setShowCalibrationModal(false)}
+        part={item()}
+        onSuccess={(newWeight) => {
+          setEditWeight(newWeight);
+          fetchItemDetails();
+        }}
       />
     </div>
   );

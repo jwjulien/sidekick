@@ -1,6 +1,6 @@
 ---
 title: Container Tare & Software Offsets
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -13,38 +13,33 @@ dependencies:
 # Feature: Container Tare & Software Offsets
 
 ## 1. Overview
-This feature adds software-level taring to Sidekick. In addition to a live "Software Zero/Tare" action, it introduces persistent Tare Profiles for physical containers (binned storage, anti-static bags, drawers). Storing an empty container's tare weight (`Storage.tare_weight`) directly on its location record allows Sidekick to compute the net weight of components inside a bin without requiring the user to empty the bin first.
+This feature adds software-level taring to Sidekick. In addition to a live "Software Zero/Tare" action, it introduces persistent Tare Profiles for physical containers (binned storage, anti-static bags, drawers). Storing an empty container's tare weight (`Storage.last_tare_id` / `TareWeight`) directly on its location record allows Sidekick to compute the net weight of components inside a bin without requiring the user to empty the bin first.
 
 ## 2. User Experience & UI
-* **Trigger:** Available within the persistent Scale Widget and the Storage Location detail views.
+* **Trigger:** Available within the scale interface, location count modal, and Storage Location detail views.
 * **Interaction (Live Software Tare):**
-    * Clicking the "Tare" button in the scale widget captures the current scale reading as `software_tare_offset`. Subsequent displays calculate `net_weight = live_weight - software_tare_offset`.
+    * Clicking the "Tare" button captures current scale reading as tare offset. Subsequent displays calculate `net_weight = live_weight - tare_offset`.
 * **Interaction (Container Tare Profile):**
-    * In the Storage tree/detail view, a user can click "Set Container Tare".
-    * They can weigh the empty bin live on the scale or manually enter its tare weight (e.g., `42.5g`).
-    * The tare weight is saved to the database for that storage container (`Storage.tare_weight`).
-    * When performing stock checks on that container, clicking "Apply Container Tare" automatically subtracts its registered `tare_weight` from the current reading.
-* **Mobile Considerations:** The Tare button must be prominent on the scale control bar. Container tare profile indicators should clearly display `Tare: X.Xg` on location cards.
+    * Users can create/edit Tare Profiles (e.g., Small Anti-Static Bag = 1.2g, Medium Bin = 42.5g) in Settings / Storage design views.
+    * When performing stock counts, selecting a tare profile automatically applies its registered weight as the subtractive tare offset.
+* **Mobile Considerations:** Tare buttons are formatted with high-contrast, prominent touch targets.
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):**
-    * Extends `ScaleProvider` context with a `softwareTareOffset` signal.
-    * Computes `netWeight = () => liveWeight() - softwareTareOffset()`.
-    * Implements a "Reset Tare" function to clear `softwareTareOffset` back to `0`.
-* **Backend (FastAPI):**
-    * Extends the `Storage` Peewee model to include an optional float column: `tare_weight` (REAL, default 0.0).
-    * Updates `POST /api/storage` and `PUT /api/storage/{id}` routes to handle `tare_weight`.
-* **Database Schema (SQLite / Peewee):**
-    * Model: `Storage`
-    * Added Column: `tare_weight` (REAL, nullable).
+* **Frontend (SolidJS):**
+    * `ScaleProvider` context includes `tareOffset` signal, `netWeight()` calculation, `tare()`, and `resetTare()`.
+    * Tare selector dropdown loading `/api/tare-weights` endpoint.
+* **Backend (FastAPI & SQLAlchemy):**
+    * `TareWeight` model and `Storage.last_tare_id` foreign key relationship.
+    * `/api/tare-weights` CRUD router for creating, reading, updating, and deleting container tare profiles.
 
 ## 4. Out of Scope
-* Direct hardware-level zeroing commands sent to the scale (taring is managed strictly via software offset calculations in Sidekick to ensure cross-scale compatibility).
+* Direct hardware-level zeroing commands sent to the scale.
 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Add `softwareTareOffset` state and `netWeight()` calculation to `ScaleProvider`.
-- [ ] Add "Tare" and "Zero/Reset" buttons to the global Scale Widget UI.
-- [ ] Add `tare_weight` column to `Storage` Peewee model and migration script.
-- [ ] Add "Weigh/Set Empty Container Tare" action to the Storage location UI.
+- [x] Add `tareOffset` state, `netWeight()` calculation, and `tare()` to `ScaleProvider`.
+- [x] Add `TareWeight` model, Alembic migration, and `/api/tare-weights` backend endpoints.
+- [x] Add Tare profile management UI in application settings (`Design.tsx`).
+- [x] Implement standalone `ContainerTareSelector.tsx` component for reusability.
+
