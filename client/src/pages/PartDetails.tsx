@@ -25,7 +25,7 @@ import {
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
-import LocationCard from "../components/storage/LocationCard";
+import LocationCard, { getLocationPathString } from "../components/storage/LocationCard";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
@@ -1209,6 +1209,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                     {/* Location card */}
                     <LocationCard
                       location={item().storage_records[0]}
+                      allLocations={allLocations()}
                       onMove={(rec) => {
                         setMoveSourceLocation(rec);
                         setShowMoveModal(true);
@@ -1243,6 +1244,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                         <div class="flex-1 min-w-0">
                           <LocationCard
                             location={activeDrillSlot()}
+                            allLocations={allLocations()}
                             onMove={(rec) => {
                               setMoveSourceLocation(rec);
                               setShowMoveModal(true);
@@ -1281,6 +1283,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                         {(slot: any) => (
                           <button
                             onClick={() => setDrillTarget(slot.id)}
+                            title={getLocationPathString(slot, allLocations())}
                             class="w-full flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-xl px-4 py-3 transition-all group"
                           >
                             <div class="flex items-center gap-2.5 min-w-0">

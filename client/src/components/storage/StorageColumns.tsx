@@ -267,6 +267,7 @@ export default function StorageColumns(props: {
                         <div class="w-full max-w-xs bg-white/5 p-4 rounded-2xl border border-white/10 text-left shadow-lg">
                           <LocationCard
                             location={parentLoc()!}
+                            allLocations={props.locations}
                             hideTitle={true}
                             onMove={props.onMoveParts ? (loc) => props.onMoveParts!(loc) : undefined}
                             onScale={props.onScale ? (loc) => props.onScale!(loc) : undefined}

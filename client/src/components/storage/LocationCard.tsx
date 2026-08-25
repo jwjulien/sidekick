@@ -8,8 +8,12 @@ export interface LocationCardProps {
     name: string;
     quantity: number;
     last_counted?: string | null;
+    path?: string;
+    full_path?: string;
     [key: string]: any;
   };
+  allLocations?: any[];
+  pathString?: string;
   title?: string;
   hideTitle?: boolean;
   onMove?: (location: any) => void;
@@ -21,13 +25,38 @@ export interface LocationCardProps {
   class?: string;
 }
 
+export const getLocationPathString = (loc: any, allLocations?: any[], defaultTitle?: string): string => {
+  if (!loc) return "";
+  if (loc.path) return loc.path;
+  if (loc.full_path) return loc.full_path;
+  if (!allLocations || allLocations.length === 0) return defaultTitle || loc.name || "";
+
+  const chain: string[] = [];
+  let curr: any = loc;
+  const visited = new Set<string>();
+  while (curr && !visited.has(String(curr.id))) {
+    visited.add(String(curr.id));
+    if (curr.name) chain.unshift(curr.name);
+    if (curr.parent_id) {
+      curr = allLocations.find((l: any) => String(l.id) === String(curr.parent_id));
+    } else {
+      curr = null;
+    }
+  }
+  return chain.length > 0 ? chain.join(", ") : (defaultTitle || loc.name || "");
+};
+
 export default function LocationCard(props: LocationCardProps) {
+  const fullLocationPath = () => {
+    return getLocationPathString(props.location, props.allLocations, props.title || props.pathString);
+  };
+
   return (
-    <div class={`space-y-3 ${props.class || ""}`}>
+    <div class={`space-y-3 ${props.class || ""}`} title={fullLocationPath()}>
       {/* Header bar with optional location name & action buttons */}
       <div class={`flex items-center ${props.hideTitle ? "justify-center" : "justify-between px-1"}`}>
         <Show when={!props.hideTitle}>
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 cursor-help" title={fullLocationPath()}>
             <MapPin size={13} class="text-accentCyan shrink-0" />
             <span class="text-xs text-gray-300 font-medium truncate">
               {props.title || props.location.name}
