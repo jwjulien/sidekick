@@ -20,7 +20,8 @@ import {
   Link2,
   Printer,
   Move,
-  Scale
+  Scale,
+  Nfc
 } from "lucide-solid";
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -32,6 +33,8 @@ import DocumentViewer from "../components/DocumentViewer";
 import ScaleModal from "../components/ScaleModal";
 import PartWeightCalibrationModal from "../components/PartWeightCalibrationModal";
 import MovePartModal from "../components/storage/MovePartModal";
+import NfcWriteModal from "../components/NfcWriteModal";
+
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const params = useParams();
@@ -41,6 +44,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   const [item, setItem] = createSignal<any>(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  const [showNfcModal, setShowNfcModal] = createSignal(false);
 
   // Stock panel state
   // drillTarget: null = list view, number = showing StockController for that storage ID
@@ -747,15 +751,25 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                   <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().notes || "No description/notes provided."}</p>
                 </div>
 
-                {/* Edit details */}
+                {/* Edit & NFC details */}
                 <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    class="btn-secondary px-3.5 py-2 text-xs flex items-center gap-1.5 shrink-0"
-                  >
-                    <Edit3 size={14} />
-                    Edit Details
-                  </button>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setShowNfcModal(true)}
+                      class="bg-accentCyan/10 hover:bg-accentCyan/20 text-accentCyan border border-accentCyan/30 px-3 py-2 text-xs rounded-xl flex items-center gap-1.5 font-medium transition-colors"
+                      title="Program physical NFC tag for this component"
+                    >
+                      <Nfc size={14} />
+                      Write NFC
+                    </button>
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      class="btn-secondary px-3.5 py-2 text-xs flex items-center gap-1.5"
+                    >
+                      <Edit3 size={14} />
+                      Edit Details
+                    </button>
+                  </div>
                 </Show>
               </div>
 
@@ -1718,6 +1732,17 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
           fetchItemDetails();
         }}
       />
+
+      {/* NFC Write Modal */}
+      <Show when={showNfcModal() && item()}>
+        <NfcWriteModal
+          isOpen={showNfcModal()}
+          targetType="part"
+          targetId={item()?.id}
+          targetName={`${item()?.number || 'Part'} (${item()?.value || ''})`}
+          onClose={() => setShowNfcModal(false)}
+        />
+      </Show>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 ---
 title: NFC Tag Management
-status: Draft
+status: Completed
 target: 
   - Android
+  - Windows
 dependencies: 
   - 010-inventory-storage.md
   - 014-deep-link-routing.md
@@ -11,32 +12,52 @@ dependencies:
 # Feature: NFC Tag Management
 
 ## 1. Overview
-This feature allows users to program physical NFC stickers with Sidekick deep links. When an Android device is held near a programmed sticker, the OS intercepts the NDEF payload and launches the app directly to the encoded location. To prevent accidental data loss, the system implements a "read-before-write" safeguard to warn users if they are about to overwrite an existing, valid Sidekick tag.
+This feature allows users to program physical NFC stickers with Sidekick deep links (`fuse://location/{id}` and `fuse://part/{id}`). When an Android device or desktop USB PC/SC reader (ACR122U) is held near a programmed sticker, the system reads the NDEF payload and launches or navigates the app directly to the encoded location or part detail view. 
 
-## 2. User Experience & UI
-* **Trigger:** Accessed via a "Write NFC Tag" button within the detail view of a specific Storage Location.
-* **Interaction:** 1. The user clicks "Write NFC Tag" on a specific Drawer or Bin.
-    2. A bottom-sheet modal slides up displaying a pulsing NFC icon and the text "Hold phone near NFC tag..."
-    3. The user taps the phone to the tag.
-    4. **Safety Check:** The app reads the tag. If it contains an existing `fuse://` URI, the UI pauses and displays a prominent warning: "This tag is already programmed to [Existing Location Name]. Overwrite?"
-    5. If the tag is blank, or the user confirms the overwrite, the app writes the new `fuse://location/{id}` payload to the NDEF record.
-    6. A success checkmark and beep confirm the operation.
+In addition to direct navigation, NFC scanning integrates directly into modal workflows (such as part relocation) to quickly jump to target locations in Miller column selectors, and allows programming new NFC tags immediately upon creating a new storage location. To prevent accidental data loss, the system enforces a "read-before-write" safeguard to warn users before overwriting an active tag.
 
-## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** * Utilizes the `@tauri-apps/plugin-nfc` to access native mobile NFC hardware.
-    * The write function must be chained: `scan()` -> `parse NDEF` -> `evaluate` -> `write()`.
-    * Payloads must be formatted strictly as NDEF URI Records using the `fuse://` scheme.
-* **Backend (FastAPI):** * `GET /api/resolve/{uuid}` (from Feature 013) may be utilized during the Safety Check phase to translate an existing UUID on a tag into a human-readable location name for the overwrite warning.
+## 2. Architecture & Key Use Cases
 
-## 4. Out of Scope
-* Desktop/Web NFC support. While USB NFC readers exist, this feature relies heavily on the native mobile OS NDEF background dispatch systems. Desktop support is excluded for this phase.
-* Password-protecting or permanently locking the NFC tags against future rewrites.
+### 2.1 Write NFC Tags (Locations & Parts)
+* **Location Tags (`fuse://location/{id}`):** Any node in the Storage tree (Cabinet, Shelf, Drawer, Bin) can be written via a "Write NFC Tag" action button.
+* **Part Tags (`fuse://part/{id}`):** The `PartDetails` page features a "Write NFC Tag" button to program tags for standalone part reels or anti-static bags.
+* **Read-Before-Write Safeguard:** 
+  1. App initiates an NDEF read scan.
+  2. If the tag contains an existing `fuse://` payload or UUID, the app queries `GET /api/resolve/{payload}`.
+  3. If resolved to an active entity in the database, the UI displays a warning: *"This tag is already programmed to [Resolved Name / Breadcrumb]. Overwrite?"*
+  4. Upon user confirmation (or if tag is blank), the new NDEF URI record is written.
+
+### 2.2 Recall & Deep Link Dispatch
+* Background NFC scans trigger Android OS intent dispatch (`fuse://` scheme registered in Feature 014), launching/foregrounding Sidekick and navigating directly to `/storage?location={id}` or `/parts/{id}`.
+
+### 2.3 Modal Workflows (Move & Location Onboarding)
+* **In-Modal NFC Target Selection:** When `MovePartModal` or `LocationMoveModal` is open, scanning an NFC tag intercepts `fuse://location/{id}`, resolves the location, and automatically navigates the Miller columns to select that location.
+* **Onboarding NFC Programming during Location Creation:** 
+  - When creating a new storage location, `POST /api/locations` returns the created `id` (UUIDv7) immediately.
+  - Upon successful creation, the modal presents a prompt: *"Location Created! Tap phone to NFC tag to program tag now."*
+  - Writing the NDEF record assigns the physical tag immediately during location onboarding.
 
 ---
 
-## 5. Implementation Tasks
-- [ ] Install and configure `tauri-plugin-nfc`.
-- [ ] Build SolidJS bottom-sheet modal for the NFC writing UX.
-- [ ] Implement the read-before-write safety logic.
-- [ ] Implement the NDEF URI Record writing logic.
-- [ ] Handle OS-level NFC permission requests gracefully.
+## 3. Technical Implementation
+* **Tauri Rust Backend (`src-tauri`):**
+  * **Desktop Target (Windows/Linux):** Integrates the [`pcsc`](https://crates.io/crates/pcsc) Rust crate to interface directly with PC/SC WinSCard / PCSC-lite APIs. This enables native hardware support for USB NFC readers (such as the **ACR122U**) on desktop workstations via APDU NDEF commands.
+  * **Mobile Target (Android):** Utilizes `tauri-plugin-nfc` to bridge native Android `NfcAdapter` NDEF APIs.
+  * **Unified Custom Commands:** Exposes unified Tauri commands (`nfc_read_tag`, `nfc_write_tag`) to the frontend, decoupling hardware specifics from the UI.
+* **Frontend (SolidJS):**
+  * `nfcService.ts`: Unified frontend service interfacing with Tauri's Rust NFC module, with fallback Desktop Dev Mock Mode.
+  * `NfcWriteModal.tsx`: Reusable bottom-sheet modal for scanning, read-before-write safety evaluation, overwrite confirmation, and NDEF writing.
+* **Backend (FastAPI):**
+  * `GET /api/resolve/{payload}`: Universal entity resolver endpoint returning entity type (`location` | `part`), UUID, human-readable breadcrumbs, and target routes.
+
+---
+
+## 4. Implementation Tasks
+- [x] Add `GET /api/resolve/{payload:path}` router in FastAPI backend with unit tests.
+- [x] Add `pcsc` crate to Rust desktop target in `src-tauri/Cargo.toml` and configure `tauri-plugin-nfc` for mobile target.
+- [x] Implement Rust NFC commands (`nfc_read_tag`, `nfc_write_tag`) using `pcsc` and `tauri-plugin-nfc`.
+- [x] Create `nfcService.ts` with unified Tauri invoke calls and desktop dev mock mode.
+- [x] Build SolidJS `NfcWriteModal.tsx` with read-before-write safeguard.
+- [x] Add "Write NFC Tag" buttons to `Storage.tsx` location views and `PartDetails.tsx`.
+- [x] Wire NFC scanner listener into `MovePartModal.tsx` for quick Miller column location jumping.
+- [x] Wire immediate NFC programming prompt into Location Creation flow.

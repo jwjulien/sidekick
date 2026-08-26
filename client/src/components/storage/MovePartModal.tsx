@@ -1,7 +1,8 @@
 import { createSignal, createEffect, Show } from "solid-js";
-import { X, Move, MapPin, Package, Minus, Plus, Trash2, FolderMinus } from "lucide-solid";
+import { X, Move, MapPin, Package, Minus, Plus, Trash2, FolderMinus, Nfc, RefreshCw } from "lucide-solid";
 import toast from "solid-toast";
 import { apiFetch } from "../../hooks/useAuth";
+import { nfcService } from "../../services/nfcService";
 import UniversalLocationSelector from "./UniversalLocationSelector";
 
 export interface MovePartModalProps {
@@ -16,6 +17,36 @@ export default function MovePartModal(props: MovePartModalProps) {
   const [selectedTargetLocation, setSelectedTargetLocation] = createSignal<any | null>(null);
   const [deleteSourceAfterMove, setDeleteSourceAfterMove] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
+  const [scanningNfc, setScanningNfc] = createSignal(false);
+
+  const handleScanNfcTarget = async () => {
+    setScanningNfc(true);
+    try {
+      const scan = await nfcService.readTag();
+      if (!scan.success || !scan.payload) {
+        toast.error(scan.error || "No NFC tag payload detected.");
+        return;
+      }
+      
+      const resolved = await apiFetch(`/resolve/${encodeURIComponent(scan.payload)}`);
+      if (resolved.entity_type === "location") {
+        const foundLoc = (props.allLocations || []).find((l: any) => String(l.id) === String(resolved.entity_id));
+        if (foundLoc) {
+          setSelectedTargetLocation(foundLoc);
+          toast.success(`Selected location: ${resolved.breadcrumb}`);
+        } else {
+          setSelectedTargetLocation({ id: resolved.entity_id, name: resolved.display_name });
+          toast.success(`Selected location: ${resolved.display_name}`);
+        }
+      } else {
+        toast.error("Scanned NFC tag is assigned to a part, not a storage location.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to resolve scanned NFC tag.");
+    } finally {
+      setScanningNfc(false);
+    }
+  };
 
   createEffect(() => {
     if (props.location) {
@@ -267,9 +298,22 @@ export default function MovePartModal(props: MovePartModalProps) {
               </div>
             </Show>
 
-            <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              Select Target Location
-            </label>
+            <div class="flex items-center justify-between">
+              <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                Select Target Location
+              </label>
+              <button
+                type="button"
+                onClick={handleScanNfcTarget}
+                disabled={scanningNfc()}
+                class="px-2.5 py-1 text-xs rounded-lg bg-accentCyan/10 hover:bg-accentCyan/20 text-accentCyan border border-accentCyan/30 flex items-center gap-1.5 font-medium transition-colors disabled:opacity-50"
+              >
+                <Show when={scanningNfc()} fallback={<Nfc size={14} />}>
+                  <RefreshCw size={14} class="animate-spin text-accentCyan" />
+                </Show>
+                {scanningNfc() ? "Scanning..." : "Scan NFC Tag"}
+              </button>
+            </div>
 
             <UniversalLocationSelector
               locations={props.allLocations}

@@ -10,6 +10,7 @@ import MovePartModal from "../components/storage/MovePartModal";
 import PartsBrowser from "../components/storage/PartsBrowser";
 import PartDetails from "./PartDetails";
 import ScaleModal from "../components/ScaleModal";
+import NfcWriteModal from "../components/NfcWriteModal";
 import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Storage() {
@@ -32,6 +33,9 @@ export default function Storage() {
 
   // Move Part Modal State (Re-home parts at location)
   const [movePartLocation, setMovePartLocation] = createSignal<any | null>(null);
+
+  // NFC Target Location State
+  const [nfcTargetLocation, setNfcTargetLocation] = createSignal<any | null>(null);
 
   // Navigation State
   const [activePath, setActivePath] = createSignal<string[]>([]);
@@ -172,7 +176,13 @@ export default function Storage() {
         handleSelectNode(newLoc.id);
       }
 
-      toast.success("Storage location created successfully.");
+      toast.success(`Storage location "${newLoc.name}" created.`, {
+        duration: 6000,
+        icon: "✨"
+      });
+      
+      // Offer immediate NFC programming on onboarding new location
+      setNfcTargetLocation(newLoc);
     } catch (err: any) {
       toast.error(err.message || "Failed to create storage location.");
     }
@@ -399,6 +409,10 @@ export default function Storage() {
             setEditLocation(null);
             setActivePrintLocation(loc);
           }}
+          onWriteNfc={(loc) => {
+            setEditLocation(null);
+            setNfcTargetLocation(loc);
+          }}
           onDelete={handleDeleteLocation}
           onMove={(loc) => {
             setEditLocation(null);
@@ -445,6 +459,17 @@ export default function Storage() {
         location={activePrintLocation()}
         onClose={() => setActivePrintLocation(null)}
       />
+
+      {/* NFC Write Modal */}
+      <Show when={nfcTargetLocation()}>
+        <NfcWriteModal
+          isOpen={!!nfcTargetLocation()}
+          targetType="location"
+          targetId={nfcTargetLocation()?.id}
+          targetName={nfcTargetLocation()?.name}
+          onClose={() => setNfcTargetLocation(null)}
+        />
+      </Show>
 
       {/* Scale Counting Modal */}
       <Show when={showScaleModal()}>

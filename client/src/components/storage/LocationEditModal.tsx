@@ -1,5 +1,5 @@
 import { createSignal, Show } from "solid-js";
-import { X, Printer, Trash2, MapPin } from "lucide-solid";
+import { X, Printer, Trash2, MapPin, Nfc } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import toast from "solid-toast";
 
@@ -10,6 +10,7 @@ export default function LocationEditModal(props: {
   onClose: () => void;
   onUpdate: () => void;
   onPrint: (loc: any) => void;
+  onWriteNfc?: (loc: any) => void;
   onDelete: (id: string) => void;
   onMove: (loc: any) => void;
 }) {
@@ -133,21 +134,26 @@ export default function LocationEditModal(props: {
             </div>
           </form>
 
-          <div class="pt-6 border-t border-white/10 flex gap-3">
-            <button type="button" onClick={() => props.onPrint(props.location)} class="flex-1 btn-secondary py-2 flex justify-center items-center gap-2">
-              <Printer size={16} /> Print
+          <div class="pt-6 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onClick={() => props.onPrint(props.location)} class="btn-secondary py-2 flex justify-center items-center gap-1.5 text-xs">
+              <Printer size={15} /> Print
             </button>
-            <button type="button" onClick={() => props.onMove(props.location)} class="flex-1 bg-accentCyan/10 text-accentCyan hover:bg-accentCyan/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
-              <MapPin size={16} /> Move
+            <Show when={props.onWriteNfc}>
+              <button type="button" onClick={() => props.onWriteNfc!(props.location)} class="bg-accentCyan/10 text-accentCyan hover:bg-accentCyan/20 py-2 rounded-lg flex justify-center items-center gap-1.5 text-xs transition-colors">
+                <Nfc size={15} /> NFC Tag
+              </button>
+            </Show>
+            <button type="button" onClick={() => props.onMove(props.location)} class="bg-accentPurple/10 text-accentPurple hover:bg-accentPurple/20 py-2 rounded-lg flex justify-center items-center gap-1.5 text-xs transition-colors">
+              <MapPin size={15} /> Move
             </button>
-            <div title={cannotDeleteReason() || "Delete location"} class="flex-1">
+            <div title={cannotDeleteReason() || "Delete location"} class="w-full">
               <button 
                 type="button" 
                 disabled={cannotDeleteReason() !== null}
                 onClick={() => props.onDelete(props.location.id)} 
-                class="w-full h-full bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500/20 py-2 rounded-lg flex justify-center items-center gap-2 transition-colors"
+                class="w-full h-full bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-500/20 py-2 rounded-lg flex justify-center items-center gap-1.5 text-xs transition-colors"
               >
-                <Trash2 size={16} /> Delete
+                <Trash2 size={15} /> Delete
               </button>
             </div>
           </div>

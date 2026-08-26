@@ -4,9 +4,14 @@ import toast from "solid-toast";
 import { parseDeepLink } from "../utils/deepLink";
 
 export function useDeepLink() {
-  const navigate = useNavigate();
-
   onMount(() => {
+    let navigate: ReturnType<typeof useNavigate> | null = null;
+    try {
+      navigate = useNavigate();
+    } catch (_) {
+      // Catch error if invoked outside a Route context
+    }
+
     let unlisten: (() => void) | undefined;
 
     const setupListener = async () => {
@@ -22,8 +27,12 @@ export function useDeepLink() {
           for (const rawUrl of urls) {
             const parsed = parseDeepLink(rawUrl);
             if (parsed) {
-              toast.info(`Deep link: ${parsed.action}`, { id: "deep-link-toast" });
-              navigate(parsed.targetRoute);
+              toast(`Deep link: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
+              if (navigate) {
+                navigate(parsed.targetRoute);
+              } else {
+                window.location.href = parsed.targetRoute;
+              }
               break;
             }
           }

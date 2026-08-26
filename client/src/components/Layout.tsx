@@ -19,12 +19,14 @@ import {
   History
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
+import { useDeepLink } from "../hooks/useDeepLink";
 
 interface LayoutProps {
   children?: any;
 }
 
 export default function Layout(props: LayoutProps) {
+  useDeepLink();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = createSignal(false);
