@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models, schemas, auth
+from .audit import log_audit_event
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
@@ -373,8 +374,6 @@ def touch_location(
     db.commit()
     db.refresh(storage)
     return storage
-
-from .audit import log_audit_event
 
 class CountPayload(BaseModel):
     quantity: int

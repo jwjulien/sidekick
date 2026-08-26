@@ -1,5 +1,5 @@
 import { createSignal, createEffect, on, For, Show } from "solid-js";
-import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, FolderMinus } from "lucide-solid";
+import { ChevronRight, MapPin, Plus, Pencil, GripVertical, Package, Hash, AlertTriangle, Search, X, FolderMinus, ArrowLeft } from "lucide-solid";
 import LocationCard from "./LocationCard";
 import {
   DragDropProvider,
@@ -219,11 +219,22 @@ export default function StorageColumns(props: {
                   style={{ width: `${colWidth()}px`, "min-width": `${colWidth()}px` }}
                 >
                   <div class="p-3 bg-white/5 border-b border-white/10 flex justify-between items-start text-white">
-                    <div class="overflow-hidden pr-2">
-                      <div class="font-bold text-xs truncate">{title()}</div>
-                      <Show when={parentLoc() && parentLoc()!.description}>
-                        <div class="text-[10px] text-gray-400 truncate mt-0.5">{parentLoc()!.description}</div>
+                    <div class="flex items-center gap-1.5 overflow-hidden pr-2">
+                      <Show when={parentLoc()}>
+                        <button
+                          onClick={() => props.onSelect(parentLoc()!.parent_id || null)}
+                          class="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors shrink-0"
+                          title="Move up one directory"
+                        >
+                          <ArrowLeft size={14} />
+                        </button>
                       </Show>
+                      <div class="overflow-hidden min-w-0">
+                        <div class="font-bold text-xs truncate">{title()}</div>
+                        <Show when={parentLoc() && parentLoc()!.description}>
+                          <div class="text-[10px] text-gray-400 truncate mt-0.5">{parentLoc()!.description}</div>
+                        </Show>
+                      </div>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
                       <Show when={parentLoc() && !props.pickerMode}>

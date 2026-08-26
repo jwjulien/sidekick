@@ -132,7 +132,14 @@ export default function Storage() {
     return chain;
   };
 
-  const handleSelectNode = (id: string) => {
+  const handleSelectNode = (id: string | null) => {
+    if (!id) {
+      setActivePath([]);
+      updateUrlHistory([]);
+      setShowCreateForm(false);
+      setInlinePartId(null);
+      return;
+    }
     const newPath = getAncestorChain(id, locations());
     if (newPath.length > 0) {
       setActivePath(newPath);

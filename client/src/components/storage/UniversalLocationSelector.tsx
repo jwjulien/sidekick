@@ -5,7 +5,8 @@ import {
   ChevronRight, 
   Plus, 
   CheckCircle,
-  Folder
+  Folder,
+  ArrowLeft
 } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import InlineLocationCreator from "../parts/InlineLocationCreator";
@@ -181,6 +182,23 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     setMillerPath(newPath);
   };
 
+  const handleCloseColumn = (columnIndex: number) => {
+    if (columnIndex <= 0) return;
+    const newPath = millerPath().slice(0, columnIndex - 1);
+    setMillerPath(newPath);
+    if (newPath.length > 0) {
+      const parentId = newPath[newPath.length - 1];
+      setSelectedId(parentId);
+      const parentLoc = allLocations().find((l) => String(l.id) === String(parentId));
+      if (parentLoc) {
+        props.onSelectLocation(parentLoc);
+      }
+    } else {
+      setSelectedId("");
+      props.onSelectLocation(null);
+    }
+  };
+
   const handleLocationCreatedInline = (newLoc: any) => {
     let updatedLocs: any[] = [];
     if (props.locations === undefined) {
@@ -329,10 +347,22 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
                     style={{ width: `${colWidth()}px`, "min-width": `${colWidth()}px` }}
                   >
                     <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 pb-1 border-b border-white/5">
-                      <span class="truncate">
-                        {parentLoc() ? parentLoc()!.name : "Root Storage Units"}
-                      </span>
-                      <span class="text-[10px] text-gray-500 font-mono">({col.items.length})</span>
+                      <div class="flex items-center gap-1.5 overflow-hidden pr-2 min-w-0">
+                        <Show when={col.parentId}>
+                          <button
+                            type="button"
+                            onClick={() => handleCloseColumn(colIdx())}
+                            class="p-0.5 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors shrink-0"
+                            title="Move up one directory"
+                          >
+                            <ArrowLeft size={13} />
+                          </button>
+                        </Show>
+                        <span class="truncate">
+                          {parentLoc() ? parentLoc()!.name : "Root Storage Units"}
+                        </span>
+                      </div>
+                      <span class="text-[10px] text-gray-500 font-mono shrink-0">({col.items.length})</span>
                     </div>
 
                     <div class="overflow-y-auto pr-1 flex-1">
