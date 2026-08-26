@@ -5,7 +5,6 @@ import {
   MapPin,
   AlertTriangle,
   Plus,
-  Minus,
   FileText,
   Download,
   Trash2,
@@ -18,8 +17,6 @@ import {
   Cpu,
   X,
   Link2,
-  Printer,
-  Move,
   Scale,
   Nfc
 } from "lucide-solid";
@@ -34,6 +31,7 @@ import ScaleModal from "../components/ScaleModal";
 import PartWeightCalibrationModal from "../components/PartWeightCalibrationModal";
 import MovePartModal from "../components/storage/MovePartModal";
 import NfcWriteModal from "../components/NfcWriteModal";
+import UniversalLocationSelector from "../components/storage/UniversalLocationSelector";
 
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
@@ -50,11 +48,8 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   // drillTarget: null = list view, number = showing StockController for that storage ID
   const [drillTarget, setDrillTarget] = createSignal<number | null>(null);
   // Location link / create state
-  const [showLocationPanel, setShowLocationPanel] = createSignal(false);
-  const [locationPanelMode, setLocationPanelMode] = createSignal<"link" | "create">("link");
-  const [linkLocationId, setLinkLocationId] = createSignal("");
-  const [newLocationName, setNewLocationName] = createSignal("");
-  const [newLocationParentId, setNewLocationParentId] = createSignal("");
+  const [showLocationModal, setShowLocationModal] = createSignal(false);
+  const [selectedLocationId, setSelectedLocationId] = createSignal("");
   const [locationSubmitting, setLocationSubmitting] = createSignal(false);
   // All system locations (for link dropdown)
   const [allLocations, setAllLocations] = createSignal<any[]>([]);
@@ -157,39 +152,6 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
     return 1 + Math.max(...childHeights);
   };
 
-  const splitParentIfNeeded = async (parentId: string) => {
-    const parentLoc = allLocations().find((l: any) => l.id === parentId);
-    if (parentLoc && parentLoc.part_id) {
-      // Create child for the original part
-      await apiFetch("/locations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: `${parentLoc.name} - ${parentLoc.part?.value || 'Original'}`,
-          parent_id: parentLoc.id,
-          part_id: parentLoc.part_id,
-          quantity: parentLoc.quantity
-        })
-      });
-      // Clear parent's part association
-      await apiFetch(`/locations/${parentLoc.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ part_id: null })
-      });
-      await apiFetch(`/locations/${parentLoc.id}/count`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: 0 })
-      });
-    }
-  };
-
-  const parentLocations = createMemo(() => {
-    const locs = allLocations();
-    return locs.filter((l: any) => getLocationHeight(l.id, locs) <= 1);
-  });
-
   const attributesEntries = () => {
     if (!item() || !item().attributes) return [];
     return Object.entries(item().attributes);
@@ -243,50 +205,25 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   });
 
   const handleLinkLocation = async () => {
-    if (!linkLocationId()) return;
+    if (!selectedLocationId()) return;
     setLocationSubmitting(true);
     try {
-      await apiFetch(`/locations/${linkLocationId()}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ part_id: itemId })
-      });
-      setLinkLocationId("");
-      setShowLocationPanel(false);
-      fetchItemDetails();
-      toast.success("Location linked successfully.");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to link location.");
-    } finally {
-      setLocationSubmitting(false);
-    }
-  };
-
-  const handleCreateAndLinkLocation = async () => {
-    if (!newLocationName()) return;
-    setLocationSubmitting(true);
-    try {
-      const parentIdVal = newLocationParentId();
-      if (parentIdVal) {
-        await splitParentIfNeeded(parentIdVal);
-      }
-      const created = await apiFetch("/locations", {
+      await apiFetch("/locations/assign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newLocationName(),
-          parent_id: parentIdVal ? parentIdVal : null,
           part_id: itemId,
-          quantity: 0
+          location_id: selectedLocationId(),
+          quantity: 0,
+          notes: `Linked location for component '${item()?.value || ""}'`
         })
       });
-      setNewLocationName("");
-      setNewLocationParentId("");
-      setShowLocationPanel(false);
-      fetchItemDetails();
-      toast.success(`Location "${created.name}" created and linked.`);
+      setSelectedLocationId("");
+      setShowLocationModal(false);
+      await Promise.all([fetchItemDetails(), fetchMetadata()]);
+      toast.success("Location linked successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to create location.");
+      toast.error(err.message || "Failed to link location.");
     } finally {
       setLocationSubmitting(false);
     }
@@ -1180,7 +1117,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
 
               {/* STATE 1: No locations */}
               <Show when={!item().storage_records || item().storage_records.length === 0}>
-                <div class="text-center py-8 space-y-5">
+                <div class="text-center py-8 space-y-4">
                   <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
                     <MapPin size={22} class="text-gray-500" />
                   </div>
@@ -1188,93 +1125,83 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                     <p class="text-sm font-semibold text-white">No storage locations</p>
                     <p class="text-xs text-gray-500 mt-1">Connect this part to a physical location to begin tracking stock.</p>
                   </div>
-                  <div class="flex gap-2 justify-center">
+                  <div class="flex justify-center pt-1">
                     <button
-                      onClick={() => { setLocationPanelMode("link"); setShowLocationPanel(true); }}
-                      class="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5"
+                      onClick={() => { setSelectedLocationId(""); setShowLocationModal(true); }}
+                      class="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 font-bold"
                     >
-                      <Link2 size={13} />
-                      Link Existing
-                    </button>
-                    <button
-                      onClick={() => { setLocationPanelMode("create"); setShowLocationPanel(true); }}
-                      class="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
-                    >
-                      <Plus size={13} />
-                      Create New
+                      <MapPin size={14} />
+                      Assign Storage Location
                     </button>
                   </div>
                 </div>
               </Show>
 
+              {/* STATE 2: 1 location */}
               <Show when={item().storage_records && item().storage_records.length === 1}>
-                {() => (
-                  <div class="space-y-5">
-                    {/* Total hero */}
-                    <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-5">
-                      <span class="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">Total On-Hand</span>
-                      <span class={`text-5xl font-extrabold block mt-2 ${item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
-                        }`}>
-                        {item().total_quantity}
-                      </span>
-                      <span class="text-[10px] text-gray-500 mt-2 block">Threshold: {item().threshold || 0}</span>
-                    </div>
-
-                    {/* Location card */}
-                    <LocationCard
-                      location={item().storage_records[0]}
-                      allLocations={allLocations()}
-                      onMove={(rec) => {
-                        setMoveSourceLocation(rec);
-                        setShowMoveModal(true);
-                      }}
-                      onScale={(rec) => {
-                        setScaleTargetLocation(rec);
-                        setShowScaleModal(true);
-                      }}
-                      onPrint={(rec) => setActivePrintLocation(rec)}
-                      onDelete={(rec) => handleDeleteLocation(rec)}
-                      onChanged={(qty, ts) => handleStorageChanged(item().storage_records[0]?.id, qty, ts)}
-                    />
+                <div class="space-y-5">
+                  {/* Total hero */}
+                  <div class="text-center bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+                    <span class="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">Total On-Hand</span>
+                    <span class={`text-5xl font-extrabold block mt-2 ${item().total_quantity < item().threshold ? "text-amber-400" : "text-white"
+                      }`}>
+                      {item().total_quantity}
+                    </span>
+                    <span class="text-[10px] text-gray-500 mt-2 block">Threshold: {item().threshold || 0}</span>
                   </div>
-                )}
+
+                  {/* Location card */}
+                  <LocationCard
+                    location={item().storage_records[0]}
+                    allLocations={allLocations()}
+                    onMove={(rec) => {
+                      setMoveSourceLocation(rec);
+                      setShowMoveModal(true);
+                    }}
+                    onScale={(rec) => {
+                      setScaleTargetLocation(rec);
+                      setShowScaleModal(true);
+                    }}
+                    onPrint={(rec) => setActivePrintLocation(rec)}
+                    onDelete={(rec) => handleDeleteLocation(rec)}
+                    onChanged={(qty, ts) => handleStorageChanged(item().storage_records[0]?.id, qty, ts)}
+                  />
+                </div>
               </Show>
 
               {/* STATE 3: Multiple locations */}
               <Show when={item().storage_records && item().storage_records.length > 1}>
                 {/* Drill-down: StockController for a specific location */}
                 <Show when={drillTarget() !== null}>
-                  {() => (
-                    <div class="space-y-4">
-                      {/* Header with back arrow */}
-                      <div class="flex items-start gap-2">
-                        <button
-                          onClick={() => setDrillTarget(null)}
-                          class="p-1.5 mt-0.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors shrink-0"
-                          title="Back to location list"
-                        >
-                          <ArrowLeft size={15} />
-                        </button>
-                        <div class="flex-1 min-w-0">
-                          <LocationCard
-                            location={activeDrillSlot()}
-                            allLocations={allLocations()}
-                            onMove={(rec) => {
-                              setMoveSourceLocation(rec);
-                              setShowMoveModal(true);
-                            }}
-                            onScale={(rec) => {
-                              setScaleTargetLocation(rec);
-                              setShowScaleModal(true);
-                            }}
-                            onPrint={(rec) => setActivePrintLocation(rec)}
-                            onDelete={(rec) => handleDeleteLocation(rec)}
-                            onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id, qty, ts)}
-                          />
-                        </div>
+                  <div class="space-y-4">
+                    {/* Header with back arrow */}
+                    <div class="flex items-start gap-2">
+                      <button
+                        onClick={() => setDrillTarget(null)}
+                        class="p-1.5 mt-0.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors shrink-0"
+                        title="Back to location list"
+                      >
+                        <ArrowLeft size={15} />
+                      </button>
+                      <div class="flex-1 min-w-0">
+                        <LocationCard
+                          location={activeDrillSlot()}
+                          allLocations={allLocations()}
+                          onMove={(rec) => {
+                            setMoveSourceLocation(rec);
+                            setShowMoveModal(true);
+                          }}
+                          onScale={(rec) => {
+                            setScaleTargetLocation(rec);
+                            setShowScaleModal(true);
+                          }}
+                          onPrint={(rec) => setActivePrintLocation(rec)}
+                          onDelete={(rec) => handleDeleteLocation(rec)}
+                          onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id, qty, ts)}
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
                 </Show>
 
                 {/* List view */}
@@ -1318,104 +1245,15 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                 </Show>
               </Show>
 
-              {/* ── Add Location panel — shown in all states except when drilling ── */}
-              <Show when={drillTarget() === null}>
-                <Show when={!showLocationPanel()}>
-                  <Show when={item().storage_records && item().storage_records.length > 0}>
-                    <button
-                      onClick={() => { setLocationPanelMode("link"); setShowLocationPanel(true); }}
-                      class="w-full text-xs text-gray-500 hover:text-accentCyan transition-colors flex items-center justify-center gap-1.5 py-2"
-                    >
-                      <Plus size={12} />
-                      Add Another Location
-                    </button>
-                  </Show>
-                </Show>
-
-                <Show when={showLocationPanel()}>
-                  <div class="border border-white/10 rounded-xl p-4 space-y-3 bg-white/[0.02]">
-                    {/* Tab toggle */}
-                    <div class="flex rounded-lg overflow-hidden border border-white/10 text-xs font-semibold">
-                      <button
-                        onClick={() => setLocationPanelMode("link")}
-                        class={`flex-1 py-1.5 transition-colors ${locationPanelMode() === "link" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
-                      >
-                        Link Existing
-                      </button>
-                      <button
-                        onClick={() => setLocationPanelMode("create")}
-                        class={`flex-1 py-1.5 transition-colors ${locationPanelMode() === "create" ? "bg-accentCyan/20 text-accentCyan" : "text-gray-500 hover:text-white"}`}
-                      >
-                        Create New
-                      </button>
-                    </div>
-
-                    {/* Link existing */}
-                    <Show when={locationPanelMode() === "link"}>
-                      <select
-                        value={linkLocationId()}
-                        onChange={(e) => setLinkLocationId(e.currentTarget.value)}
-                        class="glass-input w-full text-xs"
-                      >
-                        <option value="">Select a location...</option>
-                        <For each={allLocations().filter((l: any) => getLocationHeight(l.id, allLocations()) === 0 && (!l.part_id || l.part_id === itemId))}>
-                          {(loc: any) => <option value={loc.id}>{loc.name}</option>}
-                        </For>
-                      </select>
-                      <div class="flex gap-2">
-                        <button
-                          onClick={() => setShowLocationPanel(false)}
-                          class="flex-1 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleLinkLocation}
-                          disabled={locationSubmitting() || !linkLocationId()}
-                          class="flex-1 btn-primary py-1.5 text-xs disabled:opacity-50"
-                        >
-                          {locationSubmitting() ? "Linking..." : "Link"}
-                        </button>
-                      </div>
-                    </Show>
-
-                    {/* Create new */}
-                    <Show when={locationPanelMode() === "create"}>
-                      <input
-                        type="text"
-                        value={newLocationName()}
-                        onInput={(e) => setNewLocationName(e.currentTarget.value)}
-                        placeholder="Location name (e.g. Drawer B3)"
-                        class="glass-input w-full text-xs"
-                      />
-                      <select
-                        value={newLocationParentId()}
-                        onChange={(e) => setNewLocationParentId(e.currentTarget.value)}
-                        class="glass-input w-full text-xs"
-                      >
-                        <option value="">No parent (top-level)</option>
-                        <For each={parentLocations()}>
-                          {(loc: any) => <option value={loc.id}>{loc.name}</option>}
-                        </For>
-                      </select>
-                      <div class="flex gap-2">
-                        <button
-                          onClick={() => setShowLocationPanel(false)}
-                          class="flex-1 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleCreateAndLinkLocation}
-                          disabled={locationSubmitting() || !newLocationName()}
-                          class="flex-1 btn-primary py-1.5 text-xs disabled:opacity-50"
-                        >
-                          {locationSubmitting() ? "Creating..." : "Create & Link"}
-                        </button>
-                      </div>
-                    </Show>
-                  </div>
-                </Show>
+              {/* ── Add Location button — shown in states 2 & 3 when clicking "Add Another Location" ── */}
+              <Show when={drillTarget() === null && item().storage_records && item().storage_records.length > 0}>
+                <button
+                  onClick={() => { setSelectedLocationId(""); setShowLocationModal(true); }}
+                  class="w-full text-xs text-gray-500 hover:text-accentCyan transition-colors flex items-center justify-center gap-1.5 py-2"
+                >
+                  <Plus size={12} />
+                  Add Another Location
+                </button>
               </Show>
             </div>
 
@@ -1742,6 +1580,70 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
           targetName={`${item()?.number || 'Part'} (${item()?.value || ''})`}
           onClose={() => setShowNfcModal(false)}
         />
+      </Show>
+
+      {/* ----------------- LOCATION SELECTOR MODAL ----------------- */}
+      <Show when={showLocationModal()}>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+          <div class="glass-panel max-w-2xl w-full max-h-[90vh] rounded-2xl p-4 sm:p-6 border border-white/10 relative my-auto flex flex-col space-y-4 overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div class="flex items-start justify-between shrink-0">
+              <div>
+                <h3 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <MapPin class="text-accentCyan" size={22} />
+                  Assign Storage Location
+                </h3>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Select or create a physical bin/container for <span class="text-white font-semibold">{item()?.value}</span>.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowLocationModal(false); setSelectedLocationId(""); }}
+                class="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Scrollable Selector Body */}
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+              <UniversalLocationSelector
+                locations={allLocations()}
+                selectedLocationId={selectedLocationId()}
+                part={item()}
+                onSelectLocation={(loc) => setSelectedLocationId(loc ? loc.id : "")}
+                initialMode="miller"
+                showInlineCreate={true}
+              />
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div class="flex justify-end pt-3 border-t border-white/10 gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => { setShowLocationModal(false); setSelectedLocationId(""); }}
+                class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLinkLocation}
+                disabled={locationSubmitting() || !selectedLocationId()}
+                class="btn-primary flex items-center justify-center gap-2 text-xs min-w-[140px] disabled:opacity-50"
+              >
+                {locationSubmitting() ? (
+                  <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <Link2 size={14} />
+                    Confirm Location
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   );

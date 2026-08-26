@@ -213,11 +213,37 @@ def patch_location(
         if not part:
             raise HTTPException(status_code=404, detail="Part not found.")
 
-        # Verify storage location does not have child locations
-        has_children = db.query(models.Storage).filter(models.Storage.parent_id == location_id).first() is not None
-        if has_children:
-            raise HTTPException(status_code=400, detail="Cannot assign a part to a location that contains child locations.")
-        storage.part_id = payload.part_id
+        if storage.part_id is None or storage.part_id == payload.part_id:
+            storage.part_id = payload.part_id
+        else:
+            # If target location already has a part assigned (PartOrig), split it into 2 child leaf sub-locations:
+            # Sub-location 1: PartOrig (with existing stock quantity)
+            # Sub-location 2: PartNew (with 0 quantity)
+            existing_part = db.query(models.Part).filter(models.Part.id == storage.part_id).first()
+            orig_name = existing_part.value if existing_part else "Original Part"
+            
+            orig_sub_bin = models.Storage(
+                name=orig_name,
+                parent_id=storage.id,
+                part_id=storage.part_id,
+                quantity=storage.quantity or 0,
+                description=f"Auto-split sub-location for {orig_name}"
+            )
+            db.add(orig_sub_bin)
+
+            # Clear parent container part_id and quantity so it remains a clean parent container node
+            storage.part_id = None
+            storage.quantity = 0
+
+            # Sub-location 2 for new part
+            new_sub_bin = models.Storage(
+                name=f"{part.value}",
+                parent_id=storage.id,
+                part_id=part.id,
+                quantity=0,
+                description=f"Assigned part {part.value} ({part.number})"
+            )
+            db.add(new_sub_bin)
 
     if payload.name is not None:
         storage.name = payload.name
@@ -321,7 +347,10 @@ def collapse_location_to_parent(
     parent.part_id = part_id
     parent.quantity = prev_parent_qty + transferred_qty
 
-    # 2. Delete intermediate child location
+    # 2. Re-link foreign key references from child to parent before deletion
+    db.query(models.AuditLog).filter(models.AuditLog.location_id == child.id).update({"location_id": parent.id})
+
+    # 3. Delete intermediate child location
     db.delete(child)
 
     # 3. Create transaction record and audit log

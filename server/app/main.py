@@ -36,6 +36,9 @@ app = FastAPI(
 # Enable CORS for local client and Tauri app origins
 origins = [
     "http://localhost:5173",       # Vite dev server
+    "http://127.0.0.1:5173",       # Local IP Vite dev server
+    "http://localhost:5174",       # Alternate Vite port
+    "http://127.0.0.1:5174",       # Alternate Vite IP
     "http://localhost:1420",       # Tauri v2 dev server
     "http://127.0.0.1:1420",      # Local IP dev server
     "http://localhost:1421",       # Alternate Tauri port
@@ -56,15 +59,42 @@ app.add_middleware(
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers
+    )
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     traceback.print_exc()
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={"detail": f"Server Error: {str(exc)}"}
     )
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 # Register routers
 app.include_router(auth_router.router)
