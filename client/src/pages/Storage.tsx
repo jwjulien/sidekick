@@ -1,4 +1,5 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
+import { useLocation } from "@solidjs/router";
 import { MapPin, Plus } from "lucide-solid";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
@@ -15,6 +16,7 @@ import { useConfirm } from "../contexts/ConfirmContext";
 
 export default function Storage() {
   const { confirm } = useConfirm();
+  const location = useLocation();
   const [locations, setLocations] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
   
@@ -90,32 +92,6 @@ export default function Storage() {
     }
   };
 
-  onMount(() => {
-    loadData();
-
-    // Initialize activePath from URL if present
-    const params = new URLSearchParams(window.location.search);
-    const locParam = params.get("locPath");
-    if (locParam) {
-      const initialPath = locParam.split(",").filter(Boolean);
-      setActivePath(initialPath);
-      window.history.replaceState({ activePath: initialPath }, "", window.location.href);
-    }
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (e.state && Array.isArray(e.state.activePath)) {
-        setActivePath(e.state.activePath);
-      } else {
-        const p = new URLSearchParams(window.location.search).get("locPath");
-        setActivePath(p ? p.split(",").filter(Boolean) : []);
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-  });
-
-  let nameInputRef: HTMLInputElement | undefined;
-
   const getAncestorChain = (locId: string, allLocs: any[]): string[] => {
     const chain: string[] = [];
     let curr = allLocs.find(l => l.id === locId);
@@ -131,6 +107,67 @@ export default function Storage() {
     }
     return chain;
   };
+
+  // Automatically resolve and expand Miller column ancestor lineage whenever location query param changes or data loads
+  createEffect(() => {
+    const allLocs = locations();
+    if (!allLocs || allLocs.length === 0) return;
+
+    const params = new URLSearchParams(location.search);
+    const targetLocId = params.get("location") || params.get("loc");
+    const locPathStr = params.get("locPath");
+
+    if (targetLocId) {
+      const chain = getAncestorChain(targetLocId, allLocs);
+      if (chain.length > 0) {
+        setActivePath(chain);
+        updateUrlHistory(chain, true);
+      }
+    } else if (locPathStr) {
+      const initialPath = locPathStr.split(",").filter(Boolean);
+      setActivePath(initialPath);
+    }
+  });
+
+  onMount(() => {
+    loadData();
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && Array.isArray(e.state.activePath)) {
+        setActivePath(e.state.activePath);
+      } else {
+        const p = new URLSearchParams(window.location.search).get("locPath");
+        setActivePath(p ? p.split(",").filter(Boolean) : []);
+      }
+    };
+
+    const handleNfcEvent = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      const parsed = customEvt.detail;
+      if (parsed && (parsed.action === "location" || parsed.action === "storage") && parsed.id) {
+        const allLocs = locations();
+        if (allLocs && allLocs.length > 0) {
+          const chain = getAncestorChain(parsed.id, allLocs);
+          if (chain.length > 0) {
+            setActivePath(chain);
+            updateUrlHistory(chain);
+            setShowCreateForm(false);
+            setInlinePartId(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("sidekick:nfc-scanned", handleNfcEvent);
+
+    onCleanup(() => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("sidekick:nfc-scanned", handleNfcEvent);
+    });
+  });
+
+  let nameInputRef: HTMLInputElement | undefined;
 
   const handleSelectNode = (id: string | null) => {
     if (!id) {

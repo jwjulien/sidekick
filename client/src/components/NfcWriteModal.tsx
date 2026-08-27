@@ -1,7 +1,7 @@
 import { createSignal, createEffect, Show } from "solid-js";
-import { X, Nfc, AlertTriangle, CheckCircle2, RefreshCw, Smartphone } from "lucide-solid";
+import { X, Nfc, AlertTriangle, CheckCircle2, RefreshCw, Smartphone, Cpu } from "lucide-solid";
 import toast from "solid-toast";
-import { nfcService, type ResolvedEntity } from "../services/nfcService";
+import { nfcService, type ResolvedEntity, type NfcReaderStatus } from "../services/nfcService";
 
 interface NfcWriteModalProps {
   isOpen: boolean;
@@ -20,16 +20,22 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
   const [existingEntity, setExistingEntity] = createSignal<ResolvedEntity | null>(null);
   const [existingPayload, setExistingPayload] = createSignal<string | null>(null);
   const [mockModeTagType, setMockModeTagType] = createSignal<"blank" | "existing">("blank");
+  const [hardwareStatus, setHardwareStatus] = createSignal<NfcReaderStatus | null>(null);
 
   const targetUri = () => `fuse://${props.targetType}/${props.targetId}`;
 
-  // Reset modal state whenever opened
+  // Reset modal state & check reader status whenever opened
   createEffect(() => {
     if (props.isOpen) {
       setStep("ready");
       setErrorMessage("");
       setExistingEntity(null);
       setExistingPayload(null);
+
+      // Check connected PC/SC USB hardware reader
+      nfcService.getReaderStatus().then((status) => {
+        setHardwareStatus(status);
+      });
     }
   });
 
@@ -121,6 +127,24 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
             </button>
           </div>
 
+          {/* Hardware Connection Banner */}
+          <Show when={hardwareStatus()}>
+            <div class="px-5 py-2 bg-[#171924] border-b border-gray-800/80 flex items-center justify-between text-xs">
+              <span class="flex items-center gap-1.5 font-medium text-gray-300">
+                <Cpu class={`w-3.5 h-3.5 ${hardwareStatus()?.connected ? "text-emerald-400" : "text-amber-400"}`} />
+                <span>{hardwareStatus()?.readerName || "NFC Reader"}</span>
+              </span>
+              <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                hardwareStatus()?.connected
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+              }`}>
+                <span class={`w-1.5 h-1.5 rounded-full ${hardwareStatus()?.connected ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`}></span>
+                {hardwareStatus()?.connected ? "Reader Active" : "No Hardware"}
+              </span>
+            </div>
+          </Show>
+
           {/* Dev Mock Mode Switcher Banner */}
           <div class="px-5 py-2 bg-gray-900/80 border-b border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
             <span class="flex items-center gap-1.5 font-mono text-[11px]">
@@ -160,9 +184,9 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
                   <Nfc class="w-12 h-12 text-accentCyan" />
                 </div>
               </div>
-              <p class="text-sm font-medium text-white mt-2">Hold phone or USB reader near tag</p>
+              <p class="text-sm font-medium text-white mt-2">Place NFC sticker on ACR122U or hold phone near tag</p>
               <p class="text-xs text-gray-400 mt-1 max-w-xs">
-                Payload <span class="font-mono text-accentCyan bg-accentCyan/10 px-1.5 py-0.5 rounded">{targetUri()}</span> will be written to the NFC sticker.
+                Payload <span class="font-mono text-accentCyan bg-accentCyan/10 px-1.5 py-0.5 rounded">{targetUri()}</span> will be written to the physical tag.
               </p>
               <button
                 onClick={handleStartWriteProcess}
@@ -178,7 +202,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
               <div class="my-6">
                 <RefreshCw class="w-12 h-12 text-accentCyan animate-spin mx-auto" />
               </div>
-              <p class="text-sm font-medium text-white">Scanning Tag...</p>
+              <p class="text-sm font-medium text-white">Scanning Reader & Tag...</p>
               <p class="text-xs text-gray-400 mt-1">Reading NDEF payload & checking database safeguards...</p>
             </Show>
 
@@ -222,8 +246,8 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
               <div class="my-6">
                 <RefreshCw class="w-12 h-12 text-accentCyan animate-spin mx-auto" />
               </div>
-              <p class="text-sm font-medium text-white">Writing NDEF Record...</p>
-              <p class="text-xs text-gray-400 mt-1">Do not move phone away from tag.</p>
+              <p class="text-sm font-medium text-white">Writing APDU NDEF Record...</p>
+              <p class="text-xs text-gray-400 mt-1">Hold tag firmly on ACR122U reader surface.</p>
             </Show>
 
             {/* Step: Success */}
@@ -233,7 +257,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
               </div>
               <h4 class="text-base font-bold text-emerald-400 mt-1">NFC Tag Programmed!</h4>
               <p class="text-xs text-gray-300 mt-1">
-                Sticker is now encoded with <span class="font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded">{targetUri()}</span>
+                Sticker encoded with <span class="font-mono text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded">{targetUri()}</span>
               </p>
               <button
                 onClick={props.onClose}

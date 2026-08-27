@@ -7,6 +7,13 @@ export interface NfcTagData {
   error?: string;
 }
 
+export interface NfcReaderStatus {
+  connected: boolean;
+  readerName: string | null;
+  cardPresent: boolean;
+  error?: string;
+}
+
 export interface ResolvedEntity {
   entity_type: "location" | "part";
   entity_id: string;
@@ -34,6 +41,34 @@ export const nfcService = {
   },
 
   /**
+   * Checks connection status of PC/SC USB Reader (ACR122U).
+   */
+  async getReaderStatus(): Promise<NfcReaderStatus> {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const res: any = await invoke("nfc_get_status");
+        if (res) {
+          return {
+            connected: res.connected ?? false,
+            readerName: res.reader_name || null,
+            cardPresent: res.card_present ?? false,
+            error: res.error || undefined,
+          };
+        }
+      } catch (err) {
+        console.warn("[NFC Service] Reader status query failed:", err);
+      }
+    }
+    // Browser Mock Mode Fallback
+    return {
+      connected: true,
+      readerName: "Dev Mock Reader",
+      cardPresent: false,
+    };
+  },
+
+  /**
    * Reads NFC tag using Tauri native Rust commands (PC/SC on desktop, plugin on mobile) or Dev Mock Mode.
    */
   async readTag(): Promise<NfcTagData> {
@@ -42,14 +77,14 @@ export const nfcService = {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const res: any = await invoke("nfc_read_tag");
-        if (res && res.success) {
+        if (res) {
           return {
-            success: true,
+            success: res.success ?? false,
             payload: res.payload || null,
             tagUid: res.tag_uid || null,
+            error: res.error || undefined,
           };
         }
-        // If native call returned no hardware, fall through to mock mode in dev
       } catch (err) {
         console.warn("[NFC Service] Native read invoke failed, using dev fallback:", err);
       }
@@ -99,7 +134,7 @@ export const nfcService = {
     } catch (err) {
       // Payload exists but is not an active DB entity (e.g. unknown tag or deleted location)
       return {
-        canWriteDirectly: true, // Or allow overwrite since entity no longer exists
+        canWriteDirectly: true, // Allow overwrite since entity no longer exists
         existingPayload: payload,
         resolvedEntity: null,
       };
@@ -124,13 +159,15 @@ export const nfcService = {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const res: any = await invoke("nfc_write_tag", { uri });
-        if (res && res.success) {
-          // Update mock state as well
-          mockCurrentTagPayload = uri;
+        if (res) {
+          if (res.success) {
+            mockCurrentTagPayload = uri;
+          }
           return {
-            success: true,
-            payload: uri,
-            tagUid: res.tag_uid || "NFC-TAG-OK",
+            success: res.success ?? false,
+            payload: res.payload || null,
+            tagUid: res.tag_uid || null,
+            error: res.error || undefined,
           };
         }
       } catch (err) {

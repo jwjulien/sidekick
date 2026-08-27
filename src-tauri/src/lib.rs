@@ -15,7 +15,8 @@ pub fn run() {
   builder
     .invoke_handler(tauri::generate_handler![
       nfc::nfc_read_tag,
-      nfc::nfc_write_tag
+      nfc::nfc_write_tag,
+      nfc::nfc_get_status
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -24,6 +25,10 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+      }
+      #[cfg(desktop)]
+      {
+        nfc::start_desktop_nfc_polling(app.handle().clone());
       }
       Ok(())
     })
