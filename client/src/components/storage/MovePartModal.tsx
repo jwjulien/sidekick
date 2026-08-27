@@ -27,7 +27,7 @@ export default function MovePartModal(props: MovePartModalProps) {
         toast.error(scan.error || "No NFC tag payload detected.");
         return;
       }
-      
+
       const resolved = await apiFetch(`/resolve/${encodeURIComponent(scan.payload)}`);
       if (resolved.entity_type === "location") {
         const foundLoc = (props.allLocations || []).find((l: any) => String(l.id) === String(resolved.entity_id));
