@@ -128,6 +128,7 @@ export default function StorageColumns(props: {
   onStorageChanged?: (locationId: string, newQty: number, newLastCounted: string) => void;
   onScale?: (location: any) => void;
   onPrint?: (location: any) => void;
+  onWriteNfc?: (location: any) => void;
   onDeleteLocation?: (location: any) => void;
 }) {
   const [filterText, setFilterText] = createSignal("");
@@ -145,9 +146,9 @@ export default function StorageColumns(props: {
   let scrollRef: HTMLDivElement | undefined;
 
   createEffect(on(() => props.activePath.length, () => {
-    if (scrollRef) {
+    if (scrollRef && typeof scrollRef.scrollTo === "function") {
       setTimeout(() => {
-        scrollRef!.scrollTo({ left: scrollRef!.scrollWidth, behavior: 'smooth' });
+        scrollRef?.scrollTo({ left: scrollRef.scrollWidth, behavior: 'smooth' });
       }, 50);
     }
   }));
@@ -283,6 +284,7 @@ export default function StorageColumns(props: {
                             onMove={props.onMoveParts ? (loc) => props.onMoveParts!(loc) : undefined}
                             onScale={props.onScale ? (loc) => props.onScale!(loc) : undefined}
                             onPrint={props.onPrint ? (loc) => props.onPrint!(loc) : undefined}
+                            onWriteNfc={props.onWriteNfc ? (loc) => props.onWriteNfc!(loc) : undefined}
                             onDelete={props.onDeleteLocation ? (loc) => props.onDeleteLocation!(loc) : undefined}
                             onChanged={(qty, ts) => props.onStorageChanged?.(String(parentLoc()!.id), qty, ts)}
                           />

@@ -45,6 +45,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [showNfcModal, setShowNfcModal] = createSignal(false);
+  const [nfcTargetLocation, setNfcTargetLocation] = createSignal<any | null>(null);
 
   // Stock panel state
   // drillTarget: null = list view, number = showing StockController for that storage ID
@@ -1172,6 +1173,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                       setShowScaleModal(true);
                     }}
                     onPrint={(rec) => setActivePrintLocation(rec)}
+                    onWriteNfc={(rec) => setNfcTargetLocation(rec)}
                     onDelete={(rec) => handleDeleteLocation(rec)}
                     onChanged={(qty, ts) => handleStorageChanged(item().storage_records[0]?.id, qty, ts)}
                   />
@@ -1205,6 +1207,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                             setShowScaleModal(true);
                           }}
                           onPrint={(rec) => setActivePrintLocation(rec)}
+                          onWriteNfc={(rec) => setNfcTargetLocation(rec)}
                           onDelete={(rec) => handleDeleteLocation(rec)}
                           onChanged={(qty, ts) => handleStorageChanged(activeDrillSlot()?.id, qty, ts)}
                         />
@@ -1580,7 +1583,7 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
         }}
       />
 
-      {/* NFC Write Modal */}
+      {/* NFC Write Modal (Part) */}
       <Show when={showNfcModal() && item()}>
         <NfcWriteModal
           isOpen={showNfcModal()}
@@ -1588,6 +1591,17 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
           targetId={item()?.id}
           targetName={`${item()?.number || 'Part'} (${item()?.value || ''})`}
           onClose={() => setShowNfcModal(false)}
+        />
+      </Show>
+
+      {/* NFC Write Modal (Location) */}
+      <Show when={nfcTargetLocation()}>
+        <NfcWriteModal
+          isOpen={!!nfcTargetLocation()}
+          targetType="location"
+          targetId={String(nfcTargetLocation()?.id)}
+          targetName={nfcTargetLocation()?.name || "Storage Location"}
+          onClose={() => setNfcTargetLocation(null)}
         />
       </Show>
 

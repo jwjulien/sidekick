@@ -375,6 +375,7 @@ export default function Storage() {
             onStorageChanged={() => loadData(true)}
             onPrint={(loc) => setActivePrintLocation(loc)}
             onScale={handleScaleLocation}
+            onWriteNfc={(loc) => setNfcTargetLocation(loc)}
             onDeleteLocation={(loc) => handleDeleteLocation(String(loc.id))}
           />
         </div>

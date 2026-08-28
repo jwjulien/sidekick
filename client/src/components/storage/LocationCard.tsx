@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import { MapPin, Move, Scale, Printer, Trash2 } from "lucide-solid";
+import { MapPin, Move, Scale, Printer, Nfc, Trash2 } from "lucide-solid";
 import StockController from "../StockController";
 
 export interface LocationCardProps {
@@ -19,6 +19,7 @@ export interface LocationCardProps {
   onMove?: (location: any) => void;
   onScale?: (location: any) => void;
   onPrint?: (location: any) => void;
+  onWriteNfc?: (location: any) => void;
   onDelete?: (location: any) => void;
   onChanged?: (newQty: number, newLastCounted: string) => void;
   compact?: boolean;
@@ -92,6 +93,16 @@ export default function LocationCard(props: LocationCardProps) {
               title="Print Label"
             >
               <Printer size={14} />
+            </button>
+          </Show>
+
+          <Show when={props.onWriteNfc}>
+            <button
+              onClick={() => props.onWriteNfc?.(props.location)}
+              class="p-1.5 rounded-lg bg-white/5 text-accentCyan hover:text-cyan-300 transition-colors"
+              title="Write NFC Tag"
+            >
+              <Nfc size={14} />
             </button>
           </Show>
 

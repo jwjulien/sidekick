@@ -44,9 +44,9 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   // Auto-scroll Miller Columns container to the right when path expands
   createEffect(() => {
     millerPath();
-    if (millerContainerRef) {
+    if (millerContainerRef && typeof millerContainerRef.scrollTo === "function") {
       setTimeout(() => {
-        millerContainerRef?.scrollTo({
+        millerContainerRef.scrollTo({
           left: millerContainerRef.scrollWidth,
           behavior: "smooth"
         });

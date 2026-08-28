@@ -56,7 +56,7 @@ describe("Storage page deep link reset behavior", () => {
   it("retains the newly selected location path after location edit/reload without resetting to original deep link location", async () => {
     window.history.replaceState({}, "", "/storage?location=loc-1");
 
-    const { getByText, findByText } = render(() => (
+    const { getByText, findAllByText, findByText } = render(() => (
       <ViewStateProvider>
         <ConfirmProvider>
           <Router>
@@ -66,7 +66,7 @@ describe("Storage page deep link reset behavior", () => {
       </ViewStateProvider>
     ));
 
-    await findByText("Location 1");
+    await findAllByText("Location 1");
     await findByText("Location 2");
 
     // Click on "Location 2" to navigate away from deep linked Location 1
