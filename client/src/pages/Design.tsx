@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Show } from "solid-js";
+import { createSignal, createEffect, onMount, For, Show } from "solid-js";
 import { 
   FolderTree, 
   Tag, 
@@ -13,16 +13,19 @@ import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useScale } from "../context/ScaleContext";
+import { useViewState } from "../context/ViewStateContext";
 
 const CategoryNode = (props: {
   category: any;
   allCategories: any[];
   depth: number;
+  expandedIds: () => string[];
+  onToggleExpand: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (cat: any) => void;
 }) => {
-  const [expanded, setExpanded] = createSignal(false);
-  const children = () => props.allCategories.filter(c => c.parent_id === props.category.id);
+  const expanded = () => props.expandedIds().includes(String(props.category.id));
+  const children = () => props.allCategories.filter(c => String(c.parent_id) === String(props.category.id));
   const hasChildren = () => children().length > 0;
 
   return (
@@ -31,7 +34,7 @@ const CategoryNode = (props: {
         style={{ "margin-left": `${props.depth * 20}px` }}
         class="glass-card p-3.5 rounded-xl border border-white/5 flex items-center justify-between gap-3 text-xs"
       >
-        <div class="flex items-center gap-2 cursor-pointer" onClick={() => hasChildren() && setExpanded(!expanded())}>
+        <div class="flex items-center gap-2 cursor-pointer" onClick={() => hasChildren() && props.onToggleExpand(String(props.category.id))}>
           <span class="text-accentCyan shrink-0 w-4 flex justify-center">
             {hasChildren() ? (
               expanded() ? <ChevronDown size={14} /> : <ChevronRight size={14} />
@@ -72,6 +75,8 @@ const CategoryNode = (props: {
               category={child} 
               allCategories={props.allCategories} 
               depth={props.depth + 1} 
+              expandedIds={props.expandedIds}
+              onToggleExpand={props.onToggleExpand}
               onDelete={props.onDelete}
               onEdit={props.onEdit}
             />
@@ -85,10 +90,31 @@ const CategoryNode = (props: {
 export default function Design() {
   const scale = useScale();
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = createSignal<"categories" | "tares">("categories");
+  const viewState = useViewState();
+  const savedState = viewState.designState();
+
+  const [activeTab, setActiveTab] = createSignal<"categories" | "tares">(savedState.activeTab || "categories");
+  const [expandedCategoryIds, setExpandedCategoryIds] = createSignal<string[]>(savedState.expandedCategoryIds || []);
   const [categories, setCategories] = createSignal<any[]>([]);
   const [tareWeights, setTareWeights] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
+
+  // Sync state back to ViewStateContext
+  createEffect(() => {
+    viewState.setDesignState({
+      activeTab: activeTab(),
+      expandedCategoryIds: expandedCategoryIds(),
+    });
+  });
+
+  const toggleExpandCategory = (catId: string) => {
+    const current = expandedCategoryIds();
+    if (current.includes(catId)) {
+      setExpandedCategoryIds(current.filter((id) => id !== catId));
+    } else {
+      setExpandedCategoryIds([...current, catId]);
+    }
+  };
 
   // Category Form State
   const [editCatId, setEditCatId] = createSignal<string | null>(null);
@@ -376,6 +402,8 @@ export default function Design() {
                         category={cat} 
                         allCategories={categories()} 
                         depth={0} 
+                        expandedIds={expandedCategoryIds}
+                        onToggleExpand={toggleExpandCategory}
                         onDelete={handleDeleteCategory}
                         onEdit={handleEditCategoryClick}
                       />

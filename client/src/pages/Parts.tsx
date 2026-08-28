@@ -1,12 +1,14 @@
 import { createSignal, onMount, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Plus, X, Trash2 } from "lucide-solid";
+import { Plus, X, Trash2, ArrowLeft } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
 import UniversalPartsBrowser from "../components/parts/UniversalPartsBrowser";
+import { useViewState } from "../context/ViewStateContext";
 
 export default function Parts() {
   const navigate = useNavigate();
+  const viewState = useViewState();
   const [parts, setParts] = createSignal<any[]>([]);
   const [categories, setCategories] = createSignal<any[]>([]);
   const [locations, setLocations] = createSignal<any[]>([]);
@@ -123,16 +125,29 @@ export default function Parts() {
           <p class="text-gray-400 text-sm">Browse, search, filter, and track components in stock.</p>
         </div>
 
-        {/* Create Button */}
-        <Show when={user()?.role === "admin" || user()?.role === "stocker" || user()?.role === "designer"}>
-          <button
-            onClick={() => setShowAddModal(true)}
-            class="btn-primary flex items-center justify-center gap-2"
-          >
-            <Plus size={18} />
-            Add New Part
-          </button>
-        </Show>
+        <div class="flex items-center gap-3">
+          <Show when={viewState.partsState().lastViewedPartId}>
+            <button
+              onClick={() => navigate(`/parts/${viewState.partsState().lastViewedPartId}`)}
+              class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-accentCyan/15 text-accentCyan border border-accentCyan/30 hover:bg-accentCyan/25 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Return to the last viewed part"
+            >
+              <ArrowLeft size={14} />
+              Return to Last Viewed Part ({viewState.partsState().lastViewedPartName || "Part"})
+            </button>
+          </Show>
+
+          {/* Create Button */}
+          <Show when={user()?.role === "admin" || user()?.role === "stocker" || user()?.role === "designer"}>
+            <button
+              onClick={() => setShowAddModal(true)}
+              class="btn-primary flex items-center justify-center gap-2"
+            >
+              <Plus size={18} />
+              Add New Part
+            </button>
+          </Show>
+        </div>
       </div>
 
       {/* Shared Universal Parts Browser Component */}
@@ -140,7 +155,6 @@ export default function Parts() {
         parts={parts()}
         loading={loading()}
         title="Inventory Parts Catalog"
-        mode="grid"
         onSelectPart={(part) => navigate(`/parts/${part.id}`)}
       />
 

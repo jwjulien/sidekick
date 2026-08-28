@@ -13,9 +13,11 @@ import PartDetails from "./PartDetails";
 import ScaleModal from "../components/ScaleModal";
 import NfcWriteModal from "../components/NfcWriteModal";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { useViewState } from "../context/ViewStateContext";
 
 export default function Storage() {
   const { confirm } = useConfirm();
+  const viewState = useViewState();
   const location = useLocation();
   const [locations, setLocations] = createSignal<any[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -40,7 +42,12 @@ export default function Storage() {
   const [nfcTargetLocation, setNfcTargetLocation] = createSignal<any | null>(null);
 
   // Navigation State
-  const [activePath, setActivePath] = createSignal<string[]>([]);
+  const [activePath, setActivePath] = createSignal<string[]>(viewState.storagePath());
+
+  // Keep ViewStateContext in sync whenever activePath updates
+  createEffect(() => {
+    viewState.setStoragePath(activePath());
+  });
   
   // Parts Browser & Inline Part Details
   const [inlinePartId, setInlinePartId] = createSignal<string | null>(null);

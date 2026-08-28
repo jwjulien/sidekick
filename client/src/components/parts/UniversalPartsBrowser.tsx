@@ -13,6 +13,7 @@ import {
   Tag
 } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
+import { useViewState } from "../../context/ViewStateContext";
 
 export interface UniversalPartsBrowserProps {
   parts?: any[]; // Input array of parts (if passed, operates in client-side mode)
@@ -33,20 +34,37 @@ export interface UniversalPartsBrowserProps {
 }
 
 export default function UniversalPartsBrowser(props: UniversalPartsBrowserProps) {
+  const viewState = useViewState();
+  const savedState = viewState.partsState();
+
   const [remoteParts, setRemoteParts] = createSignal<any[]>([]);
   const [remoteLoading, setRemoteLoading] = createSignal(false);
   const [categories, setCategories] = createSignal<any[]>([]);
 
   // State for search, filter, sort
-  const [search, setSearch] = createSignal("");
-  const [selectedCat, setSelectedCat] = createSignal(props.categoryId || "");
-  const [filterLowStock, setFilterLowStock] = createSignal(props.lowStockOnly || false);
+  const [search, setSearch] = createSignal(savedState.search || "");
+  const [selectedCat, setSelectedCat] = createSignal(props.categoryId || savedState.selectedCat || "");
+  const [filterLowStock, setFilterLowStock] = createSignal(props.lowStockOnly !== undefined ? props.lowStockOnly : (savedState.filterLowStock || false));
   const [filterUnassigned] = createSignal(props.unassignedOnly || false);
-  const [viewMode, setViewMode] = createSignal<"table" | "grid" | "picker">(props.mode || "table");
+  const [viewMode, setViewMode] = createSignal<"table" | "grid" | "picker">(props.mode || savedState.viewMode || "table");
   
   // Sorting state
-  const [sortField, setSortField] = createSignal<string>("value");
-  const [sortOrder, setSortOrder] = createSignal<"asc" | "desc">("asc");
+  const [sortField, setSortField] = createSignal<string>(savedState.sortField || "value");
+  const [sortOrder, setSortOrder] = createSignal<"asc" | "desc">(savedState.sortOrder || "asc");
+
+  // Sync state back to ViewStateContext for non-picker mode
+  createEffect(() => {
+    if (props.mode !== "picker") {
+      viewState.setPartsState({
+        search: search(),
+        selectedCat: selectedCat(),
+        filterLowStock: filterLowStock(),
+        viewMode: viewMode(),
+        sortField: sortField(),
+        sortOrder: sortOrder()
+      });
+    }
+  });
 
   // Selection state
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(

@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Show } from "solid-js";
+import { createSignal, createEffect, onMount, For, Show } from "solid-js";
 import { 
   FolderGit2, 
   Plus, 
@@ -20,22 +20,35 @@ import {
 import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { useViewState } from "../context/ViewStateContext";
 
 export default function Projects() {
   const { confirm } = useConfirm();
+  const viewState = useViewState();
+  const savedState = viewState.projectsState();
+
   const [projects, setProjects] = createSignal<any[]>([]);
   const [parts, setParts] = createSignal<any[]>([]);
   
-  const [selectedProjectId, setSelectedProjectId] = createSignal<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = createSignal<number | null>(savedState.selectedProjectId);
   const [selectedProject, setSelectedProject] = createSignal<any>(null);
   
-  const [selectedAssemblyId, setSelectedAssemblyId] = createSignal<number | null>(null);
+  const [selectedAssemblyId, setSelectedAssemblyId] = createSignal<number | null>(savedState.selectedAssemblyId);
   const [selectedAssembly, setSelectedAssembly] = createSignal<any>(null);
   
-  const [selectedRevisionId, setSelectedRevisionId] = createSignal<number | null>(null);
+  const [selectedRevisionId, setSelectedRevisionId] = createSignal<number | null>(savedState.selectedRevisionId);
   const [selectedRevision, setSelectedRevision] = createSignal<any>(null);
   
   const [loading, setLoading] = createSignal(true);
+
+  // Sync selection back to ViewStateContext
+  createEffect(() => {
+    viewState.setProjectsState({
+      selectedProjectId: selectedProjectId(),
+      selectedAssemblyId: selectedAssemblyId(),
+      selectedRevisionId: selectedRevisionId(),
+    });
+  });
 
   // Add/Edit Project Modal
   const [showProjModal, setShowProjModal] = createSignal(false);
@@ -156,9 +169,15 @@ export default function Projects() {
       setProjects(projs);
       setParts(catalogParts);
       
-      // Auto select first project
-      if (projs.length > 0 && !selectedProjectId()) {
-        handleSelectProject(projs[0].id);
+      // Auto select project or restore saved selection
+      if (projs.length > 0) {
+        const saved = viewState.projectsState();
+        const savedProj = saved.selectedProjectId ? projs.find((p: any) => p.id === saved.selectedProjectId) : null;
+        if (savedProj) {
+          handleSelectProject(savedProj.id, saved.selectedAssemblyId, saved.selectedRevisionId);
+        } else {
+          handleSelectProject(projs[0].id);
+        }
       }
     } catch (err) {
       console.error("Failed to load projects:", err);
@@ -171,7 +190,7 @@ export default function Projects() {
     loadInitialData();
   });
 
-  const handleSelectProject = async (id: string, autoSelectAssemblyId?: number) => {
+  const handleSelectProject = async (id: any, autoSelectAssemblyId?: any, autoSelectRevisionId?: any) => {
     setSelectedProjectId(id);
     setSelectedAssemblyId(null);
     setSelectedAssembly(null);
@@ -183,15 +202,16 @@ export default function Projects() {
       
       // Auto select assembly
       if (detailedProject.assemblies && detailedProject.assemblies.length > 0) {
-        const assemToSelect = autoSelectAssemblyId || detailedProject.assemblies[0].id;
-        handleSelectAssembly(assemToSelect, detailedProject);
+        const targetAssem = autoSelectAssemblyId ? detailedProject.assemblies.find((a: any) => a.id === autoSelectAssemblyId) : null;
+        const assemToSelect = targetAssem ? targetAssem.id : detailedProject.assemblies[0].id;
+        handleSelectAssembly(assemToSelect, detailedProject, targetAssem ? autoSelectRevisionId : null);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleSelectAssembly = (assemId: string, projDetails = selectedProject()) => {
+  const handleSelectAssembly = (assemId: any, projDetails = selectedProject(), autoSelectRevisionId?: any) => {
     setSelectedAssemblyId(assemId);
     setSelectedRevisionId(null);
     setSelectedRevision(null);
@@ -200,14 +220,16 @@ export default function Projects() {
       const assem = projDetails.assemblies.find((a: any) => a.id === assemId);
       setSelectedAssembly(assem);
       
-      // Auto select first revision if available
+      // Auto select revision if available
       if (assem && assem.revisions && assem.revisions.length > 0) {
-        handleSelectRevision(assem.revisions[0].id, assem);
+        const targetRev = autoSelectRevisionId ? assem.revisions.find((r: any) => r.id === autoSelectRevisionId) : null;
+        const revToSelect = targetRev ? targetRev.id : assem.revisions[0].id;
+        handleSelectRevision(revToSelect, assem);
       }
     }
   };
 
-  const handleSelectRevision = (revId: string, assemDetails = selectedAssembly()) => {
+  const handleSelectRevision = (revId: any, assemDetails = selectedAssembly()) => {
     setSelectedRevisionId(revId);
     if (assemDetails) {
       const rev = assemDetails.revisions.find((r: any) => r.id === revId);

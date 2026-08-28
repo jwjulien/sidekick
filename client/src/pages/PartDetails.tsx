@@ -23,6 +23,7 @@ import {
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { useViewState } from "../context/ViewStateContext";
 import LocationCard, { getLocationPathString } from "../components/storage/LocationCard";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
@@ -35,6 +36,7 @@ import UniversalLocationSelector from "../components/storage/UniversalLocationSe
 
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
+  const viewState = useViewState();
   const params = useParams();
   const navigate = useNavigate();
   const itemId = props.id || params.id;
@@ -164,6 +166,13 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
     try {
       const data = await apiFetch(`/parts/${itemId}`);
       setItem(data);
+
+      if (data && data.id) {
+        viewState.setPartsState({
+          lastViewedPartId: String(data.id),
+          lastViewedPartName: data.value ? `${data.value}${data.number ? ` (${data.number})` : ""}` : (data.number || String(data.id))
+        });
+      }
 
       // Seed edit form values
       setEditValue(data.value);
