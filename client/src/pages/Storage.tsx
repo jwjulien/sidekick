@@ -92,6 +92,10 @@ export default function Storage() {
     } else {
       url.searchParams.delete("locPath");
     }
+    // Clean up deep link search params once path is set/updated
+    url.searchParams.delete("location");
+    url.searchParams.delete("loc");
+
     if (replace) {
       window.history.replaceState({ activePath: path }, "", url.toString());
     } else {
@@ -120,7 +124,8 @@ export default function Storage() {
     const allLocs = locations();
     if (!allLocs || allLocs.length === 0) return;
 
-    const params = new URLSearchParams(location.search);
+    const search = window.location.search || location.search;
+    const params = new URLSearchParams(search);
     const targetLocId = params.get("location") || params.get("loc");
     const locPathStr = params.get("locPath");
 
@@ -156,6 +161,7 @@ export default function Storage() {
         if (allLocs && allLocs.length > 0) {
           const chain = getAncestorChain(parsed.id, allLocs);
           if (chain.length > 0) {
+            e.preventDefault(); // Prevent default fallback route navigation in useDeepLink
             setActivePath(chain);
             updateUrlHistory(chain);
             setShowCreateForm(false);
