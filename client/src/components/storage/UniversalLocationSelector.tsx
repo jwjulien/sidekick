@@ -1,4 +1,5 @@
-import { createSignal, createMemo, createEffect, onMount, For, Show } from "solid-js";
+import { createSignal, createMemo, createEffect, onMount, onCleanup, For, Show } from "solid-js";
+import toast from "solid-toast";
 import { 
   Search, 
   MapPin, 
@@ -73,6 +74,10 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   // Track whether initial path has been set from initialLocationId
   const [initialPathSet, setInitialPathSet] = createSignal(false);
 
+  const allLocations = createMemo(() => {
+    return props.locations !== undefined ? props.locations : remoteLocations();
+  });
+
   // Sync prop changes for selectedLocationId or initialLocationId
   createEffect(() => {
     const locs = allLocations();
@@ -84,6 +89,9 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
       if (chain.length > 0) {
         setMillerPath(chain);
       }
+      if (searchTerm()) {
+        setSearchTerm("");
+      }
     } else if (props.initialLocationId && !initialPathSet()) {
       const chain = getAncestorChain(props.initialLocationId, locs);
       if (chain.length > 0) {
@@ -93,7 +101,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     }
   });
 
-  // Fetch locations if not provided as props
+  // Fetch locations if not provided as props & Listen for hardware NFC scans
   onMount(async () => {
     if (props.locations === undefined) {
       setLoading(true);
@@ -106,10 +114,72 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
         setLoading(false);
       }
     }
-  });
 
-  const allLocations = createMemo(() => {
-    return props.locations !== undefined ? props.locations : remoteLocations();
+    const handleNfcEvent = async (e: Event) => {
+      const customEvt = e as CustomEvent;
+      const parsed = customEvt.detail;
+      if (!parsed) return;
+
+      let targetLocId: string | null = parsed.id || null;
+      const rawPayload: string = parsed.rawUrl || parsed.id || "";
+
+      const locs = allLocations();
+
+      // Resolve via backend API if action is 'resolve' or targetLocId isn't found directly in current locations
+      if ((parsed.action === "resolve" || !targetLocId || !locs.some((l) => String(l.id) === String(targetLocId))) && rawPayload) {
+        try {
+          const resolved = await apiFetch(`/resolve/${encodeURIComponent(rawPayload)}`);
+          if (resolved && resolved.entity_type === "location" && resolved.entity_id) {
+            targetLocId = resolved.entity_id;
+          }
+        } catch (err) {
+          console.warn("[UniversalLocationSelector] Failed to resolve NFC payload:", err);
+        }
+      }
+
+      if (!targetLocId) return;
+
+      let foundLoc = locs.find((l) => String(l.id) === String(targetLocId));
+
+      // Fallback fetch location details if missing from locs array
+      if (!foundLoc) {
+        try {
+          const fetched = await apiFetch(`/locations/${encodeURIComponent(targetLocId)}`);
+          if (fetched && fetched.id) {
+            foundLoc = fetched;
+            if (props.locations === undefined) {
+              setRemoteLocations((prev) => [...prev.filter((l) => String(l.id) !== String(fetched.id)), fetched]);
+            }
+          }
+        } catch (err) {
+          console.warn("[UniversalLocationSelector] Location fetch failed:", err);
+        }
+      }
+
+      if (foundLoc) {
+        e.preventDefault(); // Stop default route navigation in useDeepLink
+
+        if (searchTerm()) {
+          setSearchTerm("");
+        }
+
+        setSelectedId(foundLoc.id);
+        const currentLocs = allLocations();
+        const chain = getAncestorChain(foundLoc.id, currentLocs);
+        if (chain.length > 0) {
+          setMillerPath(chain);
+        }
+
+        props.onSelectLocation(foundLoc);
+        toast.success(`NFC Selected: ${foundLoc.name}`, { id: "nfc-loc-select", icon: "🏷️" });
+      }
+    };
+
+    window.addEventListener("sidekick:nfc-scanned", handleNfcEvent);
+
+    onCleanup(() => {
+      window.removeEventListener("sidekick:nfc-scanned", handleNfcEvent);
+    });
   });
 
   // Map of parentId -> children array

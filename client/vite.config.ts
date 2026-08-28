@@ -5,7 +5,7 @@ import solid from 'vite-plugin-solid'
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [solid({ hot: process.env.VITEST ? false : true })],
   server: {
     host: host || true,
     port: 5173,

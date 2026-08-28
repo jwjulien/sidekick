@@ -38,4 +38,12 @@ describe("parseDeepLink", () => {
     expect(result?.id).toBe("test-uuid-123");
     expect(result?.targetRoute).toBe("/scan?resolve=test-uuid-123");
   });
+
+  it("parses fuse://storage?id={id} query parameter links", () => {
+    const result = parseDeepLink("fuse://storage?id=018f8a32-1234-7000-8000-000000000001");
+    expect(result).not.toBeNull();
+    expect(result?.action).toBe("location");
+    expect(result?.id).toBe("018f8a32-1234-7000-8000-000000000001");
+    expect(result?.targetRoute).toBe("/storage?location=018f8a32-1234-7000-8000-000000000001");
+  });
 });

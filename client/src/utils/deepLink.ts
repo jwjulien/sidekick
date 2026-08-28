@@ -39,7 +39,14 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
     : "";
 
   const primaryAction = parts[0]?.toLowerCase() || "";
-  const secondaryId = parts[1] || "";
+  let secondaryId = parts[1] || "";
+
+  if (!secondaryId && queryString) {
+    try {
+      const params = new URLSearchParams(queryString);
+      secondaryId = params.get("id") || params.get("location") || params.get("part") || params.get("resolve") || "";
+    } catch (_) {}
+  }
 
   switch (primaryAction) {
     case "location":

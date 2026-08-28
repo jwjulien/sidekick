@@ -29,11 +29,15 @@ export function useDeepLink() {
           for (const rawUrl of urls) {
             const parsed = parseDeepLink(rawUrl);
             if (parsed) {
-              toast(`Deep link: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
-              if (navigate) {
-                navigate(parsed.targetRoute);
-              } else {
-                window.location.href = parsed.targetRoute;
+              const evt = new CustomEvent("sidekick:nfc-scanned", { detail: parsed, cancelable: true });
+              const handled = !window.dispatchEvent(evt);
+              if (!handled) {
+                toast(`Deep link: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
+                if (navigate) {
+                  navigate(parsed.targetRoute);
+                } else {
+                  window.location.href = parsed.targetRoute;
+                }
               }
               break;
             }
@@ -54,12 +58,15 @@ export function useDeepLink() {
             if (rawPayload && rawPayload.startsWith("fuse://")) {
               const parsed = parseDeepLink(rawPayload);
               if (parsed) {
-                toast(`NFC Reader: Navigating to ${parsed.action}`, { id: "nfc-tap-toast", icon: "🏷️" });
-                window.dispatchEvent(new CustomEvent("sidekick:nfc-scanned", { detail: parsed }));
-                if (navigate) {
-                  navigate(parsed.targetRoute);
-                } else {
-                  window.location.href = parsed.targetRoute;
+                const evt = new CustomEvent("sidekick:nfc-scanned", { detail: parsed, cancelable: true });
+                const handled = !window.dispatchEvent(evt);
+                if (!handled) {
+                  toast(`NFC Reader: Navigating to ${parsed.action}`, { id: "nfc-tap-toast", icon: "🏷️" });
+                  if (navigate) {
+                    navigate(parsed.targetRoute);
+                  } else {
+                    window.location.href = parsed.targetRoute;
+                  }
                 }
               }
             }
