@@ -1,6 +1,6 @@
 ---
 title: Markdown Rendering Component
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -40,11 +40,11 @@ The Markdown Rendering Component provides a reactive, display-only UI element (`
 ---
 
 ## 5. Implementation Tasks
-- [ ] Install `marked` and `dompurify` dependencies in `client/package.json`.
-- [ ] Create `client/src/components/Markdown.tsx` with SolidJS reactivity, `marked` extensions, and `DOMPurify` sanitization.
-- [ ] Create `client/src/components/Markdown.css` styling tokens for admonitions, tables, code, and abbreviations.
-- [ ] Integrate `<Markdown />` into `PartLists.tsx` (list cards and header details).
-- [ ] Integrate `<Markdown />` into `PartDetails.tsx` (part notes/description).
-- [ ] Integrate `<Markdown />` into `Projects.tsx` (project description and card preview).
-- [ ] Integrate `<Markdown />` into `Inventory.tsx` (inventory notes preview).
-- [ ] Add unit test suite `Markdown.test.tsx` verifying parsing, feature extensions, and XSS sanitization.
+- [x] Install `marked` and `dompurify` dependencies in `client/package.json`.
+- [x] Create `client/src/components/Markdown.tsx` with SolidJS reactivity, `marked` extensions, and `DOMPurify` sanitization.
+- [x] Create `client/src/components/Markdown.css` styling tokens for admonitions, tables, code, and abbreviations.
+- [x] Integrate `<Markdown />` into `PartLists.tsx` (list cards and header details).
+- [x] Integrate `<Markdown />` into `PartDetails.tsx` (part notes/description).
+- [x] Integrate `<Markdown />` into `Projects.tsx` (project description and card preview).
+- [x] Integrate `<Markdown />` into `Inventory.tsx` (inventory notes preview).
+- [x] Add unit test suite `Markdown.test.tsx` verifying parsing, feature extensions, and XSS sanitization.
