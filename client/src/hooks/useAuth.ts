@@ -78,6 +78,11 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${currentToken}`);
   }
 
+  const activeDbMode = localStorage.getItem("sidekick_db_mode");
+  if (activeDbMode) {
+    headers.set("X-Database-Mode", activeDbMode);
+  }
+
   if (options.body && typeof options.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }

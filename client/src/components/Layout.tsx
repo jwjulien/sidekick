@@ -23,6 +23,8 @@ import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
 import ActiveListBottomDrawer from "./lists/ActiveListBottomDrawer";
 import NavigationToolbar from "./NavigationToolbar";
+import TestingModeBanner from "./TestingModeBanner";
+import DatabaseOperationOverlay from "./DatabaseOperationOverlay";
 
 interface LayoutProps {
   children?: any;
@@ -83,7 +85,12 @@ export default function Layout(props: LayoutProps) {
   };
 
   return (
-    <div class="min-h-screen flex flex-col md:flex-row">
+    <div class="min-h-screen flex flex-col">
+      <TestingModeBanner />
+      <DatabaseOperationOverlay />
+      
+      <div class="flex-1 flex flex-col md:flex-row">
+
       
       {/* ----------------- MOBILE HEADER ----------------- */}
       <header class="md:hidden glass-panel h-16 px-4 flex items-center justify-between border-b border-white/5 z-50">
@@ -274,6 +281,8 @@ export default function Layout(props: LayoutProps) {
 
       {/* Sticky Active List Drawer */}
       <ActiveListBottomDrawer />
+      </div>
     </div>
   );
 }
+
