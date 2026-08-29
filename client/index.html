@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Sidekick | Physical Inventory Manager</title>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('sidekick_app_theme') || 'system';
+          var theme = saved;
+          if (saved === 'system') {
+            theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
     <!-- Premium Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +30,7 @@
       }
     </style>
   </head>
-  <body class="bg-[#0b0b0e] text-gray-200">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
   </body>

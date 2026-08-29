@@ -28,6 +28,8 @@ import { ScaleProvider } from "./context/ScaleContext";
 import { ViewStateProvider } from "./context/ViewStateContext";
 import { ActiveListProvider } from "./context/ActiveListContext";
 
+import { ThemeProvider } from "./context/ThemeContext";
+
 export default function App() {
   // Try to authenticate session on startup
   createEffect(() => {
@@ -38,12 +40,13 @@ export default function App() {
     <Show 
       when={!isLoading()} 
       fallback={
-        <div class="min-h-screen bg-[#0b0b0e] flex flex-col items-center justify-center">
+        <div class="min-h-screen flex flex-col items-center justify-center">
           <div class="w-12 h-12 border-4 border-accentCyan/30 border-t-accentCyan rounded-full animate-spin"></div>
           <span class="text-xs text-gray-500 mt-4 tracking-widest uppercase font-semibold">Loading Sidekick...</span>
         </div>
       }
     >
+    <ThemeProvider>
       <ViewStateProvider>
         <ScaleProvider>
           <ConfirmProvider>
@@ -203,6 +206,7 @@ export default function App() {
           </ConfirmProvider>
         </ScaleProvider>
       </ViewStateProvider>
+    </ThemeProvider>
     </Show>
   );
 }

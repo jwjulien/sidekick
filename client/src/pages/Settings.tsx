@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onMount, Show, For } from "solid-js";
+import { createSignal, onMount, Show, For } from "solid-js";
 import { 
   backendUrl, setBackendUrl,
   isDevMode, setIsDevMode,
@@ -7,9 +7,11 @@ import {
   user, apiFetch
 } from "../hooks/useAuth";
 import toast from "solid-toast";
-import { Server, Settings as SettingsIcon, ShieldCheck, RefreshCw, UserCheck } from "lucide-solid";
+import { Server, Settings as SettingsIcon, RefreshCw, UserCheck, Palette, Sun, Moon, Monitor } from "lucide-solid";
+import { useTheme } from "../context/ThemeContext";
 
 export default function Settings() {
+  const { theme, effectiveTheme, setTheme } = useTheme();
   const [localUrl, setLocalUrl] = createSignal(backendUrl());
   const [localDevMode, setLocalDevMode] = createSignal(isDevMode());
   const [localIssuer, setLocalIssuer] = createSignal(oidcIssuer());
@@ -120,6 +122,76 @@ export default function Settings() {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ----------------- APPEARANCE & THEME SETTINGS CARD ----------------- */}
+        <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-3">
+            <Palette size={18} class="text-accentCyan" />
+            Appearance & Theme Settings
+          </h3>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Color Theme Preference</label>
+              <p class="text-xs text-gray-400 mb-3">
+                Saved locally on this device in browser storage (<code class="text-accentCyan">localStorage</code>).
+              </p>
+              
+              <div class="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTheme("dark")}
+                  class={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    theme() === "dark"
+                      ? "bg-accentCyan/15 border-accentCyan text-white shadow-lg shadow-accentCyan/10"
+                      : "glass-card border-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Moon size={20} class={theme() === "dark" ? "text-accentCyan" : ""} />
+                  <span class="text-xs font-semibold">Dark</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme("light")}
+                  class={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    theme() === "light"
+                      ? "bg-accentCyan/15 border-accentCyan text-white shadow-lg shadow-accentCyan/10"
+                      : "glass-card border-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Sun size={20} class={theme() === "light" ? "text-amber-400" : ""} />
+                  <span class="text-xs font-semibold">Light</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme("system")}
+                  class={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    theme() === "system"
+                      ? "bg-accentCyan/15 border-accentCyan text-white shadow-lg shadow-accentCyan/10"
+                      : "glass-card border-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Monitor size={20} class={theme() === "system" ? "text-accentPurple" : ""} />
+                  <span class="text-xs font-semibold">System</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="p-3 bg-white/5 rounded-xl border border-white/5 text-xs text-gray-400 space-y-1">
+              <div class="flex items-center justify-between text-white font-medium">
+                <span>Active Effective Theme:</span>
+                <span class="capitalize font-bold text-accentCyan">{effectiveTheme()} Mode</span>
+              </div>
+              <p class="text-[11px] text-gray-500">
+                {theme() === "system" 
+                  ? "Automatically mirroring OS light/dark preferences via window.matchMedia." 
+                  : "Explicit local device override active."}
+              </p>
+            </div>
+          </div>
+        </div>
         
         {/* ----------------- CONNECTION SETTINGS CARD ----------------- */}
         <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">

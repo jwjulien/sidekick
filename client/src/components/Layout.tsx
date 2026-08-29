@@ -22,6 +22,7 @@ import {
 import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
 import ActiveListBottomDrawer from "./lists/ActiveListBottomDrawer";
+import NavigationToolbar from "./NavigationToolbar";
 
 interface LayoutProps {
   children?: any;
@@ -82,7 +83,7 @@ export default function Layout(props: LayoutProps) {
   };
 
   return (
-    <div class="min-h-screen bg-[#0b0b0e] text-gray-200 flex flex-col md:flex-row">
+    <div class="min-h-screen flex flex-col md:flex-row">
       
       {/* ----------------- MOBILE HEADER ----------------- */}
       <header class="md:hidden glass-panel h-16 px-4 flex items-center justify-between border-b border-white/5 z-50">
@@ -92,7 +93,7 @@ export default function Layout(props: LayoutProps) {
           </div>
           <span class="font-bold text-white tracking-wide">SIDEKICK</span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
           <Show when={lowStockCount() > 0}>
             <A href="/" class="relative p-1 text-amber-400 hover:text-amber-300">
               <Bell size={20} class="animate-bounce" />
@@ -112,19 +113,23 @@ export default function Layout(props: LayoutProps) {
 
       {/* ----------------- SIDEBAR (DESKTOP) ----------------- */}
       <aside class="hidden md:flex flex-col w-64 glass-panel border-r border-white/5 h-screen sticky top-0 p-4">
-        {/* Brand */}
-        <div class="flex items-center gap-3 px-2 py-4 mb-6">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accentCyan via-accentBlue to-accentPurple flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-accentCyan/15">
-            S
+        {/* Brand & Desktop Navigation Toolbar */}
+        <div class="space-y-3 mb-6 relative z-50">
+          <div class="flex items-center gap-3 px-2 pt-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accentCyan via-accentBlue to-accentPurple flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-accentCyan/15">
+              S
+            </div>
+            <div>
+              <h1 class="font-extrabold text-white tracking-wider text-base leading-none">SIDEKICK</h1>
+              <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Inventory Manager</span>
+            </div>
           </div>
-          <div>
-            <h1 class="font-extrabold text-white tracking-wider text-base leading-none">SIDEKICK</h1>
-            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Inventory Manager</span>
-          </div>
+
+          <NavigationToolbar />
         </div>
 
         {/* User Card */}
-        <div class="glass-card p-3 rounded-xl mb-6 flex items-center gap-3 border border-white/5">
+        <div class="glass-card p-3 rounded-xl mb-6 flex items-center gap-3 border border-white/5 relative z-10">
           <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-accentCyan">
             <User size={20} />
           </div>
@@ -197,15 +202,27 @@ export default function Layout(props: LayoutProps) {
       {/* ----------------- MOBILE NAV OVERLAY ----------------- */}
       <Show when={mobileMenuOpen()}>
         <div class="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40" onClick={() => setMobileMenuOpen(false)}>
-          <aside class="w-64 glass-panel border-r border-white/5 h-full p-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div class="flex items-center justify-between pb-6 border-b border-white/5">
-              <span class="font-bold text-white">Navigation</span>
-              <button onClick={() => setMobileMenuOpen(false)} class="p-1">
-                <X size={20} />
+          <aside class="w-72 glass-panel border-r border-white/5 h-full p-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div class="flex items-center justify-between pb-3 border-b border-white/5">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-r from-accentCyan to-accentBlue flex items-center justify-center font-bold text-white text-base">
+                  S
+                </div>
+                <span class="font-bold text-white tracking-wide text-sm">SIDEKICK</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} class="p-1 text-gray-400 hover:text-white">
+                <X size={22} />
               </button>
             </div>
+
+            {/* Navigation & Theme Toolbar at top of mobile menu */}
+            <div class="py-3 border-b border-white/5 relative z-50">
+              <span class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold block mb-2 px-1">Navigation & Theme</span>
+              <NavigationToolbar />
+            </div>
             
-            <nav class="flex-1 mt-4 space-y-1">
+            <nav class="flex-1 mt-3 space-y-1 overflow-y-auto">
               {navItems.filter(item => item.roles.includes(user()?.role || "")).map((item) => (
                 <A
                   href={item.path}
