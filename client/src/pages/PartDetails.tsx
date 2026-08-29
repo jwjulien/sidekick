@@ -707,11 +707,19 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
       {/* Back button */}
       <Show when={!props.hideBackButton}>
         <button
-          onClick={() => props.onCloseInline ? props.onCloseInline() : navigate("/inventory")}
+          onClick={() => {
+            if (props.onCloseInline) {
+              props.onCloseInline();
+            } else if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate("/parts");
+            }
+          }}
           class="btn-secondary py-1.5 px-3 flex items-center gap-2 text-xs"
         >
           <ArrowLeft size={14} />
-          {props.onCloseInline ? "Back to Storage Layout" : "Back to Catalog"}
+          {props.onCloseInline ? "Back to Storage Layout" : "Back to Browser"}
         </button>
       </Show>
 
