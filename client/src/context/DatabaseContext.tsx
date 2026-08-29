@@ -28,6 +28,7 @@ interface DatabaseContextValue {
   snapshots: () => SnapshotItem[];
   hasUnsavedChanges: () => boolean;
   latestSnapshot: () => SnapshotItem | null;
+  recentlyCreatedFilename: () => string | null;
   refreshStatus: () => Promise<void>;
   switchMode: (mode: "prod" | "testing", copyProdToTesting?: boolean) => Promise<boolean>;
   createSnapshot: () => Promise<SnapshotItem | null>;
@@ -47,6 +48,7 @@ export function DatabaseProvider(props: ParentProps) {
   const [snapshots, setSnapshots] = createSignal<SnapshotItem[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal<boolean>(false);
   const [latestSnapshot, setLatestSnapshot] = createSignal<SnapshotItem | null>(null);
+  const [recentlyCreatedFilename, setRecentlyCreatedFilename] = createSignal<string | null>(null);
 
   // Sync mode signal to localStorage for apiFetch header
   createEffect(() => {
@@ -66,6 +68,7 @@ export function DatabaseProvider(props: ParentProps) {
 
     try {
       const snapData: SnapshotItem[] = await apiFetch("/system/db/snapshots");
+      snapData.sort((a, b) => b.filename.localeCompare(a.filename));
       setSnapshots(snapData);
     } catch (err) {
       console.error("Failed to fetch snapshots:", err);
@@ -110,6 +113,12 @@ export function DatabaseProvider(props: ParentProps) {
     try {
       const res = await apiFetch("/system/db/snapshots", { method: "POST" });
       toast.success(res.message || "Snapshot created successfully!");
+      if (res.snapshot && res.snapshot.filename) {
+        setRecentlyCreatedFilename(res.snapshot.filename);
+        setTimeout(() => {
+          setRecentlyCreatedFilename(null);
+        }, 4000);
+      }
       await refreshStatus();
       return res.snapshot;
     } catch (err: any) {
@@ -120,6 +129,7 @@ export function DatabaseProvider(props: ParentProps) {
       setPendingMessage("");
     }
   };
+
 
   const deleteSnapshot = async (filename: string): Promise<boolean> => {
     try {
@@ -169,7 +179,9 @@ export function DatabaseProvider(props: ParentProps) {
       snapshots,
       hasUnsavedChanges,
       latestSnapshot,
+      recentlyCreatedFilename,
       refreshStatus,
+
       switchMode,
       createSnapshot,
       deleteSnapshot,

@@ -16,8 +16,10 @@ from ..database import (
     get_active_db_path,
     flush_and_checkpoint_db,
     dispose_engines,
+    dispose_engine_for_path,
     calculate_db_hash
 )
+
 
 router = APIRouter(prefix="/system/db", tags=["system-database"])
 
@@ -77,9 +79,10 @@ def get_snapshot_files() -> List[dict]:
             except Exception as e:
                 print(f"Error processing snapshot {filename}: {e}")
                 
-    # Sort descending by creation timestamp / mtime
-    snapshots.sort(key=lambda x: x["mtime"], reverse=True)
+    # Sort reverse chronologically by timestamp filename (newest first)
+    snapshots.sort(key=lambda x: x["filename"], reverse=True)
     return snapshots
+
 
 @router.get("/status")
 def get_db_status():
@@ -212,11 +215,14 @@ def delete_snapshot(filename: str):
         )
         
     try:
+        dispose_engine_for_path(snapshot_path)
+        dispose_engines()
         os.remove(snapshot_path)
         return {
             "status": "success",
             "message": f"Snapshot file '{filename}' was deleted successfully."
         }
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

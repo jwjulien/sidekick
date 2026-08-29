@@ -37,7 +37,8 @@ export default function Settings() {
     activeDbFile, 
     snapshots, 
     hasUnsavedChanges, 
-    latestSnapshot, 
+    latestSnapshot,
+    recentlyCreatedFilename,
     switchMode, 
     createSnapshot, 
     deleteSnapshot, 
@@ -45,6 +46,7 @@ export default function Settings() {
     isOperationPending,
     refreshStatus
   } = useDatabase();
+
   const { confirm } = useConfirm();
 
   const [localUrl, setLocalUrl] = createSignal(backendUrl());
@@ -292,23 +294,36 @@ export default function Settings() {
             </Show>
 
             <Show when={snapshots().length > 0}>
-              <div class="overflow-x-auto rounded-xl border border-white/5">
+              <div class="max-h-[270px] overflow-y-auto overflow-x-auto rounded-xl border border-white/5 custom-scrollbar">
                 <table class="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr class="bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
+                  <thead class="sticky top-0 bg-[#0f172a] border-b border-white/10 z-10 shadow-sm">
+                    <tr class="text-gray-400 font-semibold uppercase tracking-wider">
                       <th class="py-3 px-4">Snapshot Filename</th>
                       <th class="py-3 px-4">Created Date / Time</th>
                       <th class="py-3 px-4">File Size</th>
                       <th class="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     <For each={snapshots()}>
-                      {(snap) => (
-                        <tr class="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                          <td class="py-3.5 px-4 font-mono font-semibold text-white">
-                            {snap.filename}
-                          </td>
+                      {(snap) => {
+                        const isRecentlyCreated = () => snap.filename === recentlyCreatedFilename();
+                        return (
+                          <tr class={`border-b transition-all duration-700 ${
+                            isRecentlyCreated()
+                              ? "bg-accentCyan/20 border-l-4 border-l-accentCyan text-white shadow-lg shadow-accentCyan/10 animate-in fade-in slide-in-from-top-3 duration-500"
+                              : "border-white/5 hover:bg-white/[0.02]"
+                          }`}>
+                            <td class="py-3.5 px-4 font-mono font-semibold text-white flex items-center gap-2">
+                              <span>{snap.filename}</span>
+                              <Show when={isRecentlyCreated()}>
+                                <span class="bg-accentCyan text-black font-extrabold text-[10px] uppercase px-1.5 py-0.5 rounded tracking-wide animate-pulse">
+                                  NEW
+                                </span>
+                              </Show>
+                            </td>
+
                           <td class="py-3.5 px-4 text-gray-400">
                             {snap.created_at}
                           </td>
@@ -335,8 +350,11 @@ export default function Settings() {
                             </button>
                           </td>
                         </tr>
-                      )}
-                    </For>
+                      );
+                    }}
+
+                  </For>
+
                   </tbody>
                 </table>
               </div>

@@ -40,6 +40,16 @@ def dispose_engines():
             print(f"Error disposing engine: {e}")
     _engines.clear()
 
+def dispose_engine_for_path(db_path: str):
+    """Dispose engine for a specific path if cached."""
+    db_path = os.path.normpath(db_path)
+    if db_path in _engines:
+        try:
+            _engines[db_path].dispose()
+        except Exception as e:
+            print(f"Error disposing engine for {db_path}: {e}")
+        del _engines[db_path]
+
 def flush_and_checkpoint_db(db_path: Optional[str] = None):
     """Flush WAL write-ahead log to disk for the given database file or all active databases."""
     target_paths = [db_path] if db_path else [PROD_DB_PATH, TESTING_DB_PATH]
@@ -54,19 +64,23 @@ def flush_and_checkpoint_db(db_path: Optional[str] = None):
                 print(f"WAL checkpoint warning for {path}: {e}")
 
 def calculate_db_hash(db_path: str) -> Optional[str]:
-    """Compute SHA256 hash of a database file after flushing pending WAL writes."""
+    """Compute SHA256 hash of a database file. Only flushes WAL if active DB."""
     if not os.path.exists(db_path):
         return None
-    flush_and_checkpoint_db(db_path)
+    db_path_norm = os.path.normpath(db_path)
+    if db_path_norm in [PROD_DB_PATH, TESTING_DB_PATH]:
+        flush_and_checkpoint_db(db_path_norm)
+        
     sha256 = hashlib.sha256()
     try:
-        with open(db_path, "rb") as f:
+        with open(db_path_norm, "rb") as f:
             while chunk := f.read(65536):
                 sha256.update(chunk)
         return sha256.hexdigest()
     except Exception as e:
-        print(f"Failed to calculate DB hash for {db_path}: {e}")
+        print(f"Failed to calculate DB hash for {db_path_norm}: {e}")
         return None
+
 
 def get_active_db_path() -> str:
     global ACTIVE_MODE
