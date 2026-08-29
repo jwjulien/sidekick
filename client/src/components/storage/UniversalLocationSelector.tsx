@@ -11,6 +11,7 @@ import {
 } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import InlineLocationCreator from "../parts/InlineLocationCreator";
+import Markdown from "../Markdown";
 
 export interface UniversalLocationSelectorProps {
   locations?: any[];
@@ -704,9 +705,11 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
                             {getFullPathName(loc)}
                           </span>
                           <Show when={loc.description}>
-                            <span class="text-[10px] text-gray-500 font-normal">
-                              {loc.description}
-                            </span>
+                            <Markdown
+                              content={loc.description}
+                              compact={true}
+                              class="text-[10px] text-gray-500 font-normal"
+                            />
                           </Show>
                         </div>
                       </div>

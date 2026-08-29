@@ -19,6 +19,7 @@ import toast from "solid-toast";
 import PartListItemsTable from "../components/lists/PartListItemsTable";
 import UniversalPartFinderModal from "../components/parts/UniversalPartFinderModal";
 import { useActiveList } from "../context/ActiveListContext";
+import Markdown from "../components/Markdown";
 
 export default function PartLists() {
   const params = useParams();
@@ -363,11 +364,13 @@ export default function PartLists() {
                     {currentList()?.name}
                   </h1>
 
-                  <p class="text-sm text-gray-300 leading-relaxed">
-                    {currentList()?.description || (
-                      <span class="italic text-gray-500">No description provided. Click "Edit Details" to add description notes.</span>
-                    )}
-                  </p>
+                  <div class="mt-2">
+                    <Markdown
+                      content={currentList()?.description}
+                      fallback={<span class="italic text-gray-500 text-sm">No description provided. Click "Edit Details" to add description notes.</span>}
+                      class="text-sm text-gray-300 leading-relaxed"
+                    />
+                  </div>
                 </div>
               }
             >
@@ -604,7 +607,11 @@ export default function PartLists() {
                     </div>
 
                     <Show when={l.description}>
-                      <p class="text-xs text-gray-400 line-clamp-2">{l.description}</p>
+                      <Markdown
+                        content={l.description}
+                        compact={true}
+                        class="text-xs text-gray-400 line-clamp-2 mt-1"
+                      />
                     </Show>
 
                     <div class="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-gray-400">

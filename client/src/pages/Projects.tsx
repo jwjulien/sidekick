@@ -21,6 +21,7 @@ import { apiFetch, user } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useViewState } from "../context/ViewStateContext";
+import Markdown from "../components/Markdown";
 
 export default function Projects() {
   const { confirm } = useConfirm();
@@ -655,9 +656,11 @@ export default function Projects() {
                       }`}
                     >
                       <h4 class="font-bold text-sm text-white truncate">{proj.title}</h4>
-                      <p class="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-normal">
-                        {proj.description}
-                      </p>
+                      <Markdown
+                        content={proj.description}
+                        compact={true}
+                        class="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-normal"
+                      />
                     </div>
                   )}
                 </For>
@@ -683,7 +686,13 @@ export default function Projects() {
                 <div class="flex justify-between items-start gap-4 pb-4 border-b border-white/5">
                   <div>
                     <h3 class="text-xl font-bold text-white tracking-tight">{selectedProject().title}</h3>
-                    <p class="text-gray-400 text-xs mt-2 leading-relaxed">{selectedProject().description}</p>
+                    <div class="mt-1">
+                      <Markdown
+                        content={selectedProject().description}
+                        fallback="No description provided."
+                        class="text-gray-400 text-xs leading-relaxed"
+                      />
+                    </div>
                   </div>
                   <Show when={user()?.role === "admin" || user()?.role === "designer"}>
                     <div class="flex items-center gap-1 shrink-0">

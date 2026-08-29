@@ -28,6 +28,7 @@ import { useViewState } from "../context/ViewStateContext";
 import { useActiveList } from "../context/ActiveListContext";
 import LocationCard, { getLocationPathString } from "../components/storage/LocationCard";
 import LabelPreviewModal from "../components/LabelPreviewModal";
+import Markdown from "../components/Markdown";
 import PartImages from "../components/PartImages";
 import DocumentViewer from "../components/DocumentViewer";
 import ScaleModal from "../components/ScaleModal";
@@ -756,7 +757,9 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                       </span>
                     </Show>
                   </div>
-                  <p class="text-gray-400 text-sm mt-2 leading-relaxed">{item().notes || "No description/notes provided."}</p>
+                  <div class="mt-2">
+                    <Markdown content={item().notes} fallback="No description/notes provided." class="text-gray-400 text-sm leading-relaxed" />
+                  </div>
                 </div>
 
                 {/* Edit & NFC details */}

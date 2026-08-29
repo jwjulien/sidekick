@@ -11,6 +11,7 @@ import {
   X
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import Markdown from "../components/Markdown";
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -253,9 +254,12 @@ export default function Inventory() {
                       </Show>
                     </div>
                     <div class="text-[11px] font-mono text-gray-400 mt-1 truncate">{item.number}</div>
-                    <p class="text-gray-500 text-xs mt-1.5 line-clamp-2 leading-relaxed">
-                      {item.notes || "No description provided."}
-                    </p>
+                    <Markdown
+                      content={item.notes}
+                      fallback="No description provided."
+                      compact={true}
+                      class="text-gray-500 text-xs mt-1.5 line-clamp-2 leading-relaxed"
+                    />
                   </div>
 
                   <div class="border-t border-white/5 pt-4 flex justify-between items-center text-xs">
