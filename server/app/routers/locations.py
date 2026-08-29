@@ -12,6 +12,7 @@ router = APIRouter(prefix="/locations", tags=["locations"])
 @router.get("", response_model=List[schemas.StorageOut])
 def get_locations(
     flat: bool = Query(True, description="Return flat list vs nested top-level elements"),
+    part_id: Optional[str] = Query(None, description="Filter locations holding specific part ID"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -19,10 +20,17 @@ def get_locations(
     Get storage locations list. If flat=True (default), returns all entries.
     If flat=False, returns only top-level root locations.
     """
+    query = db.query(models.Storage)
+    if part_id is not None:
+        clean_pid = part_id.strip()
+        if not clean_pid or clean_pid.lower() in ("undefined", "null", "none"):
+            return []
+        query = query.filter(models.Storage.part_id == clean_pid)
+
     if flat:
-        return db.query(models.Storage).order_by(models.Storage.name).all()
+        return query.order_by(models.Storage.name).all()
     else:
-        return db.query(models.Storage).filter(models.Storage.parent_id == None).order_by(models.Storage.name).all()
+        return query.filter(models.Storage.parent_id == None).order_by(models.Storage.name).all()
 
 @router.post("", response_model=schemas.StorageOut, status_code=status.HTTP_201_CREATED)
 def create_location(

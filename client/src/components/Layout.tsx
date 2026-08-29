@@ -16,10 +16,12 @@ import {
   Building2,
   MapPin,
   PackageCheck,
-  History
+  History,
+  ShoppingBag
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
+import ActiveListBottomDrawer from "./lists/ActiveListBottomDrawer";
 
 interface LayoutProps {
   children?: any;
@@ -67,6 +69,7 @@ export default function Layout(props: LayoutProps) {
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Scan / Check", path: "/scan", icon: QrCode, roles: ["admin", "stocker", "puller"] },
     { name: "Design Structure", path: "/design", icon: FolderTree, roles: ["admin", "designer"] },
+    { name: "Part Kits", path: "/lists", icon: ShoppingBag, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "Storage Locations", path: "/storage", icon: MapPin, roles: ["admin", "designer", "stocker", "puller"] }
   ];
 
@@ -251,6 +254,9 @@ export default function Layout(props: LayoutProps) {
       <main class="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
         {props.children}
       </main>
+
+      {/* Sticky Active List Drawer */}
+      <ActiveListBottomDrawer />
     </div>
   );
 }

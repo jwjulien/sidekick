@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, LargeBinary, Date, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, LargeBinary, Date, JSON, Boolean
 from sqlalchemy.orm import relationship
 from uuid6 import uuid7
 from .database import Base
@@ -54,6 +54,7 @@ class Part(Base):
     images = relationship("Image", back_populates="part", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="part", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="part", cascade="all, delete-orphan")
+    list_items = relationship("PartListItem", back_populates="part", cascade="all, delete-orphan")
 
 class Supplier(Base):
     __tablename__ = "suppliers"
@@ -237,5 +238,34 @@ class AuditLog(Base):
     user = relationship("User")
     location = relationship("Storage")
     project = relationship("Project")
+
+
+class PartList(Base):
+    __tablename__ = "part_lists"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid7()))
+    created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
+    modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    type = Column(String(50), default="General", nullable=False)  # Wishlist, Bench Kit, Pick List, General
+    is_active = Column(Boolean, default=False, nullable=False)
+
+    items = relationship("PartListItem", back_populates="part_list", cascade="all, delete-orphan")
+
+
+class PartListItem(Base):
+    __tablename__ = "part_list_items"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid7()))
+    created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
+    modified_on = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    list_id = Column(String(36), ForeignKey("part_lists.id", ondelete="CASCADE"), nullable=False)
+    part_id = Column(String(36), ForeignKey("parts.id", ondelete="CASCADE"), nullable=False)
+    quantity = Column(Float, default=1.0, nullable=False)
+    notes = Column(Text, nullable=True, default="")
+
+    part_list = relationship("PartList", back_populates="items")
+    part = relationship("Part", back_populates="list_items")
 
 

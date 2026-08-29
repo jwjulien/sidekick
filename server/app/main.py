@@ -11,7 +11,7 @@ from alembic import command
 
 from .database import engine, Base, get_db, SIDEKICK_DB_PATH, REFERENCE_DB_PATH, BASE_DIR
 from . import models, auth
-from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products, tares, audit, resolve
+from .routers import auth as auth_router, parts, locations, categories, uploads, suppliers, projects, products, tares, audit, resolve, part_lists
 
 # Helper to run Alembic migrations programmatically
 def run_startup_migrations():
@@ -108,6 +108,7 @@ app.include_router(products.router)
 app.include_router(tares.router)
 app.include_router(audit.router)
 app.include_router(resolve.router)
+app.include_router(part_lists.router)
 
 
 @app.get("/")

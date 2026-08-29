@@ -30,8 +30,12 @@ Crucially, users can mark any list as the **"Active List"**, anchoring a persist
   * **Drawer Features:**
     * **Header:** Displays active list title, category tag, unique item count, and quick toggle to collapse/expand drawer body.
     * **Quick Navigation Button:** A `[View Full List]` button immediately routes the user to `/lists/:id`.
+    * **Quick Add Current Part:** When viewing a specific component page (`/parts/:id`), a `[+ Add Current Part]` button appears right in the sticky bottom drawer header for instant 1-click addition to the active list.
     * **Deactivation Control:** Clicking the `[✕ Close]` button opens a confirmation prompt ("Deactivate active list?"). Upon confirmation, the active list state is cleared and the sticky bottom drawer is unmounted.
     * **Persistent Visibility:** The drawer stays docked across all routes (Parts, Storage, Dashboard, Projects), allowing instant drag-or-click part additions while exploring the inventory catalog.
+* **Component Details View Integration (`/parts/:id`):**
+  * Top action buttons bar includes a prominent **`[+ Add to Active List]`** button (or `[Add to List]`).
+  * Clicking immediately posts the viewed component to the active list and shows a confirmation toast.
 * **List Detail View (`/lists/:id`):**
   * **Header:** Displays list title, category tag, total unique parts, total component quantity required, active list state toggle button (`[Activate List]` / `[Deactivate]`), and header actions (`Add Component`, `Duplicate List`, `Export CSV`, `Delete`).
   * **Items Data Table:**
@@ -44,7 +48,7 @@ Crucially, users can mark any list as the **"Active List"**, anchoring a persist
   * Clicking `[+ Add Component]` opens `UniversalPartFinderModal` (`030`), wrapping `UniversalPartsBrowser` in `mode="picker"`.
   * **Universal Quantity Input:** Features a built-in numerical quantity controller (default `1`).
   * **Custom Field Slot:** Renders a custom text input field slot for item **Notes** (e.g., "Check footprint before ordering").
-  * Selecting an already-added part increments its existing quantity in the list rather than creating a duplicate row.
+  * **Duplicate Addition Behavior & Drawer Locating:** Attempting to add an already-present component returns HTTP 409 Conflict ("Item already in list"). A toast is displayed with an interactive **`[Locate in Drawer]`** button. Clicking it automatically expands the sticky bottom drawer, smooth-scrolls to the part row, and applies a glowing 10-second animated highlight fade.
 * **Mobile Considerations:** On narrow viewports, the sticky bottom drawer transforms into a compact bottom sheet with swipe-to-dismiss confirmation, and the item table converts to a stacked card layout.
 
 ## 3. Technical Implementation

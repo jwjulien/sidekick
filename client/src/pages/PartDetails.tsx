@@ -18,12 +18,14 @@ import {
   X,
   Link2,
   Scale,
-  Nfc
+  Nfc,
+  ShoppingBag
 } from "lucide-solid";
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useViewState } from "../context/ViewStateContext";
+import { useActiveList } from "../context/ActiveListContext";
 import LocationCard, { getLocationPathString } from "../components/storage/LocationCard";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import PartImages from "../components/PartImages";
@@ -37,6 +39,7 @@ import UniversalLocationSelector from "../components/storage/UniversalLocationSe
 export default function PartDetails(props: { id?: string; onCloseInline?: () => void; hideBackButton?: boolean }) {
   const { confirm } = useConfirm();
   const viewState = useViewState();
+  const activeListCtx = useActiveList();
   const params = useParams();
   const navigate = useNavigate();
   const itemId = props.id || params.id;
@@ -611,6 +614,56 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
     }
   };
 
+  const handleAddPartToActiveList = async () => {
+    const activeList = activeListCtx.activeList();
+    if (activeList) {
+      try {
+        await apiFetch(`/lists/${activeList.id}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ part_id: itemId, quantity: 1 })
+        });
+        toast.success(`Added "${item()?.value || "component"}" to active list "${activeList.name}"!`);
+        await activeListCtx.refreshActiveList();
+      } catch (err: any) {
+        if (err.message?.includes("already in list")) {
+          toast((t) => (
+            <div class="flex items-center justify-between gap-4 py-1 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                <span class="text-xs font-bold text-white tracking-wide">Item already in list</span>
+              </div>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  activeListCtx.highlightPartInDrawer(itemId!);
+                }}
+                class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-gray-950 font-extrabold text-[11px] uppercase tracking-wider transition-all shadow-md active:scale-95 shrink-0"
+              >
+                Locate in Drawer
+              </button>
+            </div>
+          ), {
+            duration: 6000,
+            style: {
+              background: "#0f172a",
+              color: "#ffffff",
+              border: "1px solid rgba(245, 158, 11, 0.5)",
+              "border-radius": "0.85rem",
+              "box-shadow": "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              padding: "0.5rem 0.75rem"
+            }
+          });
+        } else {
+          toast.error(err.message || "Failed to add component to active list.");
+        }
+      }
+    } else {
+      toast.error("No active list selected. Redirecting to Part Kits...");
+      navigate("/lists");
+    }
+  };
+
   const handleDeleteItem = async () => {
     const isConfirmed = await confirm({
       title: "Confirm Action",
@@ -701,6 +754,18 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
                 {/* Edit & NFC details */}
                 <Show when={user()?.role === "admin" || user()?.role === "stocker"}>
                   <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleAddPartToActiveList}
+                      class="bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-2 text-xs rounded-xl flex items-center gap-1.5 font-medium transition-colors"
+                      title={activeListCtx.activeList() ? `Add component to active list "${activeListCtx.activeList()?.name}"` : "Add component to a part list"}
+                    >
+                      <ShoppingBag size={14} />
+                      <span>
+                        {activeListCtx.activeList()
+                          ? `+ Add to Active List`
+                          : "Add to List"}
+                      </span>
+                    </button>
                     <button
                       onClick={() => setShowNfcModal(true)}
                       class="bg-accentCyan/10 hover:bg-accentCyan/20 text-accentCyan border border-accentCyan/30 px-3 py-2 text-xs rounded-xl flex items-center gap-1.5 font-medium transition-colors"

@@ -77,6 +77,7 @@ class PartOut(PartBase):
     modified_on: Optional[datetime] = None
     total_quantity: int = 0
     category: Optional[CategoryOut] = None
+    locations: Optional[List[Dict[str, Any]]] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -381,4 +382,55 @@ class CategoryDetailsOut(CategoryOut):
 
 CategoryDetailsOut.model_rebuild()
 StorageDetailsOut.model_rebuild()
+
+# ----------------- Part List Schemas -----------------
+class PartListItemBase(BaseModel):
+    part_id: str
+    quantity: float = 1.0
+    notes: Optional[str] = ""
+
+class PartListItemCreate(PartListItemBase):
+    pass
+
+class PartListItemUpdate(BaseModel):
+    quantity: Optional[float] = None
+    notes: Optional[str] = None
+
+class PartListItemOut(PartListItemBase):
+    id: str
+    list_id: str
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    part: Optional[PartOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PartListBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    type: str = "General"  # Wishlist, Bench Kit, Pick List, General
+    is_active: bool = False
+
+class PartListCreate(PartListBase):
+    pass
+
+class PartListUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    type: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class PartListOut(PartListBase):
+    id: str
+    created_on: datetime
+    modified_on: Optional[datetime] = None
+    item_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PartListDetailsOut(PartListOut):
+    items: List[PartListItemOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
 
