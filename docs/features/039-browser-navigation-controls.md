@@ -1,6 +1,6 @@
 ---
 title: Browser Navigation Controls
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -27,11 +27,11 @@ This feature introduces explicit browser navigation controls (**Back**, **Forwar
 
 ## 3. Technical Implementation
 * **Frontend (SolidJS / Router):**
-  * Create `client/src/components/NavigationToolbar.tsx` component.
-  * Use `window.history.back()` and `window.history.forward()` for history traversal.
-  * Use `window.location.reload()` for page refresh with rotation icon animation during reload.
-  * Integrate `<ThemeToggle />` popover dropdown into the toolbar.
-  * Insert `<NavigationToolbar />` into `Layout.tsx` (desktop sidebar header and mobile drawer header).
+  * Created `client/src/components/NavigationToolbar.tsx` component.
+  * Uses `window.history.back()` and `window.history.forward()` for history traversal.
+  * Uses `window.location.reload()` for page refresh with rotation icon animation during reload.
+  * Integrated `<ThemeToggle />` popover dropdown into the toolbar.
+  * Inserted `<NavigationToolbar />` into `Layout.tsx` (desktop sidebar header and mobile drawer header).
 * **Backend (FastAPI / SQLite):**
   * No backend API changes required.
 * **Database Schema:**
@@ -44,6 +44,6 @@ This feature introduces explicit browser navigation controls (**Back**, **Forwar
 ---
 
 ## 5. Implementation Tasks
-- [ ] Build `client/src/components/NavigationToolbar.tsx` with Back, Forward, Refresh, and Theme Toggle dropdown.
-- [ ] Update `client/src/components/Layout.tsx` to render `<NavigationToolbar />` in desktop sidebar and mobile menu drawer.
-- [ ] Verify history traversal, page reload, and theme selection in browser and desktop modes.
+- [x] Build `client/src/components/NavigationToolbar.tsx` with Back, Forward, Refresh, and Theme Toggle dropdown.
+- [x] Update `client/src/components/Layout.tsx` to render `<NavigationToolbar />` in desktop sidebar and mobile menu drawer.
+- [x] Verify history traversal, page reload, and theme selection in browser and desktop modes.

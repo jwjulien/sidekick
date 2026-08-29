@@ -1,6 +1,6 @@
 ---
 title: Light and Dark Theme Support
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -11,11 +11,11 @@ dependencies: []
 # Feature: Light and Dark Theme Support
 
 ## 1. Overview
-This feature introduces multi-theme support to Sidekick, adding a bright, high-contrast Light Mode alongside the existing dark glassmorphism design. Users can select between `System` (matches OS preference), `Dark` (preserves existing dark glass theme), and `Light` (a clean, frosted glass light palette). Theme preferences persist locally per device in `localStorage` without requiring backend API calls, and settings can be toggled via the navbar or Settings screen.
+This feature introduces multi-theme support to Sidekick, adding a bright, high-contrast Light Mode alongside the existing dark glassmorphism design. Users can select between `System` (matches OS preference), `Dark` (preserves existing dark glass theme), and `Light` (a clean, frosted glass light palette). Theme preferences persist locally per device in `localStorage` without requiring backend API calls, and settings can be toggled via the navbar, popover menu, or Settings screen.
 
 ## 2. User Experience & UI
 * **Trigger:**
-  * **Quick Toggle:** A sun/moon/laptop theme toggle icon in the top Navbar header for instant one-click switching.
+  * **Quick Toggle Dropdown:** A theme toggle button in the top navigation toolbar featuring a popover dropdown menu to select `Dark`, `Light`, or `System`.
   * **Settings Panel:** An "Appearance & Theme" section in `Settings.tsx` with segmented controls (`System`, `Dark`, `Light`) and descriptions.
 * **Interaction:**
   * Selecting `System` listens to OS `prefers-color-scheme` media queries and updates live if the OS theme changes.
@@ -39,7 +39,7 @@ This feature introduces multi-theme support to Sidekick, adding a bright, high-c
   * **Startup Initialization:**
     * Inline snippet in `index.html` or before main app render reads `localStorage` to immediately set `data-theme` on `<html>` tag, preventing theme flash on boot.
   * **UI Updates:**
-    * Add `<ThemeToggle />` button to `client/src/components/Navbar.tsx`.
+    * Add `<ThemeToggle />` popover dropdown button to navigation toolbar.
     * Add Theme selection card to `client/src/pages/Settings.tsx`.
 * **Backend (FastAPI / SQLite):**
   * None required. Theme preferences are local hardware/device-bound settings.
@@ -53,9 +53,9 @@ This feature introduces multi-theme support to Sidekick, adding a bright, high-c
 ---
 
 ## 5. Implementation Tasks
-- [ ] Refactor `client/src/index.css` to use CSS theme tokens (`data-theme="dark"` and `data-theme="light"`).
-- [ ] Create `client/src/context/ThemeContext.tsx` provider for local theme persistence & system media query listener.
-- [ ] Implement early theme initialization script to avoid FOUC.
-- [ ] Build `<ThemeToggle />` component and insert into `Navbar.tsx`.
-- [ ] Add "Appearance & Theme" section to `client/src/pages/Settings.tsx`.
-- [ ] Audit component color overrides (text-white, bg-darkBg) across views to ensure clean rendering in both Light and Dark modes.
+- [x] Refactor `client/src/index.css` to use CSS theme tokens (`data-theme="dark"` and `data-theme="light"`).
+- [x] Create `client/src/context/ThemeContext.tsx` provider for local theme persistence & system media query listener.
+- [x] Implement early theme initialization script to avoid FOUC.
+- [x] Build `<ThemeToggle />` dropdown component and insert into navigation toolbar.
+- [x] Add "Appearance & Theme" section to `client/src/pages/Settings.tsx`.
+- [x] Audit component color overrides (text-white, bg-darkBg) across views to ensure clean rendering in both Light and Dark modes.
