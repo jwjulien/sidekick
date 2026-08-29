@@ -15,6 +15,7 @@ import {
   PackageCheck
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import { useFocusRevalidation } from "../hooks/useFocusRevalidation";
 import toast from "solid-toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 
@@ -64,6 +65,8 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  useFocusRevalidation(fetchDashboardData);
 
   onMount(() => {
     fetchDashboardData();

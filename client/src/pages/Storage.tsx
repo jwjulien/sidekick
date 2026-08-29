@@ -2,6 +2,7 @@ import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { useLocation } from "@solidjs/router";
 import { MapPin, Plus } from "lucide-solid";
 import { apiFetch } from "../hooks/useAuth";
+import { useFocusRevalidation } from "../hooks/useFocusRevalidation";
 import toast from "solid-toast";
 import LabelPreviewModal from "../components/LabelPreviewModal";
 import StorageColumns from "../components/storage/StorageColumns";
@@ -84,6 +85,8 @@ export default function Storage() {
       if (!silent) setLoading(false);
     }
   };
+
+  useFocusRevalidation(() => loadData(true));
 
   const updateUrlHistory = (path: string[], replace = false) => {
     const url = new URL(window.location.href);

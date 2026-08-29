@@ -22,6 +22,7 @@ import {
   ShoppingBag
 } from "lucide-solid";
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
+import { useFocusRevalidation } from "../hooks/useFocusRevalidation";
 import { showToast, toast } from "../utils/toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useViewState } from "../context/ViewStateContext";
@@ -211,6 +212,11 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
       setSuppliers(sups);
     } catch (_) { }
   };
+
+  useFocusRevalidation(() => {
+    fetchItemDetails();
+    fetchProducts();
+  });
 
   onMount(() => {
     fetchItemDetails();

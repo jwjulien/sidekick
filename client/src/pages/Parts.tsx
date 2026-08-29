@@ -2,6 +2,7 @@ import { createSignal, onMount, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { Plus, X, Trash2, ArrowLeft } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import { useFocusRevalidation } from "../hooks/useFocusRevalidation";
 import toast from "solid-toast";
 import UniversalPartsBrowser from "../components/parts/UniversalPartsBrowser";
 import { useViewState } from "../context/ViewStateContext";
@@ -40,6 +41,8 @@ export default function Parts() {
       setLoading(false);
     }
   };
+
+  useFocusRevalidation(fetchParts);
 
   onMount(() => {
     fetchParts();
