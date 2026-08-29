@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True)
     username = Column(String, nullable=True)
     role = Column(String, default="viewer")  # admin, designer, stocker, puller, analyst, viewer
+    preferences = Column(JSON, default=dict, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

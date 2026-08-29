@@ -13,6 +13,29 @@ def get_me(current_user: models.User = Depends(auth.get_current_user)):
     """
     return current_user
 
+@router.get("/me/preferences")
+def get_user_preferences(current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Fetch account preferences associated with current user.
+    """
+    return current_user.preferences or {}
+
+@router.put("/me/preferences")
+def update_user_preferences(
+    payload: schemas.UserPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Update account preferences for current user.
+    """
+    current_preferences = dict(current_user.preferences or {})
+    current_preferences.update(payload.preferences)
+    current_user.preferences = current_preferences
+    db.commit()
+    db.refresh(current_user)
+    return current_user.preferences
+
 @router.get("/users", response_model=List[schemas.UserOut])
 def get_all_users(
     db: Session = Depends(get_db),

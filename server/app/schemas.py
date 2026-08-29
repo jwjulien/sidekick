@@ -10,10 +10,14 @@ class UserBase(BaseModel):
 class UserUpdateRole(BaseModel):
     role: str  # admin, designer, stocker, puller, analyst, viewer
 
+class UserPreferencesUpdate(BaseModel):
+    preferences: Dict[str, Any]
+
 class UserOut(UserBase):
     id: str
     oidc_sub: str
     role: str
+    preferences: Optional[Dict[str, Any]] = None
     created_at: datetime
     last_login: datetime
 

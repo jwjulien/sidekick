@@ -1,6 +1,6 @@
 ---
 title: Device Settings and User Account Preferences Architecture
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -34,9 +34,9 @@ This feature formalizes a two-tier configuration architecture for Sidekick, clea
     * Fetches account preferences upon user authentication via `GET /auth/me/preferences`.
     * Exposes reactive store for user preferences and automatically debounces/persists updates via `PUT /auth/me/preferences`.
 * **Backend (FastAPI / SQLite):**
-  * **API Endpoint:** Create `/auth/me/preferences` routes in `server/routers/auth.py` for fetching and updating preference JSON payloads.
+  * **API Endpoint:** Created `/auth/me/preferences` routes in `server/app/routers/auth.py` for fetching and updating preference JSON payloads.
 * **Database Schema:**
-  * Add a `preferences` JSON text column (or `user_preferences` table) associated with `users` table in `server/models.py`.
+  * Added `preferences` JSON text column associated with `users` table in `server/app/models.py`.
 
 ## 4. Out of Scope
 * Enterprise remote device configuration management (MDM).
@@ -45,8 +45,8 @@ This feature formalizes a two-tier configuration architecture for Sidekick, clea
 ---
 
 ## 5. Implementation Tasks
-- [ ] Create `client/src/services/deviceSettings.ts` for unified hardware-local key-value management.
-- [ ] Create `user_preferences` table or column in `server/models.py` and run SQLite migration.
-- [ ] Add `GET /auth/me/preferences` and `PUT /auth/me/preferences` in FastAPI backend.
-- [ ] Create `UserPreferencesContext.tsx` for client-side user account state sync.
-- [ ] Reorganize `client/src/pages/Settings.tsx` into clear "Device & Local Settings" and "User Preferences" tabs/cards.
+- [x] Create `client/src/services/deviceSettings.ts` for unified hardware-local key-value management.
+- [x] Create `preferences` JSON column in `User` model (`server/app/models.py`).
+- [x] Add `GET /auth/me/preferences` and `PUT /auth/me/preferences` in FastAPI backend.
+- [x] Create `UserPreferencesContext.tsx` for client-side user account state sync.
+- [x] Reorganize `client/src/pages/Settings.tsx` into clear "Device & Local Settings" and "User Preferences" tabs/cards.

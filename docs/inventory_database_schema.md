@@ -448,6 +448,29 @@ CREATE TABLE "suppliers" ("id" INTEGER NOT NULL PRIMARY KEY, "created_on" DATETI
 
 ---
 
+### Table: `users`
+
+**Columns:**
+
+| Column        | Type          | Not Null | Default  | PK   | Notes |
+| :------------ | :------------ | :------- | :------- | :--- | :---- |
+| `id`          | `VARCHAR(36)` | Yes      | UUIDv7   | Yes  |       |
+| `oidc_sub`    | `VARCHAR`     | Yes      | -        | No   | Indexed |
+| `email`       | `VARCHAR`     | No       | -        | No   | Indexed |
+| `username`    | `VARCHAR`     | No       | -        | No   |       |
+| `role`        | `VARCHAR`     | Yes      | 'viewer' | No   | admin, designer, stocker, puller, analyst, viewer |
+| `preferences` | `JSON`        | No       | `{}`     | No   | Account-bound user preferences |
+| `created_at`  | `DATETIME`    | Yes      | UTC      | No   |       |
+| `last_login`  | `DATETIME`    | Yes      | UTC      | No   |       |
+
+**SQL Definition:**
+
+```sql
+CREATE TABLE "users" ("id" VARCHAR(36) NOT NULL PRIMARY KEY, "oidc_sub" VARCHAR NOT NULL UNIQUE, "email" VARCHAR UNIQUE, "username" VARCHAR, "role" VARCHAR DEFAULT 'viewer', "preferences" JSON, "created_at" DATETIME, "last_login" DATETIME)
+```
+
+---
+
 ## Indexes Summary
 
 | Index Name             | Table        | SQL Definition                                                       |
