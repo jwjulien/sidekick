@@ -18,8 +18,8 @@ This feature introduces runtime database environment swapping (Production vs. Sa
 * **Interaction:** 
   * **Database Mode Switching:** Toggle between **Production Mode** (`sidekick.db`) and **Testing Sandbox Mode** (`sidekick_testing.db`), or select "Copy Production to Testing & Switch".
   * **Testing Mode Ribbon:** When in Testing Sandbox Mode, a prominent warning banner is rendered at the top of all pages with an instant "Switch to Production" button.
-  * **Snapshot Creation:** Save a restore point snapshot (`Sidekick_YYYY-MM-DD_HHMMSS.db`) on demand.
-  * **Snapshot Management:** View all snapshots stored in `data/`, with options to delete files (with confirmation dialog) or restore snapshots.
+  * **Snapshot Creation:** Save a restore point snapshot (`Sidekick_YYYY-MM-DD_HHMMSS.db`) into `data/snapshots/` on demand.
+* **Snapshot Management:** View all snapshots stored in `data/snapshots/`, with options to delete files (with confirmation dialog) or restore snapshots.
   * **Smart Restore Prompt:** Restoring a snapshot prompts the user to save a snapshot of current production data first *only if* un-snapshotted changes exist (determined via SHA256 hash comparison).
   * **UI Locking:** During database file copy, swap, or migration operations, a full-screen backdrop overlay locks interaction until completion.
 * **Mobile Considerations:** The testing mode ribbon and operation lock overlay adapt seamlessly to mobile viewports.

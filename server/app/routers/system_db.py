@@ -24,6 +24,9 @@ router = APIRouter(prefix="/system/db", tags=["system-database"])
 # Regex pattern for snapshot filenames: Sidekick_YYYY-MM-DD_HHMMSS.db
 SNAPSHOT_PATTERN = r"^Sidekick_\d{4}-\d{2}-\d{2}_\d{6}\.db$"
 
+SNAPSHOTS_DIR = os.path.join(DATA_DIR, "snapshots")
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+
 class ModeSwitchRequest(BaseModel):
     mode: str  # "prod" or "testing"
     copy_prod_to_testing: bool = False
@@ -47,10 +50,11 @@ def run_migrations_on_db(db_path: str):
         print(f"Alembic migration warning for {db_path}: {e}")
 
 def get_snapshot_files() -> List[dict]:
-    """Glob and parse all snapshot files in data directory sorted newest first."""
+    """Glob and parse all snapshot files in data/snapshots directory sorted newest first."""
     snapshots = []
-    pattern = os.path.join(DATA_DIR, "Sidekick_*.db")
+    pattern = os.path.join(SNAPSHOTS_DIR, "Sidekick_*.db")
     filepaths = glob.glob(pattern)
+
     
     for filepath in filepaths:
         filename = os.path.basename(filepath)
@@ -145,12 +149,12 @@ def switch_db_mode(req: ModeSwitchRequest):
 
 @router.get("/snapshots")
 def list_snapshots():
-    """List all available database snapshots stored in the data directory."""
+    """List all available database snapshots stored in the data/snapshots directory."""
     return get_snapshot_files()
 
 @router.post("/snapshots")
 def create_snapshot():
-    """Flush the active database and copy it to a new snapshot file: Sidekick_YYYY-MM-DD_HHMMSS.db."""
+    """Flush the active database and copy it to a new snapshot file in data/snapshots/: Sidekick_YYYY-MM-DD_HHMMSS.db."""
     try:
         active_path = get_active_db_path()
         if not os.path.exists(active_path):
@@ -163,7 +167,7 @@ def create_snapshot():
         dispose_engines()
         
         now_str = datetime.now().strftime("Sidekick_%Y-%m-%d_%H%M%S.db")
-        snapshot_path = os.path.join(DATA_DIR, now_str)
+        snapshot_path = os.path.join(SNAPSHOTS_DIR, now_str)
         
         shutil.copy2(active_path, snapshot_path)
         
@@ -200,7 +204,7 @@ def delete_snapshot(filename: str):
             detail="Invalid snapshot filename pattern."
         )
         
-    snapshot_path = os.path.join(DATA_DIR, filename)
+    snapshot_path = os.path.join(SNAPSHOTS_DIR, filename)
     if not os.path.exists(snapshot_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -228,7 +232,7 @@ def restore_snapshot(filename: str, req: RestoreRequest):
             detail="Invalid snapshot filename pattern."
         )
         
-    snapshot_path = os.path.join(DATA_DIR, filename)
+    snapshot_path = os.path.join(SNAPSHOTS_DIR, filename)
     if not os.path.exists(snapshot_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -242,7 +246,7 @@ def restore_snapshot(filename: str, req: RestoreRequest):
         # Optionally create a safety snapshot of current active DB first
         if req.create_snapshot_first and os.path.exists(PROD_DB_PATH):
             now_str = datetime.now().strftime("Sidekick_%Y-%m-%d_%H%M%S.db")
-            safety_path = os.path.join(DATA_DIR, now_str)
+            safety_path = os.path.join(SNAPSHOTS_DIR, now_str)
             shutil.copy2(PROD_DB_PATH, safety_path)
 
         # Overwrite Production DB with snapshot file
@@ -265,3 +269,4 @@ def restore_snapshot(filename: str, req: RestoreRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restore snapshot: {str(e)}"
         )
+
