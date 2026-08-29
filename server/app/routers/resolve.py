@@ -53,7 +53,7 @@ def parse_payload_identifier(raw_payload: str) -> tuple[Optional[str], Optional[
         hint = parts[0].lower() if parts else None
         target_id = parts[1] if len(parts) > 1 else None
 
-        # Handle query string fallback e.g. fuse://storage?location=xxx
+        # Handle query string fallback (e.g. fuse://location?location=xxx)
         if not target_id and "?" in without_scheme:
             query_part = without_scheme.split("?", 1)[1]
             for kv in query_part.split("&"):
@@ -82,9 +82,9 @@ def resolve_scanned_payload(
     """
     hint, target_id = parse_payload_identifier(payload)
 
-    # Attempt resolution by location ID first if hint is location/storage or no hint
+    # Attempt resolution by location ID first if hint is location or no hint
     if target_id:
-        if hint in [None, "location", "storage"]:
+        if hint in [None, "location"]:
             storage = db.query(models.Storage).filter(models.Storage.id == target_id).first()
             if storage:
                 breadcrumb = get_location_breadcrumb(storage, db)

@@ -66,7 +66,7 @@ describe("UniversalLocationSelector NFC Scan handling", () => {
     expect(container).toHaveTextContent('Search Results for "Warehouse"');
 
     // Dispatch NFC scan event
-    const parsed = parseDeepLink("fuse://storage?id=bin-202");
+    const parsed = parseDeepLink("fuse://location/bin-202");
     const nfcEvent = new CustomEvent("sidekick:nfc-scanned", {
       detail: parsed,
       cancelable: true,

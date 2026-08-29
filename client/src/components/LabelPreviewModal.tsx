@@ -156,7 +156,7 @@ export default function LabelPreviewModal(props: LabelPreviewModalProps) {
     ctx.fillRect(0, 0, width, height);
 
     // Draw DataMatrix (Left side - full height, slightly inset vertically)
-    const deepLinkScheme = isPartEntity() ? `fuse://part?id=${id}` : `fuse://storage?id=${id}`;
+    const deepLinkScheme = isPartEntity() ? `fuse://part/${id}` : `fuse://location/${id}`;
     let datamatrixWidth = 0;
 
     try {

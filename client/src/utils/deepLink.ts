@@ -50,7 +50,6 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
 
   switch (primaryAction) {
     case "location":
-    case "storage":
       return {
         rawUrl,
         scheme: "fuse",
