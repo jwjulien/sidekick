@@ -1,6 +1,6 @@
 ---
 title: Ubiquitous Stock Controller Component
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -46,8 +46,8 @@ To minimize the friction of physical inventory auditing, Sidekick utilizes a con
 ---
 
 ## 5. Implementation Tasks
-- [ ] Build FastAPI `/touch` endpoint.
-- [ ] Create SolidJS `<StockController />` component.
-- [ ] Wire the `[✓ Confirm]` button to the `/touch` endpoint.
-- [ ] Integrate global Scale Context to project counts based on live weight.
-- [ ] Audit all existing UI views (Triage, Part Detail, Scanner Result) to replace static quantity text with this new component.
+- [x] Build FastAPI `/touch` endpoint.
+- [x] Create SolidJS `<StockController />` component.
+- [x] Wire the `[✓ Confirm]` button to the `/touch` endpoint.
+- [x] Integrate global Scale Context to project counts based on live weight.
+- [x] Audit all existing UI views (Triage, Part Detail, Scanner Result) to replace static quantity text with this new component.

@@ -36,38 +36,6 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
   * **Stock Status Toggles:** Quick filters for "Low Stock" (`quantity < threshold`) or "In Stock Only".
   * **Dynamic JSON Attribute Builder:** Filter by key-value specs (e.g. `Resistance = 10k`, `Tolerance = 1%`).
 * **Selection Modes:**
-  * `none`: Read-only navigation and inspection.
-  * `single`: Clicking a row triggers detail view or returns the selected part to a caller modal.
-  * `multiple`: Checkbox column enabling batch operations (e.g. bulk stow, category assignment, label printing).
-
-## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):**
-  * Core Component: [`UniversalPartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/parts/UniversalPartsBrowser.tsx) (located in `client/src/components/parts/`).
-  * Accepts an optional `parts?: any[]` input property for client-side search, filtering, and sorting over pre-fetched or custom lists, while falling back to remote fetching if omitted.
-  * Integrated Toolbar & Views: Search input, category dropdown, low stock toggle, layout mode switcher (`table`, `grid`, `picker`), multi-selection checkboxes, and column sorting.
-  * Component Interface:
-    ```typescript
-    interface UniversalPartsBrowserProps {
-      parts?: any[];
-      mode?: "table" | "grid" | "picker";
-      selectionMode?: "none" | "single" | "multiple";
-      initialLocationId?: string;
-      initialCategoryId?: string;
-      unassignedOnly?: boolean;
-      lowStockOnly?: boolean;
-      selectedPartIds?: string[];
-      title?: string;
-      showToolbar?: boolean;
-      loading?: boolean;
-      onSelectPart?: (part: any) => void;
-      onBulkSelect?: (parts: any[]) => void;
-      onAutoSelect?: (part: any) => void;
-      customActions?: (part: any) => JSX.Element;
-    }
-    ```
-
-* **Universal Part Finder Modal (`UniversalPartFinderModal.tsx`):**
-  * Built as a modal wrapper around `UniversalPartsBrowser` with `mode="picker"`.
   * Designed specifically for single-part selection workflows across the application (e.g. adding parts to project revisions, adding parts to custom lists, or finding parts for inventory check-in).
   * **Universal Features:**
     * Embeds a universal numerical **Quantity** input selector (default: `1`).
@@ -80,24 +48,10 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
     interface UniversalPartFinderModalProps {
       isOpen: boolean;
       onClose: () => void;
-      title?: string;
-      onConfirm: (part: any, quantity: number, extraData?: any) => void;
-      children?: (selectedPart: any) => JSX.Element; // Custom input fields slot (e.g. designator, notes)
-    }
-    ```
-
-* **Backend (FastAPI / SQLAlchemy):**
-  * Standardized Query API on `GET /api/parts` in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py):
-    * `search`: String (multi-term matching across `value`, `number`, `package`, `notes`, `attributes`).
-    * `category_id`: String (supports recursive child category expansion).
-    * `location_id`: String (supports location scope and nested storage bins).
-    * `is_unassigned`: Boolean (filters parts with zero assigned storage locations).
-    * `low_stock`: Boolean (filters parts below reorder threshold).
-    * `attr_key` & `attr_value`: Dynamic JSON attribute queries.
     * `sort_by` & `sort_order`: Field sorting (`value`, `number`, `category`, `quantity`, `modified_on`).
     * `page` & `limit`: Server-side pagination.
 * **Database Schema:**
-  * Uses existing `Part`, `Category`, `Storage`, and `Transaction` models in [`server/app/models.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/models.py).
+  * Uses existing `Part`, `Category`, `Storage`, and `Transaction` models in [`server/app/models.py`](../server/app/models.py).
   * Ensure SQL indexes on `parts.value`, `parts.number`, `parts.category_id`, and `storage.part_id` for sub-50ms query response times.
 
 ## 4. Out of Scope
@@ -107,10 +61,10 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
 ---
 
 ## 5. Implementation Tasks
-- [x] Refactor `GET /api/parts` in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py) to support standardized filtering, sorting, and location recursion.
-- [x] Build [`client/src/components/parts/UniversalPartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/parts/UniversalPartsBrowser.tsx) accepting an optional `parts` input property, supporting `table`, `grid`, and `picker` layout modes, live multi-term search, category filtering, low-stock toggles, and column sorting.
-- [x] Refactor [`client/src/pages/Parts.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Parts.tsx) to use the new `UniversalPartsBrowser` component.
-- [x] Refactor [`client/src/components/storage/PartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/storage/PartsBrowser.tsx) in [`Storage.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Storage.tsx) to leverage `UniversalPartsBrowser` with location scoping.
-- [x] Integrate `UniversalPartsBrowser` into the Homeless Parts view ([`029-homeless-parts.md`](file:///c:/Hobbies/Inventory/Sidekick/docs/features/029-homeless-parts.md)).
+- [x] Refactor `GET /api/parts` in [`server/app/routers/parts.py`](../server/app/routers/parts.py) to support standardized filtering, sorting, and location recursion.
+- [x] Build [`client/src/components/parts/UniversalPartsBrowser.tsx`](../client/src/components/parts/UniversalPartsBrowser.tsx) accepting an optional `parts` input property, supporting `table`, `grid`, and `picker` layout modes, live multi-term search, category filtering, low-stock toggles, and column sorting.
+- [x] Refactor [`client/src/pages/Parts.tsx`](../client/src/pages/Parts.tsx) to use the new `UniversalPartsBrowser` component.
+- [x] Refactor [`client/src/components/storage/PartsBrowser.tsx`](../client/src/components/storage/PartsBrowser.tsx) in [`Storage.tsx`](../client/src/pages/Storage.tsx) to leverage `UniversalPartsBrowser` with location scoping.
+- [x] Integrate `UniversalPartsBrowser` into the Homeless Parts view ([`029-homeless-parts.md`](../docs/features/029-homeless-parts.md)).
 - [ ] Build `UniversalPartFinderModal.tsx` wrapping `UniversalPartsBrowser` in picker mode with universal quantity input and children/slot support for workflow-specific inputs.
-- [x] Write unit tests for enhanced `GET /api/parts` query parameters in `server/tests/test_parts_browser.py`.
+- [x] Write unit tests for enhanced `GET /api/parts` query parameters in [`server/tests/test_parts_browser.py`](../server/tests/test_parts_browser.py).

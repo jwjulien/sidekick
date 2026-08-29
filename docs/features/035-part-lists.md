@@ -1,6 +1,6 @@
 ---
 title: Part Lists & Kits
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -96,13 +96,13 @@ Crucially, users can mark any list as the **"Active List"**, anchoring a persist
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `PartList` and `PartListItem` SQLAlchemy models in `server/app/models.py`.
-- [ ] Create FastAPI router `server/app/routers/part_lists.py` and register in `server/app/main.py`.
-- [ ] Build `ActiveListContext.tsx` to manage active list state with local storage persistence.
-- [ ] Build `ActiveListBottomDrawer.tsx` sticky bottom drawer component integrated into `Layout.tsx`.
-- [ ] Build `UniversalPartFinderModal.tsx` reusing `UniversalPartsBrowser` in picker mode with quantity controller and slot support for custom input fields.
-- [ ] Create SolidJS `PartLists.tsx` page with list dashboard grid and list detail view.
-- [ ] Add **"Part Kits"** menu item to sidebar navigation in `client/src/components/Layout.tsx`.
-- [ ] Wire `MultiLocationStockController` (`034`) into list item table rows.
-- [ ] Implement CSV export for lists.
-- [ ] Write backend unit tests in `server/tests/test_part_lists.py`.
+- [x] Define `PartList` and `PartListItem` SQLAlchemy models in `server/app/models.py`.
+- [x] Create FastAPI router `server/app/routers/part_lists.py` and register in `server/app/main.py`.
+- [x] Build `ActiveListContext.tsx` to manage active list state with local storage persistence.
+- [x] Build `ActiveListBottomDrawer.tsx` sticky bottom drawer component integrated into `Layout.tsx`.
+- [x] Build `UniversalPartFinderModal.tsx` reusing `UniversalPartsBrowser` in picker mode with quantity controller and slot support for custom input fields.
+- [x] Create SolidJS `PartLists.tsx` page with list dashboard grid and list detail view.
+- [x] Add **"Part Kits"** menu item to sidebar navigation in `client/src/components/Layout.tsx`.
+- [x] Wire `MultiLocationStockController` (`034`) into list item table rows.
+- [x] Implement CSV export for lists.
+- [x] Write backend unit tests in `server/tests/test_part_lists.py`.

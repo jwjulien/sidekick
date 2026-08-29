@@ -1,6 +1,6 @@
 # Database Schema Overview: `parts.dev.sqlite`
 
-This document provides a human-readable extraction and analysis of the SQLite database located at `C:\Hobbies\Inventory\BomShelter\FastAPI\parts.dev.sqlite`.
+This document provides a human-readable extraction and analysis of the SQLite database (`parts.dev.sqlite`).
 
 ## Summary Statistics
 

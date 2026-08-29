@@ -53,7 +53,7 @@ This feature introduces a dedicated view and workflow ("Homeless Parts Browser &
   * `POST /api/locations/assign` - Transactionally assigns a `part_id` to a target `storage_id` with a specified `quantity`.
   * `POST /api/locations/bulk-assign` - Transactionally assigns multiple `part_ids` to a specified location or set of locations.
 * **Database Schema:** 
-  * Utilizes existing `Part`, `Storage`, and `Transaction` models in SQLAlchemy ([`server/app/models.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/models.py)).
+  * Utilizes existing `Part`, `Storage`, and `Transaction` models in SQLAlchemy (`server/app/models.py`).
   * Add database index on `Storage.part_id` to optimize unassigned part queries.
   * Log a `Transaction` record (`action_type="assign_location"`) whenever a homeless part is assigned to maintain an audit trail.
 
@@ -65,8 +65,8 @@ This feature introduces a dedicated view and workflow ("Homeless Parts Browser &
 ---
 
 ## 5. Implementation Tasks
-- [x] Add `GET /api/parts/homeless` and `GET /api/parts/homeless/count` endpoints in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py).
-- [x] Add transactional assignment endpoints (`POST /api/locations/assign` and `POST /api/locations/bulk-assign`) in [`server/app/routers/locations.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/locations.py).
+- [x] Add `GET /api/parts/homeless` and `GET /api/parts/homeless/count` endpoints in `server/app/routers/parts.py`.
+- [x] Add transactional assignment endpoints (`POST /api/locations/assign` and `POST /api/locations/bulk-assign`) in `server/app/routers/locations.py`.
 - [x] Add DB index on `storage.part_id` for fast unassigned part filtering.
 - [x] Create `client/src/pages/HomelessParts.tsx` view with search, filtering, and bulk selection.
 - [x] Create `AssignLocationModal.tsx` component with location search tree and inline bin creation.

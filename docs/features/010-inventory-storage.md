@@ -1,6 +1,6 @@
 ---
 title: Inventory Storage & Stock
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -23,7 +23,7 @@ This feature maps the digital inventory to physical reality. It defines a hierar
 * **Mobile Considerations:** Stock adjustments ("+" and "-") must be large, distinct buttons to allow for rapid, fat-finger-friendly inventory counting while standing at the workbench.
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** * A recursive tree component to manage the nested storage containers.
+* **Frontend (SolidJS / Tauri):** * A recursive tree / Miller columns component to manage the nested storage containers (`StorageColumns.tsx`, `UniversalLocationSelector.tsx`).
     * A stock-adjustment component that triggers immediate API calls on click (debounced if necessary).
 * **Backend (FastAPI):** * `GET /api/storage` - Returns the nested hierarchical tree of all locations.
     * `POST /api/storage` - Creates a new physical location.
@@ -41,6 +41,6 @@ This feature maps the digital inventory to physical reality. It defines a hierar
 - [x] Define `Storage` Peewee model with self-referential `parent_id` and `part_id` foreign keys.
 - [x] Build FastAPI CRUD routes for locations.
 - [x] Build FastAPI endpoint for rapid stock adjustments (+/-).
-- [ ] Create SolidJS recursive tree UI for managing the hierarchy.
+- [x] Create SolidJS Miller Columns / hierarchy UI for managing the location hierarchy (`StorageColumns.tsx`, `UniversalLocationSelector.tsx`).
 - [x] Create SolidJS stock adjustment UI for the Part detail view.
 - [x] Wire frontend to backend API.

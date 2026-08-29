@@ -123,6 +123,72 @@ def format_task_lists(html_content: str) -> str:
     return html_content
 
 
+def format_admonitions(html_content: str) -> str:
+    """Transform GitHub callouts (> [!NOTE]) into styled admonition containers."""
+    admonition_icons = {
+        "note": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+        "tip": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>',
+        "important": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+        "warning": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>',
+        "caution": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>'
+    }
+
+    def replace_callout(match):
+        type_str = match.group(1).upper()
+        lower_type = type_str.lower()
+        content = match.group(2).strip()
+        icon = admonition_icons.get(lower_type, admonition_icons["note"])
+        
+        return f'<div class="admonition admonition-{lower_type}"><div class="admonition-title">{icon}<span>{type_str}</span></div><div class="admonition-content">{content}</div></div>'
+
+    pattern_p = r'<blockquote>\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(?:<br\s*\/?>)?([\s\S]*?)<\/p>\s*<\/blockquote>'
+    html_content = re.sub(pattern_p, replace_callout, html_content, flags=re.IGNORECASE)
+
+    pattern_multi = r'<blockquote>\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*<\/p>([\s\S]*?)<\/blockquote>'
+    html_content = re.sub(pattern_multi, replace_callout, html_content, flags=re.IGNORECASE)
+
+    return html_content
+
+
+def format_doc_links(html_content: str, doc_map: Dict[str, str]) -> str:
+    """Transform markdown links pointing to existing docs into SPA navigation links."""
+    def replace_link(match):
+        full_tag = match.group(0)
+        href = match.group(1)
+        
+        # Ignore external links or javascript:
+        if href.startswith("http://") or href.startswith("https://") or href.startswith("mailto:") or href.startswith("javascript:"):
+            return full_tag
+            
+        parts = href.split("#", 1)
+        path_part = parts[0].strip()
+        fragment = parts[1].strip() if len(parts) > 1 else None
+        
+        target_id = None
+        if path_part in doc_map:
+            target_id = doc_map[path_part]
+        elif Path(path_part).name in doc_map:
+            target_id = doc_map[Path(path_part).name]
+        elif Path(path_part).stem in doc_map:
+            target_id = doc_map[Path(path_part).stem]
+
+        if target_id:
+            onclick_val = f"selectDoc('{target_id}')"
+            if fragment:
+                onclick_val = f"selectDoc('{target_id}', true, '{fragment}')"
+            
+            new_tag = re.sub(
+                r'href=["\'][^"\']*["\']',
+                f'href="#{target_id}" onclick="{onclick_val}; return true;"',
+                full_tag
+            )
+            return new_tag
+
+        return full_tag
+
+    return re.sub(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>', replace_link, html_content)
+
+
 def build_doc_index() -> List[Dict[str, Any]]:
     """Scan docs directory and collect structured document objects."""
     docs = []
@@ -149,7 +215,7 @@ def build_doc_index() -> List[Dict[str, Any]]:
 
             # Render HTML body
             md_renderer = markdown.Markdown(extensions=["extra", "tables", "fenced_code", "toc"])
-            html_body = format_task_lists(md_renderer.convert(body))
+            html_body = format_task_lists(format_admonitions(md_renderer.convert(body)))
 
             docs.append({
                 "id": slug,
@@ -177,7 +243,7 @@ def build_doc_index() -> List[Dict[str, Any]]:
             title = extract_title(fm, body, slug.replace("-", " ").title())
             
             md_renderer = markdown.Markdown(extensions=["extra", "tables", "fenced_code", "toc"])
-            html_body = format_task_lists(md_renderer.convert(body))
+            html_body = format_task_lists(format_admonitions(md_renderer.convert(body)))
 
             docs.append({
                 "id": slug,
@@ -247,6 +313,20 @@ def resolve_bidirectional_dependencies(docs: List[Dict[str, Any]]) -> List[Dict[
 
         doc["prerequisites"] = resolved_prereqs
 
+    # Build alias map for link transformation in rendered HTML
+    doc_map = {}
+    for doc in docs:
+        slug = doc["id"]
+        doc_map[slug] = slug
+        doc_map[doc["filename"]] = slug
+        doc_map[doc["rel_path"]] = slug
+        doc_map[f"../{doc['rel_path']}"] = slug
+        doc_map[f"features/{doc['filename']}"] = slug
+        doc_map[f"requirements/{doc['filename']}"] = slug
+
+    for doc in docs:
+        doc["html"] = format_doc_links(doc["html"], doc_map)
+
     return docs
 
 
@@ -281,6 +361,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             --status-draft-border: #6366f1;
             --status-pending-bg: rgba(148, 163, 184, 0.15);
             --status-pending-border: #94a3b8;
+            --status-scrapped-bg: rgba(244, 63, 94, 0.15);
+            --status-scrapped-border: #f43f5e;
             
             --sidebar-width: 340px;
         }
@@ -553,6 +635,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .status-inprogress { background: var(--status-inprogress-bg); color: #fbbf24; border: 1px solid var(--status-inprogress-border); }
         .status-draft { background: var(--status-draft-bg); color: #818cf8; border: 1px solid var(--status-draft-border); }
         .status-pending { background: var(--status-pending-bg); color: #94a3b8; border: 1px solid var(--status-pending-border); }
+        .status-scrapped { background: var(--status-scrapped-bg); color: #fb7185; border: 1px solid var(--status-scrapped-border); text-decoration: line-through; }
 
         /* Main Workspace */
         main {
@@ -787,6 +870,49 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             text-decoration: line-through;
         }
 
+        /* Admonitions / Callouts */
+        .markdown-body .admonition {
+            border-left: 4px solid #06b6d4;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+        }
+        .markdown-body .admonition-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+        .markdown-body .admonition-content {
+            font-size: 0.88rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+        .markdown-body .admonition-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .markdown-body .admonition-note { border-color: #06b6d4; background: rgba(6, 182, 212, 0.08); }
+        .markdown-body .admonition-note .admonition-title { color: #22d3ee; }
+
+        .markdown-body .admonition-tip { border-color: #10b981; background: rgba(16, 185, 129, 0.08); }
+        .markdown-body .admonition-tip .admonition-title { color: #34d399; }
+
+        .markdown-body .admonition-important { border-color: #a855f7; background: rgba(168, 85, 247, 0.08); }
+        .markdown-body .admonition-important .admonition-title { color: #c084fc; }
+
+        .markdown-body .admonition-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+        .markdown-body .admonition-warning .admonition-title { color: #fbbf24; }
+
+        .markdown-body .admonition-caution { border-color: #f43f5e; background: rgba(244, 63, 94, 0.08); }
+        .markdown-body .admonition-caution .admonition-title { color: #fb7185; }
+
         /* Graph View Workspace */
         #graph-container {
             width: 100%;
@@ -989,6 +1115,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="legend-item"><div class="legend-dot" style="background: #c084fc;"></div> Requirement</div>
                 <div class="legend-item"><div class="legend-dot" style="background: #10b981;"></div> Complete</div>
                 <div class="legend-item"><div class="legend-dot" style="background: #f59e0b;"></div> In Progress</div>
+                <div class="legend-item"><div class="legend-dot" style="background: #f43f5e;"></div> Scrapped</div>
             </div>
         </div>
     </div>
@@ -1071,7 +1198,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
-        function selectDoc(docId, updateHash = true) {
+        function selectDoc(docId, updateHash = true, anchorId = null) {
             const doc = DOCS_DATA.find(d => d.id === docId);
             if (!doc) return;
 
@@ -1131,8 +1258,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Render HTML Body
             document.getElementById('markdown-content').innerHTML = doc.html;
 
-            // Scroll main workspace to top
-            document.getElementById('main-workspace').scrollTop = 0;
+            // Scroll main workspace to top or to anchor
+            if (anchorId) {
+                setTimeout(() => {
+                    const anchorEl = document.getElementById(anchorId);
+                    if (anchorEl) {
+                        anchorEl.scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        document.getElementById('main-workspace').scrollTop = 0;
+                    }
+                }, 50);
+            } else {
+                document.getElementById('main-workspace').scrollTop = 0;
+            }
         }
 
         function switchView(view) {
@@ -1184,6 +1322,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let color = '#38bdf8';
                 if (doc.type === 'requirement') color = '#c084fc';
                 if (doc.status.toLowerCase() === 'complete') color = '#10b981';
+                if (doc.status.toLowerCase() === 'scrapped') color = '#f43f5e';
 
                 elements.push({
                     data: {

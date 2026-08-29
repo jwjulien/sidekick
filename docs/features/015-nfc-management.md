@@ -1,6 +1,6 @@
 ---
 title: NFC Tag Management
-status: Completed
+status: Complete
 target: 
   - Android
   - Windows
@@ -60,4 +60,4 @@ In addition to direct navigation, NFC scanning integrates directly into modal wo
 - [x] Build SolidJS `NfcWriteModal.tsx` with read-before-write safeguard.
 - [x] Add "Write NFC Tag" buttons to `Storage.tsx` location views and `PartDetails.tsx`.
 - [x] Wire NFC scanner listener into `MovePartModal.tsx` for quick Miller column location jumping.
-- [x] Wire immediate NFC programming prompt into Location Creation flow.
+- [x] Wire immediate NFC programming prompt into Location Creation flow.
