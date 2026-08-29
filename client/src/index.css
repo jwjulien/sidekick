@@ -184,8 +184,15 @@ body {
   color: var(--color-text-subtle) !important;
 }
 
-[data-theme="light"] .bg-[#0b0b0e] {
-  background-color: var(--color-bg-base) !important;
+[data-theme="light"] .bg-[#0b0b0e],
+[data-theme="light"] .bg-gray-900,
+[data-theme="light"] .bg-gray-900\/95 {
+  background-color: var(--glass-card-bg) !important;
+}
+
+[data-theme="light"] .bg-gray-950,
+[data-theme="light"] .bg-gray-950\/60 {
+  background-color: var(--color-bg-subtle) !important;
 }
 
 [data-theme="light"] .border-white\/5,

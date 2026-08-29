@@ -71,7 +71,7 @@ export default function ActiveListBottomDrawer() {
     <Show when={activeList()}>
       {/* Sticky Docked Bottom Container */}
       <div class="fixed bottom-0 left-0 right-0 z-40 px-4 transition-all duration-300">
-        <div class="max-w-7xl mx-auto glass-card rounded-t-2xl border border-white/20 shadow-2xl bg-gray-900/95 backdrop-blur-xl overflow-hidden">
+        <div class="max-w-7xl mx-auto glass-card rounded-t-2xl border border-white/10 shadow-2xl backdrop-blur-xl overflow-hidden">
           {/* Header Bar */}
           <div class="px-5 py-3 flex items-center justify-between bg-gradient-to-r from-accentCyan/10 via-purple-500/5 to-transparent border-b border-white/10">
             <div class="flex items-center gap-3">
@@ -136,7 +136,7 @@ export default function ActiveListBottomDrawer() {
 
           {/* Expandable Body Table */}
           <Show when={expanded()}>
-            <div class="p-4 max-h-60 overflow-y-auto space-y-2 border-t border-white/5 bg-gray-950/60">
+            <div class="p-4 max-h-60 overflow-y-auto space-y-2 border-t border-white/5 bg-black/10">
               <Show
                 when={activeList()?.items?.length > 0}
                 fallback={
@@ -164,7 +164,7 @@ export default function ActiveListBottomDrawer() {
             onClick={() => setShowConfirmClose(false)}
           >
             <div
-              class="glass-card max-w-md w-full p-6 rounded-2xl border border-white/20 shadow-2xl bg-gray-900/95 space-y-4"
+              class="glass-card max-w-md w-full p-6 rounded-2xl border border-white/10 shadow-2xl space-y-4"
               onClick={(e) => e.stopPropagation()}
             >
               <h4 class="text-base font-bold text-white">Deactivate Active List?</h4>
