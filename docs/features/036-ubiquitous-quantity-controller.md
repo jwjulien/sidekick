@@ -37,7 +37,8 @@ Numerical quantity adjustment is a fundamental interaction across Sidekick, incl
     * `label`: string (optional unit label).
     * `onDelete`: `() => void | Promise<void>` (optional removal handler).
     * `onChange`: `(newVal: number) => void` (debounced change callback).
-  * **Sub-component Composition:** Reused inside `StockController.tsx` for storage counts, `PartLists.tsx` for required item quantities, and `ActiveListBottomDrawer.tsx` for sticky drawer staging.
+  * **Sub-component Composition:** Reused inside `StockController.tsx` for storage counts and inside the unified `PartListItemsTable.tsx` component consumed by both `PartLists.tsx` and `ActiveListBottomDrawer.tsx`.
+  * **Interactive Undo Toast Pattern:** On item removal via `onDelete`, a dark toast displays item name alongside a 1-click `[RotateCcw Undo]` button that restores item snapshot data on trigger.
 * **Backend (FastAPI / SQLite):** Stateless UI component; delegates persistence to parent view handlers (e.g. `PUT /locations/{id}/count`, `PUT /lists/{id}/items/{item_id}`).
 * **Database Schema:** No database changes required.
 
@@ -53,4 +54,6 @@ Numerical quantity adjustment is a fundamental interaction across Sidekick, incl
 - [x] Add click-to-edit inline number input box.
 - [x] Add contextual `onDelete` property transforming the left button to `Trash2` at quantity 1.
 - [x] Refactor `StockController.tsx` to wrap `QuantityController.tsx`.
-- [x] Integrate `QuantityController.tsx` into Part Lists table and Active List Bottom Drawer.
+- [x] Create shared `PartListItemsTable.tsx` component to DRY list row rendering.
+- [x] Integrate `QuantityController.tsx` and `PartListItemsTable.tsx` into Part Lists table and Active List Bottom Drawer.
+- [x] Add interactive Undo toast pattern on item deletion.

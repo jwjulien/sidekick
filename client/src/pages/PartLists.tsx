@@ -6,20 +6,17 @@ import {
   Copy,
   Trash2,
   Download,
-  ExternalLink,
   Edit2,
   Check,
   X,
   Search,
   Package,
   ArrowLeft,
-  CheckCircle,
-  RotateCcw
+  CheckCircle
 } from "lucide-solid";
 import { apiFetch } from "../hooks/useAuth";
 import toast from "solid-toast";
-import MultiLocationStockController from "../components/parts/MultiLocationStockController";
-import QuantityController from "../components/QuantityController";
+import PartListItemsTable from "../components/lists/PartListItemsTable";
 import UniversalPartFinderModal from "../components/parts/UniversalPartFinderModal";
 import { useActiveList } from "../context/ActiveListContext";
 
@@ -242,101 +239,7 @@ export default function PartLists() {
     }
   };
 
-  const handleUpdateItemQty = async (itemId: string, newQty: number) => {
-    const listId = currentList()?.id;
-    if (!listId) return;
-    try {
-      await apiFetch(`/lists/${listId}/items/${itemId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: newQty })
-      });
-      await fetchListDetails(listId);
-      await activeListCtx.refreshActiveList();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update item quantity.");
-    }
-  };
 
-  const handleUpdateItemNotes = async (itemId: string, newNotes: string) => {
-    const listId = currentList()?.id;
-    if (!listId) return;
-    try {
-      await apiFetch(`/lists/${listId}/items/${itemId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: newNotes })
-      });
-      await fetchListDetails(listId);
-      await activeListCtx.refreshActiveList();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update notes.");
-    }
-  };
-
-  const handleRemoveItem = async (item: any) => {
-    const listId = currentList()?.id;
-    if (!listId || !item) return;
-
-    const snapshot = {
-      listId,
-      partId: item.part_id,
-      quantity: item.quantity,
-      notes: item.notes || "",
-      partValue: item.part?.value || item.part?.number || "Component"
-    };
-
-    try {
-      await apiFetch(`/lists/${listId}/items/${item.id}`, { method: "DELETE" });
-      await fetchListDetails(listId);
-      await activeListCtx.refreshActiveList();
-
-      toast((t) => (
-        <div class="flex items-center justify-between gap-4 py-0.5">
-          <span class="text-xs font-semibold text-white truncate max-w-[200px]">
-            Removed "{snapshot.partValue}"
-          </span>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                await apiFetch(`/lists/${snapshot.listId}/items`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    part_id: snapshot.partId,
-                    quantity: snapshot.quantity,
-                    notes: snapshot.notes
-                  })
-                });
-                toast.success(`Restored "${snapshot.partValue}" to list!`);
-                await fetchListDetails(snapshot.listId);
-                await activeListCtx.refreshActiveList();
-              } catch (e: any) {
-                toast.error(e.message || "Failed to restore item.");
-              }
-            }}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accentCyan text-gray-950 font-extrabold text-[11px] uppercase tracking-wider transition-all hover:brightness-110 shadow-md active:scale-95 shrink-0"
-          >
-            <RotateCcw size={12} />
-            <span>Undo</span>
-          </button>
-        </div>
-      ), {
-        duration: 6000,
-        style: {
-          background: "#0f172a",
-          color: "#ffffff",
-          border: "1px solid rgba(6, 182, 212, 0.4)",
-          "border-radius": "0.85rem",
-          "box-shadow": "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-          padding: "0.5rem 0.75rem"
-        }
-      });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to remove item.");
-    }
-  };
 
   const handleExportCsv = async () => {
     const listId = currentList()?.id;
@@ -557,105 +460,14 @@ export default function PartLists() {
                 </div>
               }
             >
-              <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr class="border-b border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
-                      <th class="py-3.5 px-4">Component</th>
-                      <th class="py-3.5 px-4 text-center">Live Stock (Bins)</th>
-                      <th class="py-3.5 px-4 text-center">Req. Qty</th>
-                      <th class="py-3.5 px-4">Item Notes</th>
-                      <th class="py-3.5 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-white/5">
-                    <For each={currentList()?.items}>
-                      {(item) => (
-                        <tr class="hover:bg-white/5 transition-colors group">
-                          {/* Component Column */}
-                          <td class="py-3 px-4">
-                            <div class="flex items-center gap-3">
-                              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-accentCyan text-xs">
-                                {item.part?.package || "Part"}
-                              </div>
-                              <div>
-                                <div class="font-extrabold text-white text-sm">
-                                  {item.part?.value}
-                                </div>
-                                <div class="text-[11px] text-gray-400 font-mono">
-                                  {item.part?.number}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Live Multi-Location Stock Column */}
-                          <td class="py-3 px-4 text-center">
-                            <MultiLocationStockController
-                              partId={item.part_id}
-                              totalQty={item.part?.total_quantity}
-                              locations={item.part?.locations || []}
-                              compact={true}
-                              onChanged={() => fetchListDetails(currentList().id)}
-                            />
-                          </td>
-
-                          {/* Target Quantity Column */}
-                          <td class="py-3 px-4 text-center">
-                            <QuantityController
-                              value={item.quantity}
-                              compact={true}
-                              min={1}
-                              onDelete={() => handleRemoveItem(item)}
-                              onChange={(newQty) => handleUpdateItemQty(item.id, newQty)}
-                            />
-                          </td>
-
-                          {/* Editable Notes Column */}
-                          <td class="py-3 px-4">
-                            <input
-                              type="text"
-                              value={item.notes || ""}
-                              placeholder="Add optional notes..."
-                              onBlur={(e) =>
-                                handleUpdateItemNotes(item.id, (e.target as HTMLInputElement).value)
-                              }
-                              onKeyDown={(e: KeyboardEvent) =>
-                                e.key === "Enter" &&
-                                handleUpdateItemNotes(
-                                  item.id,
-                                  (e.target as HTMLInputElement).value
-                                )
-                              }
-                              class="glass-input w-full text-xs text-gray-300 py-1 px-2.5"
-                            />
-                          </td>
-
-                          {/* Actions Column */}
-                          <td class="py-3 px-4 text-right">
-                            <div class="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => navigate(`/parts/${item.part_id}`)}
-                                class="p-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-accentCyan hover:bg-white/10"
-                                title="View part details"
-                              >
-                                <ExternalLink size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleRemoveItem(item)}
-                                class="p-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10"
-                                title="Remove item"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
+              <PartListItemsTable
+                items={currentList()?.items || []}
+                listId={currentList().id}
+                onItemUpdated={() => {
+                  fetchListDetails(currentList().id);
+                  activeListCtx.refreshActiveList();
+                }}
+              />
             </Show>
           </div>
         </div>

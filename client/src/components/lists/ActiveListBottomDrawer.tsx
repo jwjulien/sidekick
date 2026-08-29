@@ -1,9 +1,8 @@
-import { createSignal, Show, For } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useNavigate, useLocation } from "@solidjs/router";
-import { ShoppingBag, ChevronUp, ChevronDown, X, ExternalLink, Trash2, Plus, RotateCcw } from "lucide-solid";
+import { ShoppingBag, ChevronUp, ChevronDown, X, ExternalLink, Plus } from "lucide-solid";
 import { useActiveList } from "../../context/ActiveListContext";
-import MultiLocationStockController from "../parts/MultiLocationStockController";
-import QuantityController from "../QuantityController";
+import PartListItemsTable from "./PartListItemsTable";
 import { apiFetch } from "../../hooks/useAuth";
 import toast from "solid-toast";
 
@@ -86,68 +85,6 @@ export default function ActiveListBottomDrawer() {
     await activeListCtx.clearActiveList();
   };
 
-  const handleRemoveItem = async (item: any) => {
-    const listId = activeList()?.id;
-    if (!listId || !item) return;
-
-    const snapshot = {
-      listId,
-      partId: item.part_id,
-      quantity: item.quantity,
-      notes: item.notes || "",
-      partValue: item.part?.value || item.part?.number || "Component"
-    };
-
-    try {
-      await apiFetch(`/lists/${listId}/items/${item.id}`, { method: "DELETE" });
-      await activeListCtx.refreshActiveList();
-
-      toast((t) => (
-        <div class="flex items-center justify-between gap-4 py-0.5">
-          <span class="text-xs font-semibold text-white truncate max-w-[200px]">
-            Removed "{snapshot.partValue}"
-          </span>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                await apiFetch(`/lists/${snapshot.listId}/items`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    part_id: snapshot.partId,
-                    quantity: snapshot.quantity,
-                    notes: snapshot.notes
-                  })
-                });
-                toast.success(`Restored "${snapshot.partValue}" to list!`);
-                await activeListCtx.refreshActiveList();
-              } catch (e: any) {
-                toast.error(e.message || "Failed to restore item.");
-              }
-            }}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accentCyan text-gray-950 font-extrabold text-[11px] uppercase tracking-wider transition-all hover:brightness-110 shadow-md active:scale-95 shrink-0"
-          >
-            <RotateCcw size={12} />
-            <span>Undo</span>
-          </button>
-        </div>
-      ), {
-        duration: 6000,
-        style: {
-          background: "#0f172a",
-          color: "#ffffff",
-          border: "1px solid rgba(6, 182, 212, 0.4)",
-          "border-radius": "0.85rem",
-          "box-shadow": "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-          padding: "0.5rem 0.75rem"
-        }
-      });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to remove item.");
-    }
-  };
-
   return (
     <Show when={activeList()}>
       {/* Sticky Docked Bottom Container */}
@@ -226,83 +163,13 @@ export default function ActiveListBottomDrawer() {
                   </div>
                 }
               >
-                <div class="grid grid-cols-1 divide-y divide-white/5">
-                  <For each={activeList()?.items}>
-                    {(item) => (
-                      <div
-                        id={`drawer-part-${item.part_id}`}
-                        class={`py-2.5 px-3 rounded-xl flex items-center justify-between gap-4 text-xs transition-all duration-500 ${
-                          activeListCtx.highlightedPartId() === item.part_id
-                            ? "bg-amber-500/30 border border-amber-400/60 shadow-lg shadow-amber-500/20 animate-pulse"
-                            : "hover:bg-white/5"
-                        }`}
-                      >
-                        <div class="flex items-center gap-3 min-w-0">
-                          <div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center font-bold text-accentCyan text-[10px]">
-                            {item.part?.package || "Part"}
-                          </div>
-                          <div class="min-w-0">
-                            <div class="font-bold text-white truncate">
-                              {item.part?.value}
-                            </div>
-                            <div class="text-[10px] text-gray-400 font-mono truncate">
-                              {item.part?.number}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="flex items-center gap-4 shrink-0">
-                          <div class="text-center">
-                            <span class="text-[10px] text-gray-400 block mb-0.5">Req Qty</span>
-                            <QuantityController
-                              value={item.quantity}
-                              compact={true}
-                              min={1}
-                              onDelete={() => handleRemoveItem(item)}
-                              onChange={async (newQty) => {
-                                const listId = activeList()?.id;
-                                if (!listId) return;
-                                try {
-                                  await apiFetch(`/lists/${listId}/items/${item.id}`, {
-                                    method: "PUT",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ quantity: newQty })
-                                  });
-                                  await activeListCtx.refreshActiveList();
-                                } catch (err: any) {
-                                  toast.error(err.message || "Failed to update item quantity.");
-                                }
-                              }}
-                            />
-                          </div>
-
-                          <div class="text-center">
-                            <span class="text-[10px] text-gray-400 block">Notes</span>
-                            <span class="text-gray-300 truncate max-w-[120px] block text-[11px]">
-                              {item.notes || "-"}
-                            </span>
-                          </div>
-
-                          <MultiLocationStockController
-                            partId={item.part_id}
-                            totalQty={item.part?.total_quantity}
-                            locations={item.part?.locations || []}
-                            compact={true}
-                            dropUp={true}
-                            onChanged={() => activeListCtx.refreshActiveList()}
-                          />
-
-                          <button
-                            onClick={() => handleRemoveItem(item)}
-                            class="p-1 rounded-lg text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </For>
-                </div>
+                <PartListItemsTable
+                  items={activeList()?.items || []}
+                  listId={activeList().id}
+                  isDrawer={true}
+                  highlightedPartId={activeListCtx.highlightedPartId()}
+                  onItemUpdated={() => activeListCtx.refreshActiveList()}
+                />
               </Show>
             </div>
           </Show>
