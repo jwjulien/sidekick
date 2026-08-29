@@ -4,7 +4,7 @@ import { ExternalLink, RotateCcw } from "lucide-solid";
 import QuantityController from "../QuantityController";
 import MultiLocationStockController from "../parts/MultiLocationStockController";
 import { apiFetch } from "../../hooks/useAuth";
-import toast from "solid-toast";
+import { showToast, toast } from "../../utils/toast";
 
 export interface PartListItemsTableProps {
   items: any[];
@@ -59,49 +59,28 @@ export default function PartListItemsTable(props: PartListItemsTableProps) {
       props.onItemRemoved?.(item);
       props.onItemUpdated?.();
 
-      toast((t) => (
-        <div class="flex items-center justify-between gap-4 py-0.5">
-          <span class="text-xs font-semibold text-white truncate max-w-[200px]">
-            Removed "{snapshot.partValue}"
-          </span>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                await apiFetch(`/lists/${snapshot.listId}/items`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    part_id: snapshot.partId,
-                    quantity: snapshot.quantity,
-                    notes: snapshot.notes
-                  })
-                });
-                toast.success(`Restored "${snapshot.partValue}" to list!`);
-                props.onItemUpdated?.();
-              } catch (e: any) {
-                toast.error(e.message || "Failed to restore item.");
-              }
-            }}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accentCyan text-gray-950 font-extrabold text-[11px] uppercase tracking-wider transition-all hover:brightness-110 shadow-md active:scale-95 shrink-0"
-          >
-            <RotateCcw size={12} />
-            <span>Undo</span>
-          </button>
-        </div>
-      ), {
-        duration: 6000,
-        style: {
-          background: "#0f172a",
-          color: "#ffffff",
-          border: "1px solid rgba(6, 182, 212, 0.4)",
-          "border-radius": "0.85rem",
-          "box-shadow": "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-          padding: "0.5rem 0.75rem"
+      showToast.undo(
+        `Removed "${snapshot.partValue}" from list`,
+        async () => {
+          try {
+            await apiFetch(`/lists/${snapshot.listId}/items`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                part_id: snapshot.partId,
+                quantity: snapshot.quantity,
+                notes: snapshot.notes
+              })
+            });
+            showToast.success(`Restored "${snapshot.partValue}" to list!`);
+            props.onItemUpdated?.();
+          } catch (e: any) {
+            showToast.error(e.message || "Failed to restore item.");
+          }
         }
-      });
+      );
     } catch (err: any) {
-      toast.error(err.message || "Failed to remove item.");
+      showToast.error(err.message || "Failed to remove item.");
     }
   };
 

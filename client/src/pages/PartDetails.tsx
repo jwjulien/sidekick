@@ -22,7 +22,7 @@ import {
   ShoppingBag
 } from "lucide-solid";
 import { apiFetch, user, backendUrl, token } from "../hooks/useAuth";
-import toast from "solid-toast";
+import { showToast, toast } from "../utils/toast";
 import { useConfirm } from "../contexts/ConfirmContext";
 import { useViewState } from "../context/ViewStateContext";
 import { useActiveList } from "../context/ActiveListContext";
@@ -624,39 +624,21 @@ export default function PartDetails(props: { id?: string; onCloseInline?: () => 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ part_id: itemId, quantity: 1 })
         });
-        toast.success(`Added "${item()?.value || "component"}" to active list "${activeList.name}"!`);
+        showToast.success(`Added "${item()?.value || "component"}" to active list "${activeList.name}"!`);
         await activeListCtx.refreshActiveList();
       } catch (err: any) {
         if (err.message?.includes("already in list")) {
-          toast((t) => (
-            <div class="flex items-center justify-between gap-4 py-1 px-1">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-                <span class="text-xs font-bold text-white tracking-wide">Item already in list</span>
-              </div>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  activeListCtx.highlightPartInDrawer(itemId!);
-                }}
-                class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-gray-950 font-extrabold text-[11px] uppercase tracking-wider transition-all shadow-md active:scale-95 shrink-0"
-              >
-                Locate in Drawer
-              </button>
-            </div>
-          ), {
-            duration: 6000,
-            style: {
-              background: "#0f172a",
-              color: "#ffffff",
-              border: "1px solid rgba(245, 158, 11, 0.5)",
-              "border-radius": "0.85rem",
-              "box-shadow": "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-              padding: "0.5rem 0.75rem"
-            }
+          showToast.warning("Item already in active list", {
+            actions: [
+              {
+                title: "Locate in Drawer",
+                variant: "primary",
+                onClick: () => activeListCtx.highlightPartInDrawer(itemId!)
+              }
+            ]
           });
         } else {
-          toast.error(err.message || "Failed to add component to active list.");
+          showToast.error(err.message || "Failed to add component to active list.");
         }
       }
     } else {

@@ -23,6 +23,7 @@ import AuditLog from "./pages/AuditLog";
 import PartLists from "./pages/PartLists";
 import Layout from "./components/Layout";
 import { Toaster } from "solid-toast";
+import "./components/toast/Toast.css";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ScaleProvider } from "./context/ScaleContext";
 import { ViewStateProvider } from "./context/ViewStateContext";
@@ -201,7 +202,16 @@ export default function App() {
                 {/* Fallback wildcard router */}
                 <Route path="*all" component={() => <Navigate href="/" />} />
               </Router>
-              <Toaster position="bottom-right" />
+              <Toaster 
+                position="bottom-right" 
+                toastOptions={{ 
+                  style: { 
+                    background: "transparent", 
+                    boxShadow: "none", 
+                    padding: "0" 
+                  } 
+                }} 
+              />
             </ActiveListProvider>
           </ConfirmProvider>
         </ScaleProvider>
