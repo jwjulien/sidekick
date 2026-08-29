@@ -16,6 +16,8 @@ dependencies:
 ## 1. Overview
 To minimize the friction of physical inventory auditing, Sidekick utilizes a concept of "Opportunistic Cycle Counting." Any time a Storage Location's part count is rendered in the UI (e.g., in a Part Detail view, a Search result, or after a Barcode Scan), it is never rendered as static text. Instead, it is rendered via the `Ubiquitous Stock Controller`—a shared SolidJS component that instantly allows the user to adjust the count, confirm the existing count, or utilize a Bluetooth scale, automatically updating the location's `last_counted` timestamp to `NOW`.
 
+*(Note: For aggregated multi-location stock control in tables and custom part lists, see `034-multi-location-stock-controller.md`).*
+
 ## 2. User Experience & UI
 * **Trigger:** Appears implicitly wherever a `Storage.quantity` is displayed in the UI.
 * **Interaction (Confirming):** 1. The component displays the current expected quantity (e.g., "Qty: 150").

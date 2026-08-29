@@ -65,6 +65,27 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
       customActions?: (part: any) => JSX.Element;
     }
     ```
+
+* **Universal Part Finder Modal (`UniversalPartFinderModal.tsx`):**
+  * Built as a modal wrapper around `UniversalPartsBrowser` with `mode="picker"`.
+  * Designed specifically for single-part selection workflows across the application (e.g. adding parts to project revisions, adding parts to custom lists, or finding parts for inventory check-in).
+  * **Universal Features:**
+    * Embeds a universal numerical **Quantity** input selector (default: `1`).
+    * Supports **arbitrary slot/children controls** to pass workflow-specific fields:
+      * **Project Revisions BOM (`009`):** Passes PCB `Designator` text input field (e.g., `C1, C2`).
+      * **Part Lists (`035`):** Passes item `Notes` text input field (e.g., "Order 2 extra for backup").
+      * **Inventory Check-In / Relocation:** Passes destination storage bin or transaction reason.
+  * **Interface:**
+    ```typescript
+    interface UniversalPartFinderModalProps {
+      isOpen: boolean;
+      onClose: () => void;
+      title?: string;
+      onConfirm: (part: any, quantity: number, extraData?: any) => void;
+      children?: (selectedPart: any) => JSX.Element; // Custom input fields slot (e.g. designator, notes)
+    }
+    ```
+
 * **Backend (FastAPI / SQLAlchemy):**
   * Standardized Query API on `GET /api/parts` in [`server/app/routers/parts.py`](file:///c:/Hobbies/Inventory/Sidekick/server/app/routers/parts.py):
     * `search`: String (multi-term matching across `value`, `number`, `package`, `notes`, `attributes`).
@@ -91,4 +112,5 @@ The browser provides a consistent experience across the main Parts Catalog, Stor
 - [x] Refactor [`client/src/pages/Parts.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Parts.tsx) to use the new `UniversalPartsBrowser` component.
 - [x] Refactor [`client/src/components/storage/PartsBrowser.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/components/storage/PartsBrowser.tsx) in [`Storage.tsx`](file:///c:/Hobbies/Inventory/Sidekick/client/src/pages/Storage.tsx) to leverage `UniversalPartsBrowser` with location scoping.
 - [x] Integrate `UniversalPartsBrowser` into the Homeless Parts view ([`029-homeless-parts.md`](file:///c:/Hobbies/Inventory/Sidekick/docs/features/029-homeless-parts.md)).
+- [ ] Build `UniversalPartFinderModal.tsx` wrapping `UniversalPartsBrowser` in picker mode with universal quantity input and children/slot support for workflow-specific inputs.
 - [x] Write unit tests for enhanced `GET /api/parts` query parameters in `server/tests/test_parts_browser.py`.

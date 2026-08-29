@@ -8,6 +8,7 @@ target:
 dependencies: 
   - 004-core-parts.md
   - 005-project-revisions.md
+  - 030-universal-parts-browser.md
 ---
 
 # Feature: Materials (Bill of Materials)
@@ -20,7 +21,7 @@ This feature acts as the core Bill of Materials (BOM) engine for Sidekick. It is
 * **Interaction:** 1. The user views the BOM workspace: a robust data table showing all parts currently assigned to this revision.
     2. **Ghost Material Highlighting:** Any row that has not been mapped to a global `Part` is visually distinguished (e.g., highlighted yellow or adorned with a warning icon).
     3. The user can click a "Map to Part" button on a ghost row, opening the search catalog to link it to a physical item.
-    4. To add a part manually, the user clicks "Add Material", searches the catalog, selects a part, enters a `quantity`, and inputs optional `designators`.
+    4. To add a part manually, the user clicks "Add Material", opening `UniversalPartFinderModal` (`030-universal-parts-browser.md`) which provides a universal `quantity` input and a custom child slot for PCB `designators`.
     5. Users can edit quantities or designators directly inline within the table.
 * **Mobile Considerations:** Tapping a row in the BOM should open a standard bottom-sheet modal to adjust the quantity, designator, or perform the "Map to Part" action easily via touch inputs.
 
