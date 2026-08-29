@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import solid from 'vite-plugin-solid'
 
 const host = process.env.TAURI_DEV_HOST;

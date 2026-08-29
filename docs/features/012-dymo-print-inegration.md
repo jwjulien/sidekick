@@ -1,6 +1,6 @@
 ---
 title: Dymo ESP32 Print Integration
-status: Draft
+status: Completed
 target: 
   - Windows
   - Android
@@ -15,29 +15,30 @@ This feature acts as the hardware interface between Sidekick and a custom ESP32-
 
 ## 2. User Experience & UI
 * **Trigger:** The user clicks "Send to Printer" from the Label Preview modal.
-* **Interaction:** 1. The UI displays a "Processing..." spinner while the canvas is mathematically rasterized.
-    2. The UI displays "Transmitting..." while the HTTP requests are sent to the ESP32.
-    3. Upon success, a toast notification confirms "Print Sent."
-* **Configuration:** A settings panel is required for the user to input and save the local IP address of the ESP32 print server (e.g., `192.168.1.100`).
-* **Mobile Considerations:** If the mobile device is on the same local WiFi network as the ESP32, the Tauri Android app will communicate directly with the printer without needing to proxy through the FastAPI backend.
+* **Interaction:**
+    1. The UI displays an animated progress spinner ("Initializing...", "Rasterizing...", "Configuring...", "Transmitting...").
+    2. The UI executes HTTP calls directly through the Tauri Rust app backend.
+    3. Upon success, a toast notification confirms "Label printed successfully!"
+* **Configuration:** Master Settings page (`/settings`) allows inputting and testing the printer IP address/hostname (`dymo-printer.local`), adjusting density/speed, and triggering network discovery.
+* **Network Discovery & Selection:** Auto-scans local subnet & mDNS. Auto-selects if 1 printer is found; prompts selection modal if >1 printers are found.
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** * Implementation of the `DymoPrinter` TypeScript class.
-    * **Rasterization Engine:** Iterates through canvas `ImageData`, evaluates pixel luminance `(r + g + b) / 3 < 128` to determine if a pixel is black, and packs the bits vertically into a `Uint8Array`.
-    * **Network Protocol:** Executes a sequential HTTP sequence (`fetch`) directly to the ESP32:
+* **Frontend Services (`printerDriver.ts` & `printerService.ts`):**
+    * **`DymoEsp32Driver`**: Bit-shifting 1-bit column-packed rasterizer (`rasterizeCanvas`), 2x Graphics Mode scaling, status bitmask parsing (`Ready`, `Top`, `Empty`, `Error`).
+    * **Network Protocol:** App-side Tauri Rust backend IPC (`printer_send_request`) executes sequence directly via native sockets:
         1. `/reset`
-        2. Set configurations (e.g., `/height`).
-        3. POST the `Uint8Array` binary payload.
-* **Backend (FastAPI):** * None. This is a direct Client-to-ESP32 execution path via standard network requests. *(Note: ESP32 server must implement generous CORS headers if accessed from a Web browser, though Tauri desktop/mobile runtimes often bypass strict browser CORS).*
-
-## 4. Out of Scope
-* Supporting other manufacturer protocols (e.g., ZPL for Zebra printers) in this initial phase.
-* Auto-discovering the ESP32 printer on the network (mDNS/Bonjour); the IP will be manually entered.
+        2. `/height`
+        3. `/speed` & `/density`
+        4. `/print` (Uint8Array binary payload)
+        5. `/feed`
+* **App Backend (Tauri Rust `printer.rs`):**
+    * Native multi-threaded TCP stream scanner (`printer_discover`), status check (`printer_check_status`), and socket proxy (`printer_send_request`) operating with 0 CORS constraints.
 
 ---
 
-## 5. Implementation Tasks
-- [ ] Build UI input in the master Settings page to save the Printer IP Address.
-- [ ] Implement the `DymoPrinter.tsx` class and bit-shifting rasterization logic.
-- [ ] Wire the "Send to Printer" button to execute the rasterization and network sequence.
-- [ ] Handle error states (e.g., ESP32 offline, paper empty) gracefully in the UI.
+## 4. Implementation Tasks
+- [x] Build UI input in the master Settings page to save and test Printer IP Address / Hostname.
+- [x] Implement `DymoEsp32Driver` rasterization engine and 1-bit column byte-packing logic.
+- [x] Wire "Send to Printer" in `LabelPreviewModal.tsx` to execute progress workflow and print.
+- [x] Handle error states (ESP32 offline, paper empty, hardware error) gracefully in UI with status badges & toasts.
+- [x] Implement native app-side network auto-discovery with single printer auto-select and multi-printer choice modal.

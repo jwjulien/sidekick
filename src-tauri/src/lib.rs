@@ -1,4 +1,5 @@
 mod nfc;
+mod printer;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,7 +17,10 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       nfc::nfc_read_tag,
       nfc::nfc_write_tag,
-      nfc::nfc_get_status
+      nfc::nfc_get_status,
+      printer::printer_discover,
+      printer::printer_check_status,
+      printer::printer_send_request
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

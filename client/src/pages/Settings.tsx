@@ -22,13 +22,21 @@ import {
   FlaskConical,
   CheckCircle2,
   AlertTriangle,
-  FileSpreadsheet,
   Layers,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Printer,
+  Wifi,
+  Search,
+  RefreshCw,
+  AlertCircle,
+  Zap
 } from "lucide-solid";
 import { useTheme } from "../context/ThemeContext";
 import { useDatabase, type SnapshotItem } from "../context/DatabaseContext";
 import { useConfirm } from "../contexts/ConfirmContext";
+import { getDeviceSetting, setDeviceSetting } from "../services/deviceSettings";
+import { printerService, type DiscoveredPrinter } from "../services/printerService";
+import type { PrinterStatusResult } from "../services/printerDriver";
 
 export default function Settings() {
   const { theme, effectiveTheme, setTheme } = useTheme();
@@ -60,6 +68,18 @@ export default function Settings() {
   // Modal signal for snapshot restore decision when un-snapshotted changes exist
   const [restoreModalTarget, setRestoreModalTarget] = createSignal<SnapshotItem | null>(null);
 
+  // Printer hardware signals
+  const [printerDriverType, setPrinterDriverType] = createSignal<"dymo_esp32" | "browser_native">(getDeviceSetting("printerDriverType"));
+  const [printerAddress, setPrinterAddress] = createSignal(getDeviceSetting("printerAddress"));
+  const [printerDensity, setPrinterDensity] = createSignal(getDeviceSetting("printerDensity"));
+  const [printerSpeed, setPrinterSpeed] = createSignal(getDeviceSetting("printerSpeed"));
+  const [printerStatus, setPrinterStatus] = createSignal<PrinterStatusResult | null>(null);
+  const [isTestingPrinter, setIsTestingPrinter] = createSignal(false);
+  const [isScanningPrinters, setIsScanningPrinters] = createSignal(false);
+  const [scanProgress, setScanProgress] = createSignal<{ scanned: number; total: number } | null>(null);
+  const [discoveredPrinters, setDiscoveredPrinters] = createSignal<DiscoveredPrinter[]>([]);
+  const [showDiscoveryModal, setShowDiscoveryModal] = createSignal(false);
+
   const fetchUsers = async () => {
     if (user()?.role !== "admin") return;
     setLoadingUsers(true);
@@ -73,9 +93,83 @@ export default function Settings() {
     }
   };
 
+  const handleTestPrinter = async (targetAddr?: string) => {
+    if (printerDriverType() === "browser_native") {
+      setPrinterStatus({
+        connected: true,
+        ready: true,
+        paperEmpty: false,
+        hasError: false,
+        rawStatus: 1,
+        statusText: "Browser System Dialog Mode",
+        address: "localhost",
+      });
+      return;
+    }
+
+    setIsTestingPrinter(true);
+    try {
+      const addr = targetAddr || printerAddress();
+      const res = await printerService.testAddress(addr);
+      setPrinterStatus(res);
+      if (res.connected && res.ready) {
+        toast.success(`Printer connected & ready at ${res.address}`);
+      } else if (res.connected) {
+        toast.error(`Printer connected but reported: ${res.statusText}`);
+      } else {
+        toast.error(`Printer unreachable at ${addr}`);
+      }
+    } catch (err: any) {
+      toast.error(`Printer check failed: ${err.message || err}`);
+    } finally {
+      setIsTestingPrinter(false);
+    }
+  };
+
+  const handleScanNetworkPrinters = async () => {
+    setIsScanningPrinters(true);
+    setScanProgress({ scanned: 0, total: 254 });
+    try {
+      const result = await printerService.runPrinterDiscovery((scanned, total) => {
+        setScanProgress({ scanned, total });
+      });
+
+      setDiscoveredPrinters(result.printers);
+
+      if (result.autoSelected) {
+        setPrinterAddress(result.autoSelected.address);
+        setPrinterDriverType("dymo_esp32");
+        setDeviceSetting("printerAddress", result.autoSelected.address);
+        setDeviceSetting("printerDriverType", "dymo_esp32");
+        toast.success(result.statusMessage);
+        handleTestPrinter(result.autoSelected.address);
+      } else if (result.printers.length > 1) {
+        setShowDiscoveryModal(true);
+        toast.success(result.statusMessage);
+      } else {
+        toast.error(result.statusMessage);
+      }
+    } catch (err: any) {
+      toast.error(`Printer discovery failed: ${err.message || err}`);
+    } finally {
+      setIsScanningPrinters(false);
+      setScanProgress(null);
+    }
+  };
+
+  const handleSavePrinterSettings = () => {
+    setDeviceSetting("printerDriverType", printerDriverType());
+    setDeviceSetting("printerAddress", printerAddress());
+    setDeviceSetting("printerDensity", printerDensity());
+    setDeviceSetting("printerSpeed", printerSpeed());
+    toast.success("Printer hardware configurations saved!");
+    handleTestPrinter();
+  };
+
   onMount(() => {
     fetchUsers();
     refreshStatus();
+    handleTestPrinter();
   });
 
   const handleSaveConnection = () => {
@@ -362,6 +456,186 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* ----------------- HARDWARE PRINTER SETTINGS CARD ----------------- */}
+        <div class="lg:col-span-2 glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+          <div class="flex items-center justify-between border-b border-white/5 pb-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <Printer size={20} class="text-accentCyan" />
+              Hardware Printer Integration & Network Discovery
+            </h3>
+            <Show when={printerStatus()}>
+              <span class={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
+                printerStatus()?.ready
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  : printerStatus()?.paperEmpty
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  : "bg-red-500/20 text-red-300 border-red-500/30"
+              }`}>
+                <Show when={printerStatus()?.ready} fallback={<AlertCircle size={13} />}>
+                  <CheckCircle2 size={13} />
+                </Show>
+                {printerStatus()?.statusText}
+              </span>
+            </Show>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Driver & Connection Setup */}
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">Printer Driver Engine</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrinterDriverType("dymo_esp32");
+                      setDeviceSetting("printerDriverType", "dymo_esp32");
+                      handleTestPrinter();
+                    }}
+                    class={`p-3 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
+                      printerDriverType() === "dymo_esp32"
+                        ? "bg-accentCyan/15 border-accentCyan text-white shadow-lg shadow-accentCyan/10"
+                        : "glass-card border-white/5 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <Wifi size={18} class={printerDriverType() === "dymo_esp32" ? "text-accentCyan" : ""} />
+                    <div>
+                      <span class="text-xs font-bold block">Dymo ESP32</span>
+                      <span class="text-[10px] text-gray-400">Direct Network HTTP</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrinterDriverType("browser_native");
+                      setDeviceSetting("printerDriverType", "browser_native");
+                      handleTestPrinter();
+                    }}
+                    class={`p-3 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
+                      printerDriverType() === "browser_native"
+                        ? "bg-accentCyan/15 border-accentCyan text-white shadow-lg shadow-accentCyan/10"
+                        : "glass-card border-white/5 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <Printer size={18} class={printerDriverType() === "browser_native" ? "text-accentPurple" : ""} />
+                    <div>
+                      <span class="text-xs font-bold block">System Print</span>
+                      <span class="text-[10px] text-gray-400">Browser Print Dialog</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <Show when={printerDriverType() === "dymo_esp32"}>
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase">
+                      Printer Address / IP (mDNS Hostname or IPv4)
+                    </label>
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        value={printerAddress()}
+                        onInput={(e) => setPrinterAddress(e.target.value)}
+                        placeholder="dymo-printer.local or 192.168.1.120"
+                        class="glass-input flex-1 text-sm font-mono"
+                      />
+                      <button
+                        onClick={() => handleTestPrinter()}
+                        disabled={isTestingPrinter()}
+                        class="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 whitespace-nowrap"
+                        title="Ping printer status endpoint"
+                      >
+                        <Show when={isTestingPrinter()} fallback={<Zap size={14} class="text-accentCyan" />}>
+                          <RefreshCw size={14} class="animate-spin text-accentCyan" />
+                        </Show>
+                        Test
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Network Discovery Button */}
+                  <div class="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-xs font-semibold text-white block">WiFi Subnet Scanner</span>
+                        <span class="text-[11px] text-gray-400">Auto-discover Dymo ESP32 printers on network</span>
+                      </div>
+                      <button
+                        onClick={handleScanNetworkPrinters}
+                        disabled={isScanningPrinters()}
+                        class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
+                      >
+                        <Show when={isScanningPrinters()} fallback={<Search size={14} />}>
+                          <RefreshCw size={14} class="animate-spin" />
+                        </Show>
+                        {isScanningPrinters() ? "Scanning..." : "Scan Network"}
+                      </button>
+                    </div>
+
+                    <Show when={scanProgress()}>
+                      <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] text-gray-400">
+                          <span>Probing LAN subnets...</span>
+                          <span>{scanProgress()?.scanned} / {scanProgress()?.total}</span>
+                        </div>
+                        <div class="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            class="bg-accentCyan h-full transition-all duration-200"
+                            style={{ width: `${((scanProgress()?.scanned || 0) / (scanProgress()?.total || 1)) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+              </Show>
+            </div>
+
+            {/* Print Hardware Tuning */}
+            <Show when={printerDriverType() === "dymo_esp32"}>
+              <div class="space-y-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
+                <div class="space-y-4">
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wider">Hardware Fine-Tuning</h4>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5">Print Density / Shade</label>
+                    <select
+                      value={printerDensity()}
+                      onChange={(e) => setPrinterDensity(e.currentTarget.value as any)}
+                      class="glass-input w-full text-xs"
+                    >
+                      <option value="dark">Dark (Recommended for DataMatrix barcodes)</option>
+                      <option value="normal">Normal</option>
+                      <option value="medium">Medium</option>
+                      <option value="light">Light</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5">Print Speed</label>
+                    <select
+                      value={printerSpeed()}
+                      onChange={(e) => setPrinterSpeed(e.currentTarget.value as any)}
+                      class="glass-input w-full text-xs"
+                    >
+                      <option value="graphics">Graphics Mode (High Detail)</option>
+                      <option value="text">Text Mode (Fast)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSavePrinterSettings}
+                  class="btn-primary py-2.5 w-full text-xs font-bold"
+                >
+                  Save Printer Configurations
+                </button>
+              </div>
+            </Show>
+          </div>
+        </div>
+
         {/* ----------------- APPEARANCE & THEME SETTINGS CARD ----------------- */}
         <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
           <h3 class="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-3">
@@ -589,6 +863,71 @@ export default function Settings() {
                 class="btn-primary text-xs py-2 px-4"
               >
                 Save Snapshot & Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* ----------------- MULTI-PRINTER DISCOVERY SELECTION MODAL ----------------- */}
+      <Show when={showDiscoveryModal()}>
+        <div class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-white/10 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <Printer class="text-accentCyan" size={20} />
+                Select Target Dymo Printer
+              </h3>
+              <button
+                onClick={() => setShowDiscoveryModal(false)}
+                class="text-gray-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p class="text-xs text-gray-300">
+              Multiple Dymo ESP32 print servers were found on your WiFi network. Select the printer you want to connect to:
+            </p>
+
+            <div class="space-y-2.5 max-h-60 overflow-y-auto">
+              <For each={discoveredPrinters()}>
+                {(p) => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrinterAddress(p.address);
+                      setPrinterDriverType("dymo_esp32");
+                      setDeviceSetting("printerAddress", p.address);
+                      setDeviceSetting("printerDriverType", "dymo_esp32");
+                      setShowDiscoveryModal(false);
+                      toast.success(`Selected printer at ${p.address}`);
+                      handleTestPrinter(p.address);
+                    }}
+                    class={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                      printerAddress() === p.address
+                        ? "bg-accentCyan/20 border-accentCyan text-white"
+                        : "glass-card border-white/5 hover:border-white/20 text-gray-300 hover:text-white"
+                    }`}
+                  >
+                    <div>
+                      <span class="text-xs font-bold block text-white">{p.name}</span>
+                      <span class="text-[11px] font-mono text-gray-400">{p.address}</span>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                      {p.status.statusText}
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+
+            <div class="flex justify-end pt-2">
+              <button
+                onClick={() => setShowDiscoveryModal(false)}
+                class="btn-secondary text-xs py-2 px-4"
+              >
+                Close
               </button>
             </div>
           </div>

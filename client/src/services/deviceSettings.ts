@@ -13,6 +13,10 @@ export interface DeviceSettings {
   dymoServiceUrl: string;
   scaleMacAddress: string;
   soundEffectsEnabled: boolean;
+  printerDriverType: "dymo_esp32" | "browser_native";
+  printerAddress: string;
+  printerDensity: "light" | "medium" | "normal" | "dark";
+  printerSpeed: "text" | "graphics";
 }
 
 const DEFAULT_SETTINGS: DeviceSettings = {
@@ -23,7 +27,11 @@ const DEFAULT_SETTINGS: DeviceSettings = {
   oidcClientId: "sidekick-client",
   dymoServiceUrl: "http://localhost:41951/DYMO/DLS/Printing/Service.svc",
   scaleMacAddress: "",
-  soundEffectsEnabled: true
+  soundEffectsEnabled: true,
+  printerDriverType: "dymo_esp32",
+  printerAddress: "dymo-printer.local",
+  printerDensity: "dark",
+  printerSpeed: "graphics"
 };
 
 const STORAGE_PREFIX = "sidekick_device_";
