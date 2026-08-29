@@ -4,43 +4,106 @@ import bwipjs from "bwip-js";
 import { apiFetch } from "../hooks/useAuth";
 
 interface LabelPreviewModalProps {
-  location: {
+  location?: {
     id: string;
-    name: string;
+    name?: string;
+    label?: string;
+    path?: string;
     description?: string;
+    parent_id?: string;
+    part?: any;
+  } | null;
+  part?: {
+    id: string;
+    name?: string;
+    value?: string;
+    category?: any;
+    category_id?: string;
+    category_path?: string;
   } | null;
   onClose: () => void;
 }
 
 export default function LabelPreviewModal(props: LabelPreviewModalProps) {
   let canvasRef!: HTMLCanvasElement;
-  const [details, setDetails] = createSignal<any>(null);
+  const [resolvedPathOrCategory, setResolvedPathOrCategory] = createSignal<string>("");
+  const [resolvedNameOrValue, setResolvedNameOrValue] = createSignal<string>("");
+  const [resolvedId, setResolvedId] = createSignal<string>("");
+  const [isPartEntity, setIsPartEntity] = createSignal<boolean>(false);
 
-  // Fetch full details of the location to get the associated parts/categories/attributes
+  // Fetch full details and hierarchy (location path or part category chain)
   createEffect(async () => {
     const loc = props.location;
-    if (!loc) {
-      setDetails(null);
+    const pt = props.part;
+
+    if (!loc && !pt) {
+      setResolvedId("");
+      setResolvedNameOrValue("");
+      setResolvedPathOrCategory("");
+      setIsPartEntity(false);
       return;
     }
-    try {
-      const data = await apiFetch(`/locations/${loc.id}`);
-      setDetails(data);
-    } catch (err) {
-      console.error("Failed to fetch location details for label:", err);
-      // Fallback to minimal data if details fetch fails
-      setDetails({
-        id: loc.id,
-        name: loc.name,
-        description: loc.description,
-        part: null
-      });
+
+    if (pt) {
+      setIsPartEntity(true);
+      setResolvedId(pt.id);
+      setResolvedNameOrValue(pt.value || pt.name || "Part");
+
+      if (pt.category_path) {
+        setResolvedPathOrCategory(pt.category_path);
+      } else if (pt.category?.title) {
+        setResolvedPathOrCategory(pt.category.title);
+      } else {
+        try {
+          const cats = await apiFetch("/categories");
+          const catMap = new Map<string, any>(cats.map((c: any) => [c.id, c]));
+          const targetCatId = pt.category_id || pt.category?.id;
+
+          if (targetCatId && catMap.has(targetCatId)) {
+            const chain: string[] = [];
+            let currentId: string | null = targetCatId;
+            while (currentId && catMap.has(currentId)) {
+              const cat = catMap.get(currentId)!;
+              chain.push(cat.title);
+              currentId = cat.parent_id || null;
+            }
+            chain.reverse();
+            setResolvedPathOrCategory(chain.join(", "));
+          } else {
+            setResolvedPathOrCategory("[No Category]");
+          }
+        } catch (err) {
+          console.error("Failed to fetch categories for part label:", err);
+          setResolvedPathOrCategory("[No Category]");
+        }
+      }
+    } else if (loc) {
+      setIsPartEntity(false);
+      setResolvedId(loc.id);
+      setResolvedNameOrValue(loc.name || loc.label || "Storage Location");
+
+      if (loc.path) {
+        setResolvedPathOrCategory(loc.path);
+      } else {
+        try {
+          const resData = await apiFetch(`/resolve/${loc.id}`);
+          if (resData && resData.breadcrumb) {
+            const formattedPath = "/" + resData.breadcrumb.split(" > ").join("/");
+            setResolvedPathOrCategory(formattedPath);
+          } else {
+            setResolvedPathOrCategory(`/${loc.name || loc.id}`);
+          }
+        } catch (err) {
+          console.error("Failed to resolve location path for label:", err);
+          setResolvedPathOrCategory(`/${loc.name || loc.id}`);
+        }
+      }
     }
   });
 
   createEffect(() => {
-    const loc = details();
-    if (!loc || !canvasRef) return;
+    const id = resolvedId();
+    if (!id || !canvasRef) return;
 
     const ctx = canvasRef.getContext("2d");
     if (!ctx) return;
@@ -57,25 +120,24 @@ export default function LabelPreviewModal(props: LabelPreviewModalProps) {
     ctx.fillRect(0, 0, width, height);
 
     // Draw DataMatrix (Left side - full height, slightly inset vertically)
-    const deeplink = `fuse://storage?id=${loc.id}`;
+    const deepLinkScheme = isPartEntity() ? `fuse://part?id=${id}` : `fuse://storage?id=${id}`;
     let datamatrixWidth = 0;
 
     try {
       const barcodeCanvas = document.createElement("canvas");
       bwipjs.toCanvas(barcodeCanvas, {
         bcid: "datamatrix",
-        text: deeplink,
+        text: deepLinkScheme,
         scale: 4,
         includetext: false,
       });
-      datamatrixWidth = barcodeCanvas.width;
-      // Draw vertically centered, starting at left x=5
       const drawHeight = height - 10;
       const drawWidth = barcodeCanvas.width * (drawHeight / barcodeCanvas.height);
       ctx.drawImage(barcodeCanvas, 5, (height - drawHeight) / 2, drawWidth, drawHeight);
       datamatrixWidth = drawWidth;
     } catch (err) {
       console.error("Failed to generate DataMatrix:", err);
+      datamatrixWidth = 110; // Fallback width calculation
     }
 
     // Text rendering styles (Right side)
@@ -84,53 +146,51 @@ export default function LabelPreviewModal(props: LabelPreviewModalProps) {
     ctx.fillStyle = "#000000";
     ctx.textBaseline = "top";
 
-    // 1. Header: "Inventory Reference Tag" (bold, size 18px)
-    ctx.font = "bold 18px sans-serif";
-    ctx.fillText("Inventory Reference Tag", textLeftMargin, 8, availableWidth);
+    // Row 1: Header - "Inventory Reference Tag" (Audiowide)
+    ctx.font = '24px "Audiowide", sans-serif';
+    ctx.fillText("Inventory Reference Tag", textLeftMargin, 0, availableWidth);
 
-    // 2. Location Name & ID: e.g. "Resistor Bin (#ID)" (size 16px)
-    ctx.font = "bold 16px sans-serif";
-    const nameLine = `${loc.name} (#${loc.id})`;
-    ctx.fillText(nameLine, textLeftMargin, 30, availableWidth);
-
-    // 3. Parts Concatenation: "Passive, Capacitor, 0.1uF, 16V" (size 12px)
-    ctx.font = "12px sans-serif";
+    // Row 2: UUID string - e.g. "#<ID>" (Quicksand)
+    ctx.font = '20px "Quicksand", sans-serif';
     ctx.fillStyle = "#333333";
+    ctx.fillText(`#${id}`, textLeftMargin, 30, availableWidth);
 
-    if (loc.part) {
-      const p = loc.part;
-      const partsList: string[] = [];
-      
-      // Category path
-      if (p.category?.title) {
-        partsList.push(p.category.title);
-      }
-      // Part value/name
-      if (p.value) {
-        partsList.push(p.value);
-      }
-      // Attributes (from part.attributes object if present)
-      if (p.attributes && typeof p.attributes === "object") {
-        Object.entries(p.attributes).forEach(([key, val]) => {
-          if (val && key !== "barcode") {
-            partsList.push(String(val));
-          }
-        });
-      }
-      const partsText = partsList.join(", ");
-      ctx.fillText(partsText, textLeftMargin, 55, availableWidth);
-    } else {
-      ctx.fillStyle = "#666666";
-      ctx.fillText("[No parts stored]", textLeftMargin, 55, availableWidth);
-    }
+    // Row 3: Current location.name or part.value (Quicksand Bold)
+    ctx.font = '20px "Quicksand", sans-serif';
+    ctx.fillStyle = "#000000";
+    ctx.fillText(resolvedNameOrValue() || "[Unnamed]", textLeftMargin, 58, availableWidth);
 
-    // Draw print date/version info (small, bottom right)
-    ctx.fillStyle = "#888888";
-    ctx.font = "10px sans-serif";
+    // Row 4: Location path or Part Category chain (Quicksand)
+    ctx.font = '14px "Roboto", sans-serif';
+    ctx.fillStyle = "#444444";
+    ctx.fillText(resolvedPathOrCategory() || "[No Path]", textLeftMargin, 88, availableWidth);
+
+    // Row 5: Muted footer containing Version: 3 (Georgia) & print date (Roboto)
+    ctx.fillStyle = "#666666";
+    const footerY = 115;
+
+    // 5a. Version: 3 (Georgia font)
+    ctx.font = '12px "Georgia", serif';
+    ctx.fillText("Version: 3", textLeftMargin, footerY);
+
+    // 5b. Print date in mm/dd/yy format (Roboto font)
+    ctx.font = '12px "Georgia", sans-serif';
     const today = new Date();
-    const dateStr = `${(today.getMonth() + 1).toString().padStart(2, "0")}/${today.getDate().toString().padStart(2, "0")}/${today.getFullYear().toString().slice(-2)}`;
-    const metrics = ctx.measureText(dateStr);
-    ctx.fillText(dateStr, width - metrics.width - 8, height - 18);
+    const month = (today.getMonth() + 1).toString().padStart(2, "0");
+    const day = today.getDate().toString().padStart(2, "0");
+    const year = today.getFullYear().toString().slice(-2);
+    const dateStr = `${month}/${day}/${year}`;
+    const dateMetrics = ctx.measureText(dateStr);
+    ctx.fillText(dateStr, width - dateMetrics.width - 8, footerY);
+
+    // Ensure re-render once web fonts are fully loaded
+    if (document.fonts && document.fonts.status !== "loaded") {
+      document.fonts.ready.then(() => {
+        if (canvasRef) {
+          ctx.font = '16px "Audiowide", sans-serif';
+        }
+      });
+    }
   });
 
   const handlePrint = () => {
@@ -171,49 +231,48 @@ export default function LabelPreviewModal(props: LabelPreviewModalProps) {
   };
 
   return (
-    <Show when={props.location}>
-      {(loc) => (
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative flex flex-col items-center">
+    <Show when={props.location || props.part}>
+      <div class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-white/10 relative flex flex-col items-center">
+          <button
+            onClick={props.onClose}
+            class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+
+          <h3 class="text-base font-bold text-white mb-6 uppercase tracking-wider">
+            Dymo 1/2" x 1-7/8" Label Preview
+          </h3>
+
+          {/* Canvas Container with horizontal aspect ratio preview */}
+          <div class="bg-gray-900 p-4 rounded-xl border border-white/5 flex justify-center items-center mb-6 w-full overflow-auto">
+            <canvas
+              ref={canvasRef}
+              width={430}
+              height={131}
+              class="w-[430px] h-[131px] rounded shadow-lg border border-black bg-white shrink-0"
+            />
+          </div>
+
+          <div class="flex gap-3 w-full">
             <button
               onClick={props.onClose}
-              class="absolute right-4 top-4 p-1 text-gray-400 hover:text-white"
+              class="btn-secondary flex-1 py-2 text-xs"
             >
-              <X size={20} />
+              Cancel
             </button>
-
-            <h3 class="text-base font-bold text-white mb-6 uppercase tracking-wider">
-              Dymo 1/2" x 1-7/8" Label Preview
-            </h3>
-
-            {/* Canvas Container with horizontal aspect ratio preview */}
-            <div class="bg-gray-900 p-4 rounded-xl border border-white/5 flex justify-center items-center mb-6 w-full overflow-auto">
-              <canvas
-                ref={canvasRef}
-                width={430}
-                height={131}
-                class="w-[430px] h-[131px] rounded shadow-lg border border-black bg-white shrink-0"
-              />
-            </div>
-
-            <div class="flex gap-3 w-full">
-              <button
-                onClick={props.onClose}
-                class="btn-secondary flex-1 py-2 text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePrint}
-                class="btn-primary flex-1 py-2 text-xs flex items-center justify-center gap-1.5 font-bold"
-              >
-                <Printer size={14} />
-                Send to Printer
-              </button>
-            </div>
+            <button
+              onClick={handlePrint}
+              class="btn-primary flex-1 py-2 text-xs flex items-center justify-center gap-1.5 font-bold"
+            >
+              <Printer size={14} />
+              Send to Printer
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </Show>
   );
 }
+
