@@ -21,6 +21,7 @@ import {
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
+import { usbScannerService } from "../services/usbScannerService";
 import ActiveListBottomDrawer from "./lists/ActiveListBottomDrawer";
 import NavigationToolbar from "./NavigationToolbar";
 import TestingModeBanner from "./TestingModeBanner";
@@ -53,6 +54,7 @@ export default function Layout(props: LayoutProps) {
   createEffect(() => {
     if (user()) {
       checkCounts();
+      usbScannerService.initGlobalListener(navigate);
       const interval = setInterval(checkCounts, 30000); // 30s
       return () => clearInterval(interval);
     }

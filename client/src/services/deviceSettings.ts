@@ -17,6 +17,9 @@ export interface DeviceSettings {
   printerAddress: string;
   printerDensity: "light" | "medium" | "normal" | "dark";
   printerSpeed: "text" | "graphics";
+  usbScannerEnabled: boolean;
+  usbScannerVid: string;
+  usbScannerPid: string;
 }
 
 const DEFAULT_SETTINGS: DeviceSettings = {
@@ -31,7 +34,10 @@ const DEFAULT_SETTINGS: DeviceSettings = {
   printerDriverType: "dymo_esp32",
   printerAddress: "dymo-printer.local",
   printerDensity: "dark",
-  printerSpeed: "graphics"
+  printerSpeed: "graphics",
+  usbScannerEnabled: false,
+  usbScannerVid: "0x0581",
+  usbScannerPid: "0x011C",
 };
 
 const STORAGE_PREFIX = "sidekick_device_";

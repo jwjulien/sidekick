@@ -1,5 +1,6 @@
 mod nfc;
 mod printer;
+mod usb_scanner;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +21,10 @@ pub fn run() {
       nfc::nfc_get_status,
       printer::printer_discover,
       printer::printer_check_status,
-      printer::printer_send_request
+      printer::printer_send_request,
+      usb_scanner::usb_enumerate_devices,
+      usb_scanner::usb_scanner_update_config,
+      usb_scanner::usb_scanner_get_status
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -33,6 +37,7 @@ pub fn run() {
       #[cfg(desktop)]
       {
         nfc::start_desktop_nfc_polling(app.handle().clone());
+        usb_scanner::start_desktop_usb_scanner_polling(app.handle().clone());
       }
       Ok(())
     })

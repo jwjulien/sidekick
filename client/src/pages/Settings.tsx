@@ -29,7 +29,9 @@ import {
   Search,
   RefreshCw,
   AlertCircle,
-  Zap
+  Zap,
+  QrCode,
+  Cpu
 } from "lucide-solid";
 import { useTheme } from "../context/ThemeContext";
 import { useDatabase, type SnapshotItem } from "../context/DatabaseContext";
@@ -37,6 +39,7 @@ import { useConfirm } from "../contexts/ConfirmContext";
 import { getDeviceSetting, setDeviceSetting } from "../services/deviceSettings";
 import { printerService, type DiscoveredPrinter } from "../services/printerService";
 import type { PrinterStatusResult } from "../services/printerDriver";
+import { usbScannerService, type UsbDeviceInfo, type UsbScannerStatusResult } from "../services/usbScannerService";
 
 export default function Settings() {
   const { theme, effectiveTheme, setTheme } = useTheme();
@@ -79,6 +82,62 @@ export default function Settings() {
   const [scanProgress, setScanProgress] = createSignal<{ scanned: number; total: number } | null>(null);
   const [discoveredPrinters, setDiscoveredPrinters] = createSignal<DiscoveredPrinter[]>([]);
   const [showDiscoveryModal, setShowDiscoveryModal] = createSignal(false);
+
+  // USB Barcode Scanner hardware signals
+  const [usbEnabled, setUsbEnabled] = createSignal(getDeviceSetting("usbScannerEnabled"));
+  const [usbVid, setUsbVid] = createSignal(getDeviceSetting("usbScannerVid"));
+  const [usbPid, setUsbPid] = createSignal(getDeviceSetting("usbScannerPid"));
+  const [usbStatus, setUsbStatus] = createSignal<UsbScannerStatusResult | null>(null);
+  const [usbDevices, setUsbDevices] = createSignal<UsbDeviceInfo[]>([]);
+  const [isEnumeratingUsb, setIsEnumeratingUsb] = createSignal(false);
+  const [manualUsbEdit, setManualUsbEdit] = createSignal(false);
+
+  const refreshUsbStatus = async () => {
+    const status = await usbScannerService.getStatus();
+    setUsbStatus(status);
+  };
+
+  const handleToggleUsb = async (enabled: boolean) => {
+    setUsbEnabled(enabled);
+    const status = await usbScannerService.updateConfig(enabled, usbVid(), usbPid());
+    setUsbStatus(status);
+    if (enabled) {
+      toast.success(status.connected ? "USB Scanner connected & active!" : "USB Scanner service enabled. Waiting for device...");
+    } else {
+      toast("USB Scanner service disabled.");
+    }
+  };
+
+  const handleEnumerateUsb = async () => {
+    setIsEnumeratingUsb(true);
+    try {
+      const list = await usbScannerService.enumerateUsbDevices();
+      setUsbDevices(list);
+      if (list.length > 0) {
+        toast.success(`Found ${list.length} USB device(s)`);
+      } else {
+        toast.error("No USB devices detected or desktop app not active.");
+      }
+    } catch (err: any) {
+      toast.error(`USB scan failed: ${err.message || err}`);
+    } finally {
+      setIsEnumeratingUsb(false);
+    }
+  };
+
+  const handleSelectUsbDevice = async (device: UsbDeviceInfo) => {
+    setUsbVid(device.vid);
+    setUsbPid(device.pid);
+    const status = await usbScannerService.updateConfig(usbEnabled(), device.vid, device.pid);
+    setUsbStatus(status);
+    toast.success(`Selected USB device ${device.product || device.vid + '/' + device.pid}`);
+  };
+
+  const handleSaveUsbSettings = async () => {
+    const status = await usbScannerService.updateConfig(usbEnabled(), usbVid(), usbPid());
+    setUsbStatus(status);
+    toast.success("USB scanner configuration saved!");
+  };
 
   const fetchUsers = async () => {
     if (user()?.role !== "admin") return;
@@ -170,6 +229,7 @@ export default function Settings() {
     fetchUsers();
     refreshStatus();
     handleTestPrinter();
+    refreshUsbStatus();
   });
 
   const handleSaveConnection = () => {
@@ -633,6 +693,153 @@ export default function Settings() {
                 </button>
               </div>
             </Show>
+          </div>
+        </div>
+
+        {/* ----------------- DESKTOP USB BARCODE SCANNER SETTINGS CARD ----------------- */}
+        <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-6">
+          <div class="flex items-center justify-between border-b border-white/5 pb-3">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <QrCode size={18} class="text-accentCyan" />
+              Desktop USB Barcode Scanner (WinUSB)
+            </h3>
+
+            <Show when={usbStatus()}>
+              <span class={`text-xs px-2.5 py-1 rounded-full font-semibold border flex items-center gap-1.5 ${
+                usbStatus()?.connected
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  : usbStatus()?.enabled
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  : "bg-gray-500/20 text-gray-400 border-gray-500/30"
+              }`}>
+                <Show when={usbStatus()?.connected} fallback={usbStatus()?.enabled ? <AlertCircle size={13} /> : <AlertTriangle size={13} />}>
+                  <CheckCircle2 size={13} />
+                </Show>
+                {usbStatus()?.connected
+                  ? `Connected (${usbStatus()?.device_name})`
+                  : usbStatus()?.enabled
+                  ? "Enabled — Waiting for Scanner..."
+                  : "Service Disabled"}
+              </span>
+            </Show>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-3.5 bg-white/[0.02] border border-white/5 rounded-xl">
+                <div>
+                  <span class="text-xs font-bold text-white block">Background USB Monitoring</span>
+                  <span class="text-[11px] text-gray-400">Intercept raw WinUSB scans across all screens</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleUsb(!usbEnabled())}
+                  class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                    usbEnabled() ? "bg-accentCyan" : "bg-white/10"
+                  }`}
+                >
+                  <span
+                    class={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      usbEnabled() ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* USB Device Picker Section */}
+              <div class="p-4 bg-white/[0.02] border border-white/5 rounded-xl space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-xs font-semibold text-white block">Attached USB Device Picker</span>
+                    <span class="text-[11px] text-gray-400">Enumerate hardware connected to desktop PC</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEnumerateUsb}
+                    disabled={isEnumeratingUsb()}
+                    class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
+                  >
+                    <Show when={isEnumeratingUsb()} fallback={<Search size={14} />}>
+                      <RefreshCw size={14} class="animate-spin" />
+                    </Show>
+                    {isEnumeratingUsb() ? "Scanning..." : "Scan for Devices"}
+                  </button>
+                </div>
+
+                <Show when={usbDevices().length > 0}>
+                  <div class="space-y-1.5">
+                    <label class="block text-[11px] font-semibold text-gray-400 uppercase">Select Target Scanner</label>
+                    <select
+                      class="glass-input w-full text-xs font-mono"
+                      onChange={(e) => {
+                        const idx = parseInt(e.target.value);
+                        if (!isNaN(idx) && usbDevices()[idx]) {
+                          handleSelectUsbDevice(usbDevices()[idx]);
+                        }
+                      }}
+                    >
+                      <option value="">-- Select connected USB device --</option>
+                      <For each={usbDevices()}>
+                        {(dev, index) => (
+                          <option value={index()}>
+                            {dev.product ? `${dev.product} (${dev.manufacturer || "USB"})` : "USB Device"} [{dev.vid}:{dev.pid}]
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                  </div>
+                </Show>
+              </div>
+            </div>
+
+            {/* Manual Hex Override Section */}
+            <div class="space-y-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wider">Device Identifiers (VID / PID)</h4>
+                  <button
+                    type="button"
+                    onClick={() => setManualUsbEdit(!manualUsbEdit())}
+                    class="text-[11px] text-accentCyan hover:underline cursor-pointer"
+                  >
+                    {manualUsbEdit() ? "Hide Manual Edit" : "Manual Edit"}
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase">Vendor ID (VID)</label>
+                    <input
+                      type="text"
+                      value={usbVid()}
+                      onInput={(e) => setUsbVid(e.target.value)}
+                      disabled={!manualUsbEdit()}
+                      placeholder="0x0581"
+                      class="glass-input w-full text-xs font-mono disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase">Product ID (PID)</label>
+                    <input
+                      type="text"
+                      value={usbPid()}
+                      onInput={(e) => setUsbPid(e.target.value)}
+                      disabled={!manualUsbEdit()}
+                      placeholder="0x011C"
+                      class="glass-input w-full text-xs font-mono disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveUsbSettings}
+                class="btn-primary py-2.5 w-full text-xs font-bold"
+              >
+                Save USB Scanner Configurations
+              </button>
+            </div>
           </div>
         </div>
 

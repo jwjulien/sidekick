@@ -1,7 +1,9 @@
 import re
+import urllib.parse
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models, auth
@@ -42,10 +44,10 @@ def parse_payload_identifier(raw_payload: str) -> tuple[Optional[str], Optional[
     if not raw_payload:
         return None, None
 
-    cleaned = raw_payload.strip()
+    cleaned = urllib.parse.unquote(raw_payload).strip()
 
     # Handle fuse:// scheme
-    if cleaned.lower().startsWith("fuse://") if hasattr(cleaned, "startsWith") else cleaned.lower().startswith("fuse://"):
+    if cleaned.lower().startswith("fuse://"):
         without_scheme = re.sub(r"^fuse://", "", cleaned, flags=re.IGNORECASE)
         parts = without_scheme.split("?")[0].split("/")
         parts = [p for p in parts if p]
@@ -70,9 +72,11 @@ def parse_payload_identifier(raw_payload: str) -> tuple[Optional[str], Optional[
     # Fallback to raw ID/UUID
     return None, cleaned
 
+@router.get("", response_model=ResolveResponse)
 @router.get("/{payload:path}", response_model=ResolveResponse)
 def resolve_scanned_payload(
-    payload: str,
+    payload: Optional[str] = None,
+    q: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_analyst)
 ):
@@ -80,12 +84,20 @@ def resolve_scanned_payload(
     Lightning-fast entity resolver endpoint for barcodes, DataMatrix labels, and NFC NDEF records.
     Parses 'fuse://' URIs or raw UUIDs and returns entity details, hierarchical breadcrumbs, and target routes.
     """
-    hint, target_id = parse_payload_identifier(payload)
+    raw_input = q or payload
+    if not raw_input:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing payload or query parameter for entity resolution."
+        )
+
+    unquoted = urllib.parse.unquote(raw_input).strip()
+    hint, target_id = parse_payload_identifier(unquoted)
 
     # Attempt resolution by location ID first if hint is location or no hint
     if target_id:
         if hint in [None, "location"]:
-            storage = db.query(models.Storage).filter(models.Storage.id == target_id).first()
+            storage = db.query(models.Storage).filter(func.lower(models.Storage.id) == target_id.lower()).first()
             if storage:
                 breadcrumb = get_location_breadcrumb(storage, db)
                 return ResolveResponse(
@@ -97,7 +109,7 @@ def resolve_scanned_payload(
                 )
 
         if hint in [None, "part", "parts"]:
-            part = db.query(models.Part).filter(models.Part.id == target_id).first()
+            part = db.query(models.Part).filter(func.lower(models.Part.id) == target_id.lower()).first()
             if part:
                 part_name = f"{part.number} ({part.value})"
                 return ResolveResponse(
@@ -108,8 +120,8 @@ def resolve_scanned_payload(
                     target_route=f"/parts/{part.id}"
                 )
 
-    # Fallback search if hint did not match: check Storage then Part using the raw payload as string
-    storage_fallback = db.query(models.Storage).filter(models.Storage.id == payload).first()
+    # Fallback search if hint did not match: check Storage then Part using unquoted payload as string
+    storage_fallback = db.query(models.Storage).filter(func.lower(models.Storage.id) == unquoted.lower()).first()
     if storage_fallback:
         breadcrumb = get_location_breadcrumb(storage_fallback, db)
         return ResolveResponse(
@@ -120,18 +132,18 @@ def resolve_scanned_payload(
             target_route=f"/storage?location={storage_fallback.id}"
         )
 
-    part_fallback = db.query(models.Part).filter(models.Part.id == payload).first()
+    part_fallback = db.query(models.Part).filter(func.lower(models.Part.id) == unquoted.lower()).first()
     if part_fallback:
         part_name = f"{part_fallback.number} ({part_fallback.value})"
         return ResolveResponse(
             entity_type="part",
             entity_id=part_fallback.id,
             display_name=part_name,
-            breadcrumb=f"Part: {part_name}",
+            breadcrumb=f"Part: {part_fallback.id}",
             target_route=f"/parts/{part_fallback.id}"
         )
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"No storage location or part found matching payload: '{payload}'"
+        detail=f"No storage location or part found matching payload: '{unquoted}'"
     )

@@ -127,7 +127,7 @@ export default function Storage() {
     const allLocs = locations();
     if (!allLocs || allLocs.length === 0) return;
 
-    const search = window.location.search || location.search;
+    const search = location.search || window.location.search;
     const params = new URLSearchParams(search);
     const targetLocId = params.get("location") || params.get("loc");
     const locPathStr = params.get("locPath");
