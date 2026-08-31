@@ -6,10 +6,21 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [solid({ hot: process.env.VITEST ? false : true })],
+  clearScreen: false,
   server: {
     host: host || true,
     port: 5173,
     strictPort: true,
+    hmr: host
+      ? {
+          protocol: 'ws',
+          host,
+          port: 5173,
+        }
+      : undefined,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
   },
   test: {
     environment: 'jsdom',
