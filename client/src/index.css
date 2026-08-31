@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* -------------------------------------------------------------
+ * Safe Area Insets & Android Camera Cutout / Status Bar Support
+ * ------------------------------------------------------------- */
+:root {
+  --safe-area-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+html.is-android body,
+body.is-android {
+  padding-top: max(env(safe-area-inset-top, 0px), 28px);
+}
+
+html.is-android .mobile-nav-drawer,
+body.is-android .mobile-nav-drawer {
+  padding-top: max(env(safe-area-inset-top, 0px), 32px);
+}
+
 @theme {
   --color-darkBg: #0f0f13;
   --color-darkCard: rgba(23, 23, 33, 0.7);

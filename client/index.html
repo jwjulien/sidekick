@@ -3,11 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Sidekick | Physical Inventory Manager</title>
     <script>
       (function() {
         try {
+          if (/android/i.test(navigator.userAgent)) {
+            document.documentElement.classList.add('is-android');
+          }
           var saved = localStorage.getItem('sidekick_app_theme') || 'system';
           var theme = saved;
           if (saved === 'system') {
