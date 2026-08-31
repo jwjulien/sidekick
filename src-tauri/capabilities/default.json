@@ -9,6 +9,7 @@
     "core:default",
     "shell:default",
     "window-state:default",
-    "deep-link:default"
+    "deep-link:default",
+    "barcode-scanner:default"
   ]
 }

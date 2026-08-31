@@ -4,14 +4,27 @@ import {
   isDevMode, setIsDevMode,
   oidcIssuer, setOidcIssuer,
   oidcClientId, setOidcClientId,
+  backendUrl, setBackendUrl,
   loginDev, loginOidc
 } from "../hooks/useAuth";
-import { KeyRound, ShieldAlert, Sparkles, Server } from "lucide-solid";
+import { KeyRound, ShieldAlert, Sparkles, Server, Check } from "lucide-solid";
 
 export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = createSignal<string | null>(null);
   const [showConfig, setShowConfig] = createSignal(false);
+  const [editingServer, setEditingServer] = createSignal(false);
+  const [customUrlInput, setCustomUrlInput] = createSignal(backendUrl());
+
+  const handleSaveServerUrl = () => {
+    let url = customUrlInput().trim();
+    if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "http://" + url;
+    }
+    setBackendUrl(url);
+    setEditingServer(false);
+    setError(null);
+  };
 
   const handleDevLogin = async (role: string) => {
     try {
@@ -58,7 +71,44 @@ export default function Login() {
           </div>
           <h1 class="text-3xl font-extrabold text-white tracking-tight">Sidekick</h1>
           <p class="text-gray-400 text-sm mt-1">Physical Inventory Manager Companion</p>
+          
+          <button
+            onClick={() => { setEditingServer(!editingServer()); setCustomUrlInput(backendUrl()); }}
+            class="text-[11px] text-gray-400 hover:text-white inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 transition-all cursor-pointer"
+          >
+            <Server size={12} class="text-accentCyan" />
+            Backend: <code class="text-accentCyan font-mono">{backendUrl()}</code>
+          </button>
         </div>
+
+        {/* Server URL Edit Drawer */}
+        <Show when={editingServer() || (error() && error()?.includes("Cannot connect"))}>
+          <div class="bg-white/5 border border-accentCyan/30 p-4 rounded-xl mb-6 space-y-3 animate-in fade-in slide-in-from-top-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                <Server size={14} class="text-accentCyan" />
+                Target FastAPI Server URL
+              </span>
+              <span class="text-[10px] text-gray-400">e.g. http://192.168.1.88:8000</span>
+            </div>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                value={customUrlInput()}
+                onInput={(e) => setCustomUrlInput(e.target.value)}
+                placeholder="http://192.168.1.88:8000"
+                class="glass-input flex-1 text-xs font-mono"
+              />
+              <button
+                onClick={handleSaveServerUrl}
+                class="btn-primary py-1.5 px-3 text-xs flex items-center gap-1 font-bold whitespace-nowrap"
+              >
+                <Check size={14} />
+                Save & Connect
+              </button>
+            </div>
+          </div>
+        </Show>
 
         {/* Display error */}
         <Show when={error()}>

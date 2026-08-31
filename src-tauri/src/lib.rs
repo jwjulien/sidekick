@@ -9,6 +9,11 @@ pub fn run() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_deep_link::init());
 
+  #[cfg(mobile)]
+  {
+    builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+  }
+
   #[cfg(desktop)]
   {
     builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());

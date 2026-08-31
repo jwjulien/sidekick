@@ -1,13 +1,35 @@
 import { createSignal, createEffect } from "solid-js";
 import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 
-// ----------------- Configuration & Signals -----------------
-const defaultBackendUrl = "http://localhost:8000";
+function getInitialBackendUrl(): string {
+  const saved = localStorage.getItem("sidekick_backend_url");
+  const host = typeof window !== "undefined" ? window.location?.hostname : "";
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+  const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
 
-// Load initial config from localStorage
-const [backendUrl, setBackendUrl] = createSignal(
-  localStorage.getItem("sidekick_backend_url") || defaultBackendUrl
-);
+  // On Android, localhost/127.0.0.1 refers to the phone itself, which will fail to reach host PC backend.
+  if (isAndroid) {
+    if (!saved || saved.includes("localhost") || saved.includes("127.0.0.1")) {
+      if (envUrl) return envUrl;
+      if (host && host !== "localhost" && host !== "127.0.0.1" && host !== "tauri.localhost") {
+        return `http://${host}:8000`;
+      }
+      return "http://192.168.1.88:8000";
+    }
+    return saved;
+  }
+
+  // Non-android / Desktop host IP fallback
+  if (host && host !== "localhost" && host !== "127.0.0.1" && host !== "tauri.localhost") {
+    if (!saved || saved.includes("localhost") || saved.includes("127.0.0.1")) {
+      return `http://${host}:8000`;
+    }
+  }
+
+  return saved || envUrl || "http://localhost:8000";
+}
+
+const [backendUrl, setBackendUrl] = createSignal(getInitialBackendUrl());
 const [token, setToken] = createSignal<string | null>(
   localStorage.getItem("sidekick_token")
 );

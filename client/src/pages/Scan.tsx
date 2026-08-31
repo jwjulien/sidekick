@@ -9,9 +9,10 @@ import {
   Keyboard,
   Barcode,
   CheckCircle,
-  HelpCircle
+  Camera
 } from "lucide-solid";
 import { apiFetch, user } from "../hooks/useAuth";
+import CameraScanModal from "../components/CameraScanModal";
 
 export default function Scan() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function Scan() {
   const [scannedItem, setScannedItem] = createSignal<any>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [successMsg, setSuccessMsg] = createSignal<string | null>(null);
+  const [showCameraModal, setShowCameraModal] = createSignal(false);
 
   // Quick action values
   const [qtyChange, setQtyChange] = createSignal(1);
@@ -130,10 +132,20 @@ export default function Scan() {
         {/* ----------------- LEFT: SCANNER FIELD ----------------- */}
         <div class="md:col-span-2 space-y-6">
           <div class="glass-panel rounded-2xl p-6 border border-white/5 space-y-4">
-            <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Keyboard size={16} class="text-accentCyan" />
-              Hardware Scanner Input
-            </h3>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Keyboard size={16} class="text-accentCyan" />
+                Hardware & Camera Scanner
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCameraModal(true)}
+                class="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              >
+                <Camera size={14} />
+                Open Camera Scanner
+              </button>
+            </div>
             
             <form onSubmit={handleBarcodeSubmit} class="relative">
               <input
@@ -153,7 +165,7 @@ export default function Scan() {
             </form>
             
             <div class="flex justify-between items-center text-[10px] text-gray-500">
-              <span>Ensure your scanner is set to keyboard mode (types text + hits Enter)</span>
+              <span>Scan via WinUSB scanner or click camera scanner to capture DataMatrix</span>
               <button 
                 onClick={focusInput} 
                 class="text-accentCyan hover:underline font-semibold cursor-pointer"
@@ -176,6 +188,11 @@ export default function Scan() {
               </div>
             </Show>
           </div>
+
+          <CameraScanModal
+            isOpen={showCameraModal()}
+            onClose={() => setShowCameraModal(false)}
+          />
 
           {/* ----------------- SCAN RESULTS CARD ----------------- */}
           <Show when={scannedItem()}>

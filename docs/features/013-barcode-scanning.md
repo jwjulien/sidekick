@@ -1,6 +1,6 @@
 ---
-title: Universal Barcode Scanning
-status: In Progress
+title: Universal Barcode Scanning Core
+status: Complete
 target: 
   - Web
   - Windows
@@ -8,34 +8,50 @@ target:
 dependencies: 
   - 010-inventory-storage.md
   - 011-storage-labels.md
+  - 014-deep-link-routing.md
 ---
 
-# Feature: Universal Barcode Scanning
+# Feature: Universal Barcode Scanning Core
 
 ## 1. Overview
-This feature provides camera-based barcode scanning for Sidekick on mobile and cross-platform clients, allowing users to rapidly pull up a specific physical Storage Location or Part by scanning its label. The camera engine decodes both legacy CODE-128 linear barcodes and modern DataMatrix squares using the device camera. (Note: Desktop-specific raw USB background scanner integration using WinUSB drivers is specified separately in `043-desktop-usb-barcode-scanner.md`).
+This feature provides the core barcode resolution architecture and deep-link routing engine for Sidekick across all platforms (Web, Windows, Android). It establishes the standard handling for internal `fuse://` URIs, barcode payload resolution against the FastAPI backend, success audio feedback, and live modal scan listeners.
+
+Platform-specific hardware barcode capturing mechanisms are specified in dedicated sub-features:
+* **Windows Desktop Raw USB Scanners**: See [`043-desktop-usb-barcode-scanner.md`](043-desktop-usb-barcode-scanner.md).
+* **Android Mobile Camera Scanners**: See [`044-android-camera-barcode-scanner.md`](044-android-camera-barcode-scanner.md).
 
 ## 2. User Experience & UI
-* **Trigger:** A global "Scan" Floating Action Button (FAB) or header icon, always accessible regardless of what screen the user is on.
-* **Interaction (Mobile Camera):** Tapping the scan button on a mobile device opens a full-screen camera view with a darkened overlay and a clear scanning reticle in the center. The camera auto-closes upon a successful read.
-* **Interaction (Desktop WinUSB Scanner):** Handled as a dedicated background worker service on Windows desktop clients—see `043-desktop-usb-barcode-scanner.md`.
-* **Resolution:** Upon any successful scan, the app emits a short success "beep", queries `/api/resolve/{payload}` for the UUID, and automatically navigates the user to that Location or Part detail view.
+* **Global Access:** Barcode scanning triggers are accessible anywhere in the app via floating action buttons (FABs), header quick-actions, or background hardware event listeners.
+* **Scan Resolution Flow:**
+  1. Barcode payload is received (from USB HID background thread, camera scanner preview, or deep link handler).
+  2. Success audio chime plays (`AudioContext` C6 1046.5Hz tone).
+  3. Active modal scanner listeners (e.g. `MovePartModal` / location picker) take precedence if registered.
+  4. If unhandled by a modal, the payload is resolved via FastAPI `GET /resolve/{payload}` or parsed directly if formatted as `fuse://location/{id}` or `fuse://part/{id}`.
+  5. SolidJS router navigates to target entity view (`/storage?location={id}` or `/parts/{id}`), or dispatches `sidekick:nfc-scanned` for live in-page Miller Column updates.
+* **Toast Feedback:** Confirmation toast appears confirming entity resolution (`USB Scanner: Navigating to location`).
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** 
-    * **Camera (`html5-qrcode` or `zxing-js`):** Utilizes standard web APIs (`navigator.mediaDevices.getUserMedia`) to feed a video stream to a JS-based decoder capable of reading both DataMatrix and Code-128.
-* **Backend (FastAPI):** 
-    * `GET /api/resolve/{scanned_payload}` - A dedicated routing endpoint. It checks the payload against the `Storage` and `Parts` tables and returns the entity type and ID so the frontend can redirect the router.
+* **FastAPI Backend (`server/app/routers/resolve.py`):**
+  * `GET /resolve/{payload:path}` and `GET /resolve?q={payload}` endpoints parse `fuse://` URIs or raw UUID strings.
+  * Performs case-insensitive SQL queries (`func.lower(Storage.id) == target_id.lower()`) against `Storage` and `Parts` tables.
+  * Generates hierarchical location breadcrumbs (e.g. `SMD Boxes > 0603`) and target route strings.
+* **Client Service Infrastructure (`client/src/services/usbScannerService.ts`):**
+  * Modal listener registration system (`registerModalListener`).
+  * Deep link parsing integration via `parseDeepLink()`.
+  * Custom event dispatching (`sidekick:nfc-scanned`) for zero-reload in-page Miller Column navigation.
+* **Audio Feedback:** Synthesizes instant audio beep via Web Audio API (`AudioContext`).
 
 ## 4. Out of Scope
-* BLE (Bluetooth Low Energy) handheld barcode scanners (deferred until physical hardware is available for testing).
-* Using the camera for OCR (Optical Character Recognition) to read human text.
-* Desktop raw WinUSB / PyUSB background scanner worker thread (handled in `043-desktop-usb-barcode-scanner.md`).
-* Scanning external manufacturer barcodes (e.g., a UPC on a DigiKey bag) to scrape the web for part data. This feature strictly resolves internal Sidekick UUIDs.
+* Direct raw USB WinUSB driver polling on Windows (handled in `043-desktop-usb-barcode-scanner.md`).
+* Android native camera reticle and camera permissions (handled in `044-android-camera-barcode-scanner.md`).
+* BLE (Bluetooth Low Energy) handheld barcode scanners (deferred until physical hardware testing).
+* Optical Character Recognition (OCR) or external manufacturer UPC web scraping.
 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Install and configure a JS-based barcode decoder (e.g., ZXing) for the camera view.
-- [ ] Build the FastAPI `/api/resolve` endpoint.
-- [ ] Wire up audio feedback (success beep) using standard HTML5 Audio.
+- [x] Build FastAPI `/resolve` routing endpoint supporting path parameters, query strings, and case-insensitive UUID matching.
+- [x] Create client deep link parsing utility (`parseDeepLink`) supporting `fuse://` URI scheme.
+- [x] Build Web Audio API success chime synthesizer (`playSuccessBeep`).
+- [x] Implement modal scan interceptor registration (`registerModalListener`).
+- [x] Wire in-page custom event dispatch (`sidekick:nfc-scanned`) for zero-reload Miller Column navigation in `Storage.tsx`.

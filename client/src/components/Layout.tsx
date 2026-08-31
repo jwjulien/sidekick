@@ -17,7 +17,8 @@ import {
   MapPin,
   PackageCheck,
   History,
-  ShoppingBag
+  ShoppingBag,
+  Camera
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
@@ -26,6 +27,7 @@ import ActiveListBottomDrawer from "./lists/ActiveListBottomDrawer";
 import NavigationToolbar from "./NavigationToolbar";
 import TestingModeBanner from "./TestingModeBanner";
 import DatabaseOperationOverlay from "./DatabaseOperationOverlay";
+import CameraScanModal from "./CameraScanModal";
 
 interface LayoutProps {
   children?: any;
@@ -38,6 +40,7 @@ export default function Layout(props: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = createSignal(false);
   const [lowStockCount, setLowStockCount] = createSignal(0);
   const [homelessCount, setHomelessCount] = createSignal(0);
+  const [showCameraModal, setShowCameraModal] = createSignal(false);
 
   // Poll for low stock alerts & homeless count periodically to show notifications
   const checkCounts = async () => {
@@ -95,7 +98,7 @@ export default function Layout(props: LayoutProps) {
 
       
       {/* ----------------- MOBILE HEADER ----------------- */}
-      <header class="md:hidden glass-panel h-16 px-4 flex items-center justify-between border-b border-white/5 z-50">
+      <header class="md:hidden glass-panel h-16 px-4 flex items-center justify-between border-b border-white/5 z-30">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-gradient-to-r from-accentCyan to-accentBlue flex items-center justify-center font-bold text-white text-lg">
             S
@@ -103,6 +106,14 @@ export default function Layout(props: LayoutProps) {
           <span class="font-bold text-white tracking-wide">SIDEKICK</span>
         </div>
         <div class="flex items-center gap-3">
+          <button
+            onClick={() => setShowCameraModal(true)}
+            class="p-1.5 text-accentCyan hover:text-white bg-accentCyan/10 border border-accentCyan/20 rounded-lg flex items-center gap-1 transition-colors"
+            title="Scan Barcode / DataMatrix"
+          >
+            <Camera size={18} />
+          </button>
+
           <Show when={lowStockCount() > 0}>
             <A href="/" class="relative p-1 text-amber-400 hover:text-amber-300">
               <Bell size={20} class="animate-bounce" />
@@ -119,6 +130,11 @@ export default function Layout(props: LayoutProps) {
           </button>
         </div>
       </header>
+
+      <CameraScanModal
+        isOpen={showCameraModal()}
+        onClose={() => setShowCameraModal(false)}
+      />
 
       {/* ----------------- SIDEBAR (DESKTOP) ----------------- */}
       <aside class="hidden md:flex flex-col w-64 glass-panel border-r border-white/5 h-screen sticky top-0 p-4">
@@ -210,8 +226,8 @@ export default function Layout(props: LayoutProps) {
 
       {/* ----------------- MOBILE NAV OVERLAY ----------------- */}
       <Show when={mobileMenuOpen()}>
-        <div class="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40" onClick={() => setMobileMenuOpen(false)}>
-          <aside class="w-72 glass-panel border-r border-white/5 h-full p-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div class="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50" onClick={() => setMobileMenuOpen(false)}>
+          <aside class="mobile-nav-drawer w-72 glass-panel border-r border-white/5 h-full p-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div class="flex items-center justify-between pb-3 border-b border-white/5">
               <div class="flex items-center gap-2">

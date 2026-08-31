@@ -8,13 +8,18 @@
 }
 
 html.is-android body,
-body.is-android {
-  padding-top: max(env(safe-area-inset-top, 0px), 28px);
+body.is-android,
+.is-android body {
+  padding-top: max(env(safe-area-inset-top, 0px), 40px);
 }
 
 html.is-android .mobile-nav-drawer,
-body.is-android .mobile-nav-drawer {
-  padding-top: max(env(safe-area-inset-top, 0px), 32px);
+body.is-android .mobile-nav-drawer,
+.is-android .mobile-nav-drawer,
+html.is-android .android-safe-top,
+body.is-android .android-safe-top,
+.is-android .android-safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 44px);
 }
 
 @theme {
@@ -250,4 +255,12 @@ select option {
 select:focus option {
   background-color: var(--select-option-bg);
   color: var(--select-option-text);
+}
+
+/* Barcode Scanner Native Webview Transparency */
+body.barcode-scanner-active,
+html.barcode-scanner-active {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
 }
