@@ -104,18 +104,31 @@ export const cameraScannerService = {
   },
 
   /**
+   * Helper to determine device screen orientation ('portrait' | 'landscape').
+   */
+  getDeviceOrientation(): "portrait" | "landscape" {
+    if (typeof window !== "undefined" && window.screen && window.screen.orientation) {
+      return window.screen.orientation.type.startsWith("portrait") ? "portrait" : "landscape";
+    }
+    if (typeof window !== "undefined") {
+      return window.innerHeight >= window.innerWidth ? "portrait" : "landscape";
+    }
+    return "portrait";
+  },
+
+  /**
    * Launches native Tauri Android barcode scanner plugin.
    */
   async startNativeScan(onResult: ScanResultCallback): Promise<boolean> {
     const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
     if (isTauri) {
       try {
-        console.info("[Camera Scanner] Starting native Tauri barcode scanner session (DataMatrix, Code128, QRCode)...");
+        console.info("[Camera Scanner] Starting native Tauri barcode scanner session (DataMatrix, QRCode)...");
         const { scan, Format } = await import("@tauri-apps/plugin-barcode-scanner");
         isScanning = true;
 
         const res = await scan({
-          formats: [Format.DataMatrix, Format.Code128, Format.QRCode],
+          formats: [Format.DataMatrix, Format.QRCode],
           windowed: true,
         });
 
@@ -143,29 +156,39 @@ export const cameraScannerService = {
     videoElement: HTMLVideoElement,
     onResult: ScanResultCallback
   ): Promise<boolean> {
-    console.info("[Camera Scanner] Initializing HTML5 ZXing camera scanner...");
+    console.info("[Camera Scanner] Initializing HTML5 ZXing camera scanner with TRY_HARDER and orientation awareness...");
     try {
       await this.stopScan(videoElement);
       isScanning = true;
 
-      const { BrowserMultiFormatReader, BarcodeFormat } = await import("@zxing/library");
-      const reader = new BrowserMultiFormatReader();
-      activeBrowserReader = reader;
+      const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await import("@zxing/library");
 
       const formats = [
         BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.CODE_128,
         BarcodeFormat.QR_CODE,
       ];
 
       const hints = new Map();
-      hints.set(2, formats);
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+      hints.set(DecodeHintType.TRY_HARDER, true);
 
-      // Attempt rear environment camera first
+      // Supply configured hints map to constructor for rotation pass & format filtering
+      const reader = new BrowserMultiFormatReader(hints);
+      activeBrowserReader = reader;
+
+      const videoConstraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      };
+
+      // Attempt rear environment camera first with 1080p target resolution
       try {
-        console.info("[Camera Scanner] Attempting rear environment camera facingMode...");
+        console.info("[Camera Scanner] Attempting rear camera with high-resolution constraints & orientation hints...", videoConstraints);
         await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
+          videoConstraints,
           videoElement,
           (result, err) => {
             if (result && isScanning) {
