@@ -19,7 +19,7 @@ body.is-android .mobile-nav-drawer,
 html.is-android .android-safe-top,
 body.is-android .android-safe-top,
 .is-android .android-safe-top {
-  padding-top: max(env(safe-area-inset-top, 0px), 44px);
+  padding-top: max(env(safe-area-inset-top, 0px), 48px);
 }
 
 @theme {
