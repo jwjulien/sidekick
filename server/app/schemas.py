@@ -286,6 +286,25 @@ class StorageDetailsOut(StorageOut):
 
     model_config = ConfigDict(from_attributes=True)
 
+class AuditLocationItemOut(BaseModel):
+    id: str
+    name: str
+    parent_id: Optional[str] = None
+    path: str
+    part_id: Optional[str] = None
+    part_name: Optional[str] = None
+    part_number: Optional[str] = None
+    unit_weight: Optional[float] = None
+    quantity: int = 0
+    last_counted: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AuditStaleCountOut(BaseModel):
+    stale_count: int
+    days_stale: int
+
+
 # ----------------- Image Schemas -----------------
 class ImageOut(BaseModel):
     id: str

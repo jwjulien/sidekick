@@ -1,8 +1,9 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import text, func
 from ..database import get_db
 from .. import models, schemas, auth
 from .audit import log_audit_event
@@ -64,6 +65,96 @@ def create_location(
     db.commit()
     db.refresh(db_storage)
     return db_storage
+
+
+@router.get("/audit", response_model=List[schemas.AuditLocationItemOut])
+def get_audit_route(
+    days_stale: int = Query(180, ge=0, description="Minimum days since last counted to consider location stale"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_analyst)
+):
+    """
+    Query stale storage locations requiring a cycle count audit.
+    Calculates physically optimized audit route by concatenating location lineage paths via SQLite Recursive CTE
+    and ordering by path ASC so sibling containers are physically grouped together.
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days_stale)
+    
+    raw_query = text("""
+        WITH RECURSIVE storage_path(id, name, parent_id, path) AS (
+            SELECT id, name, parent_id, name AS path
+            FROM storage
+            WHERE parent_id IS NULL
+            UNION ALL
+            SELECT s.id, s.name, s.parent_id, sp.path || ' / ' || s.name
+            FROM storage s
+            JOIN storage_path sp ON s.parent_id = sp.id
+        )
+        SELECT 
+            sp.id, 
+            s.name, 
+            s.parent_id, 
+            sp.path, 
+            s.part_id, 
+            s.quantity, 
+            s.last_counted,
+            p.value AS part_name, 
+            p.number AS part_number, 
+            p.weight AS unit_weight
+        FROM storage_path sp
+        JOIN storage s ON sp.id = s.id
+        LEFT JOIN parts p ON s.part_id = p.id
+        WHERE (s.part_id IS NOT NULL OR s.quantity > 0)
+          AND (s.last_counted IS NULL OR s.last_counted < :cutoff_date)
+        ORDER BY sp.path ASC
+    """)
+    
+    result = db.execute(raw_query, {"cutoff_date": cutoff_date}).mappings().all()
+    
+    items = []
+    for row in result:
+        last_counted_dt = None
+        if row["last_counted"]:
+            if isinstance(row["last_counted"], str):
+                try:
+                    last_counted_dt = datetime.fromisoformat(row["last_counted"].replace("Z", ""))
+                except ValueError:
+                    last_counted_dt = None
+            elif isinstance(row["last_counted"], datetime):
+                last_counted_dt = row["last_counted"]
+
+        items.append(schemas.AuditLocationItemOut(
+            id=str(row["id"]),
+            name=row["name"],
+            parent_id=str(row["parent_id"]) if row["parent_id"] else None,
+            path=row["path"],
+            part_id=str(row["part_id"]) if row["part_id"] else None,
+            part_name=row["part_name"],
+            part_number=row["part_number"],
+            unit_weight=row["unit_weight"],
+            quantity=row["quantity"] or 0,
+            last_counted=last_counted_dt
+        ))
+    return items
+
+
+@router.get("/stale-count", response_model=schemas.AuditStaleCountOut)
+def get_stale_location_count(
+    days_stale: int = Query(180, ge=0),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_any_user)
+):
+    """
+    Get the count of stale inventory locations for navigation badges.
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days_stale)
+    count = db.query(func.count(models.Storage.id)).filter(
+        (models.Storage.part_id.isnot(None)) | (models.Storage.quantity > 0),
+        (models.Storage.last_counted.is_(None)) | (models.Storage.last_counted < cutoff_date)
+    ).scalar() or 0
+    
+    return schemas.AuditStaleCountOut(stale_count=count, days_stale=days_stale)
+
 
 @router.get("/{location_id}", response_model=schemas.StorageDetailsOut)
 def get_location_details(
@@ -626,4 +717,5 @@ def bulk_assign_parts_location(
 
     db.commit()
     return {"status": "success", "assigned_count": assigned_count, "location_id": location.id}
+
 
