@@ -176,20 +176,6 @@ export const nfcService = {
    * Safety Check: Reads existing tag payload and resolves it via backend API to check for overwrites.
    */
   async checkTagBeforeWrite(): Promise<NfcWriteCheckResult> {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      try {
-        const { isAvailable } = await import("@tauri-apps/plugin-nfc");
-        if (await isAvailable()) {
-          // On mobile, native write performs tag touch scan and program in a single step
-          return {
-            canWriteDirectly: true,
-            existingPayload: null,
-            resolvedEntity: null,
-          };
-        }
-      } catch (_) {}
-    }
-
     const scanResult = await this.readTag();
     if (!scanResult.success) {
       return {
