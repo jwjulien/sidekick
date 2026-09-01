@@ -7,6 +7,9 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [solid({ hot: process.env.VITEST ? false : true })],
   clearScreen: false,
+  optimizeDeps: {
+    include: ['lucide-solid', '@solidjs/router', 'solid-toast'],
+  },
   server: {
     host: host || true,
     port: 5173,

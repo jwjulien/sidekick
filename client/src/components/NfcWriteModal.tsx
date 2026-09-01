@@ -107,7 +107,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
         <div class="w-full max-w-md bg-[#121319] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          
+
           {/* Header */}
           <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800 bg-[#161822]">
             <div class="flex items-center space-x-2">
@@ -119,7 +119,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
                 <p class="text-xs text-gray-400">Program physical sticker for {props.targetName}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={props.onClose}
               class="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors"
             >
@@ -134,11 +134,10 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
                 <Cpu class={`w-3.5 h-3.5 ${hardwareStatus()?.connected ? "text-emerald-400" : "text-amber-400"}`} />
                 <span>{hardwareStatus()?.readerName || "NFC Reader"}</span>
               </span>
-              <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                hardwareStatus()?.connected
+              <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${hardwareStatus()?.connected
                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                   : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-              }`}>
+                }`}>
                 <span class={`w-1.5 h-1.5 rounded-full ${hardwareStatus()?.connected ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`}></span>
                 {hardwareStatus()?.connected ? "Reader Active" : "No Hardware"}
               </span>
@@ -151,23 +150,21 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
               <Smartphone class="w-3.5 h-3.5 text-accentPurple" /> Dev Scan Mode:
             </span>
             <div class="flex items-center space-x-2">
-              <button 
+              <button
                 onClick={() => setMockModeTagType("blank")}
-                class={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  mockModeTagType() === "blank" 
-                    ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/40" 
+                class={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${mockModeTagType() === "blank"
+                    ? "bg-accentCyan/20 text-accentCyan border border-accentCyan/40"
                     : "bg-gray-800 text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Blank Tag
               </button>
-              <button 
+              <button
                 onClick={() => setMockModeTagType("existing")}
-                class={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  mockModeTagType() === "existing" 
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" 
+                class={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${mockModeTagType() === "existing"
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
                     : "bg-gray-800 text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Assigned Tag
               </button>
@@ -176,7 +173,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
 
           {/* Content Body */}
           <div class="p-6 text-center flex flex-col items-center">
-            
+
             {/* Step: Ready */}
             <Show when={step() === "ready"}>
               <div class="relative my-4 flex items-center justify-center">
@@ -246,8 +243,8 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
               <div class="my-6">
                 <RefreshCw class="w-12 h-12 text-accentCyan animate-spin mx-auto" />
               </div>
-              <p class="text-sm font-medium text-white">Writing APDU NDEF Record...</p>
-              <p class="text-xs text-gray-400 mt-1">Hold tag firmly on ACR122U reader surface.</p>
+              <p class="text-sm font-medium text-white">Writing NDEF Record...</p>
+              <p class="text-xs text-gray-400 mt-1">Hold back of phone near physical tag until complete.</p>
             </Show>
 
             {/* Step: Success */}

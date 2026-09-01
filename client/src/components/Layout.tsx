@@ -28,6 +28,8 @@ import NavigationToolbar from "./NavigationToolbar";
 import TestingModeBanner from "./TestingModeBanner";
 import DatabaseOperationOverlay from "./DatabaseOperationOverlay";
 import CameraScanModal from "./CameraScanModal";
+import { DiagnosticsModal } from "./DiagnosticsModal";
+import { Terminal } from "lucide-solid";
 
 interface LayoutProps {
   children?: any;
@@ -41,6 +43,7 @@ export default function Layout(props: LayoutProps) {
   const [lowStockCount, setLowStockCount] = createSignal(0);
   const [homelessCount, setHomelessCount] = createSignal(0);
   const [showCameraModal, setShowCameraModal] = createSignal(false);
+  const [showDiagnostics, setShowDiagnostics] = createSignal(false);
 
   // Poll for low stock alerts & homeless count periodically to show notifications
   const checkCounts = async () => {
@@ -210,6 +213,14 @@ export default function Layout(props: LayoutProps) {
             <Settings size={18} />
             <span>Settings</span>
           </A>
+
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            class="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all duration-150 text-left cursor-pointer"
+          >
+            <Terminal size={18} />
+            <span>Diagnostics Console</span>
+          </button>
           
           <button
             onClick={() => {
@@ -224,38 +235,70 @@ export default function Layout(props: LayoutProps) {
         </div>
       </aside>
 
-      {/* ----------------- MOBILE NAV OVERLAY ----------------- */}
+      {/* ----------------- MOBILE HEADER ----------------- */}
+      <div class="md:hidden glass-panel border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+        <div class="flex items-center gap-3">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            class="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5"
+          >
+            <Menu size={20} />
+          </button>
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accentCyan to-accentBlue flex items-center justify-center font-extrabold text-white text-xs">
+              SK
+            </div>
+            <span class="font-extrabold text-white text-sm tracking-wider">SIDEKICK</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <NavigationToolbar onOpenDiagnostics={() => setShowDiagnostics(true)} />
+          <button
+            onClick={() => setShowCameraModal(true)}
+            class="p-2 rounded-xl bg-accentCyan/10 text-accentCyan border border-accentCyan/20 hover:bg-accentCyan/20 transition-all"
+            title="Scan Barcode / QR Code"
+          >
+            <Camera size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* ----------------- MOBILE SLIDE-OUT MENU ----------------- */}
       <Show when={mobileMenuOpen()}>
-        <div class="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50" onClick={() => setMobileMenuOpen(false)}>
-          <aside class="mobile-nav-drawer w-72 glass-panel border-r border-white/5 h-full p-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div class="flex items-center justify-between pb-3 border-b border-white/5">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-r from-accentCyan to-accentBlue flex items-center justify-center font-bold text-white text-base">
-                  S
+        <div class="fixed inset-0 z-50 md:hidden flex">
+          <div
+            class="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside class="relative z-10 w-72 bg-[#0d0f17] border-r border-white/5 p-6 flex flex-col h-full overflow-y-auto">
+            <div class="flex items-center justify-between mb-8">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accentCyan to-accentBlue flex items-center justify-center font-extrabold text-white">
+                  SK
                 </div>
-                <span class="font-bold text-white tracking-wide text-sm">SIDEKICK</span>
+                <div>
+                  <h1 class="font-extrabold text-white text-base">SIDEKICK</h1>
+                  <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Inventory</span>
+                </div>
               </div>
-              <button onClick={() => setMobileMenuOpen(false)} class="p-1 text-gray-400 hover:text-white">
-                <X size={22} />
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                class="p-2 rounded-xl text-gray-400 hover:text-white"
+              >
+                <X size={20} />
               </button>
             </div>
 
-            {/* Navigation & Theme Toolbar at top of mobile menu */}
-            <div class="py-3 border-b border-white/5 relative z-50">
-              <span class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold block mb-2 px-1">Navigation & Theme</span>
-              <NavigationToolbar />
-            </div>
-            
-            <nav class="flex-1 mt-3 space-y-1 overflow-y-auto">
+            <nav class="flex-1 space-y-1">
               {navItems.filter(item => item.roles.includes(user()?.role || "")).map((item) => (
                 <A
                   href={item.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  class={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  class={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive(item.path)
                       ? "bg-gradient-to-r from-accentCyan/10 to-accentBlue/5 border-l-4 border-accentCyan text-white"
-                      : "text-gray-400 hover:text-white hover:bg-white/5"
+                      : "text-gray-400 hover:text-white"
                   }`}
                 >
                   <item.icon size={18} />
@@ -263,26 +306,35 @@ export default function Layout(props: LayoutProps) {
                 </A>
               ))}
             </nav>
-            
-            <div class="pt-4 border-t border-white/5 space-y-2">
+
+            <div class="pt-4 border-t border-white/5 space-y-2 mt-auto">
               <A
                 href="/settings"
                 onClick={() => setMobileMenuOpen(false)}
-                class={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 ${
-                  isActive("/settings")
-                    ? "bg-gradient-to-r from-accentCyan/10 to-accentBlue/5 border-l-4 border-accentCyan text-white"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
+                class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white"
               >
                 <Settings size={18} />
                 <span>Settings</span>
               </A>
+
               <button
                 onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowDiagnostics(true);
+                }}
+                class="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all text-left cursor-pointer"
+              >
+                <Terminal size={18} />
+                <span>Diagnostics Console</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
                   logout();
                   navigate("/login");
                 }}
-                class="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all duration-150 text-left cursor-pointer"
+                class="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-red-400"
               >
                 <LogOut size={18} />
                 <span>Sign Out</span>
@@ -299,8 +351,19 @@ export default function Layout(props: LayoutProps) {
 
       {/* Sticky Active List Drawer */}
       <ActiveListBottomDrawer />
+
+      {/* Camera Scan Modal */}
+      <CameraScanModal
+        isOpen={showCameraModal()}
+        onClose={() => setShowCameraModal(false)}
+      />
+
+      {/* In-App Diagnostics Console Modal */}
+      <DiagnosticsModal
+        isOpen={showDiagnostics()}
+        onClose={() => setShowDiagnostics(false)}
+      />
       </div>
     </div>
   );
 }
-

@@ -1,8 +1,8 @@
-import { createSignal } from "solid-js";
-import { ArrowLeft, ArrowRight, RotateCw } from "lucide-solid";
+import { createSignal, Show } from "solid-js";
+import { ArrowLeft, ArrowRight, RotateCw, Terminal } from "lucide-solid";
 import ThemeToggle from "./ThemeToggle";
 
-export default function NavigationToolbar(props: { compact?: boolean }) {
+export default function NavigationToolbar(props: { compact?: boolean; onOpenDiagnostics?: () => void }) {
   const [isRefreshing, setIsRefreshing] = createSignal(false);
 
   const handleBack = () => {
@@ -48,6 +48,17 @@ export default function NavigationToolbar(props: { compact?: boolean }) {
       >
         <RotateCw size={15} class={isRefreshing() ? "animate-spin text-accentCyan" : ""} />
       </button>
+
+      <Show when={props.onOpenDiagnostics}>
+        <button
+          type="button"
+          onClick={props.onOpenDiagnostics}
+          title="Diagnostics Console"
+          class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+        >
+          <Terminal size={15} />
+        </button>
+      </Show>
 
       <div class="w-px h-4 bg-white/10 mx-0.5" />
 

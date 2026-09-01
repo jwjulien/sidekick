@@ -32,7 +32,17 @@ export interface NfcWriteCheckResult {
 // Dev Mock State for Desktop Browser Testing
 let mockCurrentTagPayload: string | null = null; // Set to simulate an already programmed tag
 
+let isWritingActive = false;
+
 export const nfcService = {
+  isWriting(): boolean {
+    return isWritingActive;
+  },
+
+  setIsWriting(val: boolean) {
+    isWritingActive = val;
+  },
+
   /**
    * Configure dev mock state for browser testing
    */
@@ -45,6 +55,22 @@ export const nfcService = {
    */
   async getReaderStatus(): Promise<NfcReaderStatus> {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      // 1. Try mobile native plugin check first
+      try {
+        const { isAvailable } = await import("@tauri-apps/plugin-nfc");
+        const available = await isAvailable();
+        if (available) {
+          return {
+            connected: true,
+            readerName: "Android NFC Adapter",
+            cardPresent: false,
+          };
+        }
+      } catch (_) {
+        // Fall back to desktop Rust PC/SC query
+      }
+
+      // 2. Desktop PC/SC reader check via Tauri Rust IPC
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const res: any = await invoke("nfc_get_status");
@@ -60,7 +86,7 @@ export const nfcService = {
         console.warn("[NFC Service] Reader status query failed:", err);
       }
     }
-    // Browser Mock Mode Fallback
+
     return {
       connected: true,
       readerName: "Dev Mock Reader",
@@ -69,11 +95,58 @@ export const nfcService = {
   },
 
   /**
-   * Reads NFC tag using Tauri native Rust commands (PC/SC on desktop, plugin on mobile) or Dev Mock Mode.
+   * Reads NFC tag using native mobile plugin (@tauri-apps/plugin-nfc) on Android/iOS,
+   * Tauri native Rust PC/SC commands on Desktop, or Dev Mock Mode.
    */
   async readTag(): Promise<NfcTagData> {
-    // 1. Try Tauri IPC if running inside Tauri runtime
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      // 1. Try mobile native NFC scan if available
+      try {
+        const { isAvailable, scan } = await import("@tauri-apps/plugin-nfc");
+        if (await isAvailable()) {
+          const tag = await scan({ type: "tag" });
+          const tagUid = tag.id && tag.id.length > 0
+            ? tag.id.map((b) => b.toString(16).padStart(2, "0").toUpperCase()).join(":")
+            : null;
+
+          let payload: string | null = null;
+          if (tag.records && tag.records.length > 0) {
+            for (const rec of tag.records) {
+              if (rec.payload && rec.payload.length > 0) {
+                const prefixCode = rec.payload[0];
+                const prefixes: Record<number, string> = {
+                  0x00: "",
+                  0x01: "http://www.",
+                  0x02: "https://www.",
+                  0x03: "http://",
+                  0x04: "https://",
+                };
+                const prefix = prefixes[prefixCode] ?? "";
+                const body = new TextDecoder().decode(new Uint8Array(rec.payload.slice(1)));
+                payload = prefix + body;
+                if (payload) break;
+              }
+            }
+          }
+
+          return {
+            success: true,
+            payload,
+            tagUid,
+          };
+        }
+      } catch (mobileErr: any) {
+        console.warn("[NFC Service] Native mobile scan error:", mobileErr);
+        const errMsg = typeof mobileErr === "string" ? mobileErr : mobileErr?.message || "NFC scan failed or cancelled";
+        return {
+          success: false,
+          payload: null,
+          tagUid: null,
+          error: errMsg,
+        };
+      }
+
+      // 2. Desktop PC/SC Rust command fallback
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const res: any = await invoke("nfc_read_tag");
@@ -86,12 +159,12 @@ export const nfcService = {
           };
         }
       } catch (err) {
-        console.warn("[NFC Service] Native read invoke failed, using dev fallback:", err);
+        console.warn("[NFC Service] Native desktop read invoke failed:", err);
       }
     }
 
-    // 2. Dev Mock Fallback Mode
-    await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate hardware scan delay
+    // 3. Dev Mock Fallback Mode
+    await new Promise((resolve) => setTimeout(resolve, 800));
     return {
       success: true,
       payload: mockCurrentTagPayload,
@@ -103,6 +176,20 @@ export const nfcService = {
    * Safety Check: Reads existing tag payload and resolves it via backend API to check for overwrites.
    */
   async checkTagBeforeWrite(): Promise<NfcWriteCheckResult> {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { isAvailable } = await import("@tauri-apps/plugin-nfc");
+        if (await isAvailable()) {
+          // On mobile, native write performs tag touch scan and program in a single step
+          return {
+            canWriteDirectly: true,
+            existingPayload: null,
+            resolvedEntity: null,
+          };
+        }
+      } catch (_) {}
+    }
+
     const scanResult = await this.readTag();
     if (!scanResult.success) {
       return {
@@ -115,7 +202,6 @@ export const nfcService = {
 
     const payload = scanResult.payload;
     if (!payload || !payload.trim()) {
-      // Tag is blank -> can write directly without overwrite warning!
       return {
         canWriteDirectly: true,
         existingPayload: null,
@@ -123,7 +209,6 @@ export const nfcService = {
       };
     }
 
-    // Attempt to resolve existing payload via backend lightning resolver
     try {
       const resolved: ResolvedEntity = await apiFetch(`/resolve/${encodeURIComponent(payload)}`);
       return {
@@ -132,9 +217,8 @@ export const nfcService = {
         resolvedEntity: resolved,
       };
     } catch (err) {
-      // Payload exists but is not an active DB entity (e.g. unknown tag or deleted location)
       return {
-        canWriteDirectly: true, // Allow overwrite since entity no longer exists
+        canWriteDirectly: true,
         existingPayload: payload,
         resolvedEntity: null,
       };
@@ -154,34 +238,75 @@ export const nfcService = {
       };
     }
 
-    // 1. Try Tauri IPC invoke if running in Tauri runtime
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const res: any = await invoke("nfc_write_tag", { uri });
-        if (res) {
-          if (res.success) {
+    this.setIsWriting(true);
+
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        // 1. Try mobile native NFC plugin write first
+        try {
+          const { isAvailable, scan, write, uriRecord } = await import("@tauri-apps/plugin-nfc");
+          if (await isAvailable()) {
+            console.log("[NFC-DEBUG] [nfcService writeTag] Initiating scan-then-write sequence for URI:", uri);
+            const rec = uriRecord(uri);
+
+            // Step 1: Scan and hold tag connection alive
+            console.log("[NFC-DEBUG] [nfcService writeTag] Step 1: Scanning tag with keepSessionAlive: true...");
+            const scannedTag = await scan({ type: "tag" }, { keepSessionAlive: true });
+            console.log("[NFC-DEBUG] [nfcService writeTag] Step 1 complete! Connected tag:", scannedTag);
+
+            // Step 2: Write NDEF record to connected tag
+            console.log("[NFC-DEBUG] [nfcService writeTag] Step 2: Writing NDEF record to connected tag...");
+            await write([rec]);
+            console.log("[NFC-DEBUG] [nfcService writeTag] Step 2 complete! Native NDEF write succeeded!");
+
             mockCurrentTagPayload = uri;
+            return {
+              success: true,
+              payload: uri,
+              tagUid: null,
+            };
           }
+        } catch (mobileErr: any) {
+          console.warn("[NFC-DEBUG] [nfcService writeTag] Native mobile write error:", mobileErr);
+          const errMsg = typeof mobileErr === "string" ? mobileErr : mobileErr?.message || "NFC write failed or cancelled";
           return {
-            success: res.success ?? false,
-            payload: res.payload || null,
-            tagUid: res.tag_uid || null,
-            error: res.error || undefined,
+            success: false,
+            payload: null,
+            tagUid: null,
+            error: errMsg,
           };
         }
-      } catch (err) {
-        console.warn("[NFC Service] Native write invoke failed, using dev fallback:", err);
-      }
-    }
 
-    // 2. Dev Mock Fallback Mode
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    mockCurrentTagPayload = uri;
-    return {
-      success: true,
-      payload: uri,
-      tagUid: "MOCK-NFC-UID-778899",
-    };
+        // 2. Desktop PC/SC Rust command fallback
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const res: any = await invoke("nfc_write_tag", { uri });
+          if (res) {
+            if (res.success) {
+              mockCurrentTagPayload = uri;
+            }
+            return {
+              success: res.success ?? false,
+              payload: res.payload || null,
+              tagUid: res.tag_uid || null,
+              error: res.error || undefined,
+            };
+          }
+        } catch (err) {
+          console.warn("[NFC Service] Native desktop write invoke failed:", err);
+        }
+      }
+
+      // 3. Dev Mock Fallback Mode
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      mockCurrentTagPayload = uri;
+      return {
+        success: true,
+        payload: uri,
+        tagUid: "MOCK-NFC-UID-778899",
+      };
+    } finally {
+      this.setIsWriting(false);
+    }
   },
 };

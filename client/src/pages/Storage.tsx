@@ -78,7 +78,9 @@ export default function Storage() {
     if (!silent) setLoading(true);
     try {
       const locRes = await apiFetch("/locations?flat=true");
-      setLocations(locRes);
+      if (JSON.stringify(locations()) !== JSON.stringify(locRes)) {
+        setLocations(locRes);
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to load data.");
     } finally {
@@ -169,6 +171,10 @@ export default function Storage() {
             updateUrlHistory(chain);
             setShowCreateForm(false);
             setInlinePartId(null);
+            const targetLoc = allLocs.find((l) => l.id === parsed.id);
+            toast.success(`Scanned location: ${targetLoc?.name || parsed.id}`, { id: "nfc-scanned-location", icon: "🏷️" });
+          } else {
+            toast.error(`Location tag scanned, but location ID '${parsed.id}' was not found in storage.`, { id: "nfc-scanned-missing" });
           }
         }
       }
