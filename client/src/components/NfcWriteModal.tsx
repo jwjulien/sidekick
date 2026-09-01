@@ -35,6 +35,10 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
       // Check connected PC/SC USB hardware reader
       nfcService.getReaderStatus().then((status) => {
         setHardwareStatus(status);
+        // On Mobile Android Adapter, automatically start write/scan listener upon modal open!
+        if (status.readerName === "Android NFC Adapter") {
+          handleStartWriteProcess();
+        }
       });
     }
   });
@@ -244,7 +248,7 @@ export default function NfcWriteModal(props: NfcWriteModalProps) {
                 <RefreshCw class="w-12 h-12 text-accentCyan animate-spin mx-auto" />
               </div>
               <p class="text-sm font-medium text-white">Writing NDEF Record...</p>
-              <p class="text-xs text-gray-400 mt-1">Hold back of phone near physical tag until complete.</p>
+              <p class="text-xs text-gray-400 mt-1">Hold back of phone near tag (if already touching, lift & re-touch).</p>
             </Show>
 
             {/* Step: Success */}
