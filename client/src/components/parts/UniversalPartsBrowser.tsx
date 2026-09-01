@@ -14,6 +14,7 @@ import {
 } from "lucide-solid";
 import { apiFetch } from "../../hooks/useAuth";
 import { useViewState } from "../../context/ViewStateContext";
+import MultiLocationStockController from "./MultiLocationStockController";
 
 export interface UniversalPartsBrowserProps {
   parts?: any[]; // Input array of parts (if passed, operates in client-side mode)
@@ -460,13 +461,17 @@ export default function UniversalPartsBrowser(props: UniversalPartsBrowserProps)
                           {part.category?.title || part.category?.name || "Uncategorized"}
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-400">{part.package || "N/A"}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div class="flex items-center gap-2">
-                            <span class={`font-bold ${isLowStock ? "text-red-400" : "text-green-400"}`}>
-                              {qty}
-                            </span>
+                            <MultiLocationStockController
+                              partId={part.id}
+                              totalQty={qty}
+                              locations={part.locations || part.storage_records}
+                              compact={true}
+                              onChanged={() => fetchRemoteParts()}
+                            />
                             <Show when={isLowStock}>
-                              <AlertTriangle size={14} class="text-red-400" />
+                              <AlertTriangle size={14} class="text-red-400 shrink-0" title="Low stock warning" />
                             </Show>
                           </div>
                         </td>

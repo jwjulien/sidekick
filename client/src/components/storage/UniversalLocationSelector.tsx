@@ -187,7 +187,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   const locationsByParent = createMemo(() => {
     const map = new Map<string | null, any[]>();
     for (const loc of allLocations()) {
-      const pid = loc.parent_id || null;
+      const pid = loc.parent_id !== undefined && loc.parent_id !== null ? String(loc.parent_id) : null;
       if (!map.has(pid)) {
         map.set(pid, []);
       }
@@ -212,7 +212,7 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
     // Subsequent columns driven by valid millerPath()
     const validPath = millerPath().filter((id) => allLocations().some((l) => String(l.id) === String(id)));
     for (let i = 0; i < validPath.length; i++) {
-      const currentParentId = validPath[i];
+      const currentParentId = String(validPath[i]);
       const children = locationsByParent().get(currentParentId) || [];
       cols.push({ parentId: currentParentId, items: children });
     }
@@ -238,17 +238,19 @@ export default function UniversalLocationSelector(props: UniversalLocationSelect
   });
 
   const handleSelectNode = (node: any, columnIndex: number) => {
-    setSelectedId(node.id);
+    const nodeIdStr = String(node.id);
+    setSelectedId(nodeIdStr);
     props.onSelectLocation(node);
 
     // Update Miller path up to columnIndex
-    const newPath = millerPath().slice(0, columnIndex);
+    const newPath = millerPath().map(String).slice(0, columnIndex);
     
     // Check if node has children or dimensions (1D/2D) to expand
-    const hasChildren = (locationsByParent().get(node.id) || []).length > 0;
+    const children = locationsByParent().get(nodeIdStr) || [];
+    const hasChildren = children.length > 0;
     const hasDimensions = Array.isArray(node.dimensions) && node.dimensions.length > 0;
     if (hasChildren || hasDimensions) {
-      newPath.push(node.id);
+      newPath.push(nodeIdStr);
     }
     setMillerPath(newPath);
   };

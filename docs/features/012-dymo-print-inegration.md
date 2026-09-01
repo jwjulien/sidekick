@@ -1,6 +1,6 @@
 ---
 title: Dymo ESP32 Print Integration
-status: Completed
+status: Complete
 target: 
   - Windows
   - Android

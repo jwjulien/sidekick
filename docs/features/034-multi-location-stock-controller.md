@@ -1,6 +1,6 @@
 ---
 title: Multi-Location Stock Controller Component
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -19,7 +19,7 @@ Parts in Sidekick often reside across multiple physical storage bins or shelf lo
 This feature introduces the **`MultiLocationStockController`**—an adaptive UI primitive that inspects a part's total inventory distribution. If a part exists in a single location, it renders immediate `+` / `-` stock adjustment controls. If the part exists across multiple locations, it displays the aggregated stock count and opens a fast popover card on click/tap, allowing the user to view all storage locations and rapidly adjust inventory at any specific bin with minimal clicks and zero page navigation.
 
 ## 2. User Experience & UI
-* **Trigger:** Renders in tabular lists, Part Detail headers, search results, and custom Part Lists whenever part stock needs to be inspected or adjusted inline.
+* **Trigger:** Renders in tabular lists, search results, and custom Part Lists whenever part stock needs to be inspected or adjusted inline.
 * **Single Location Mode (1 storage node):**
   * Displays the quantity for that location with adjacent `[-]` and `[+]` buttons.
   * Tapping `+` or `-` updates the count inline, using debounced backend dispatch to prevent spamming the API.
@@ -67,8 +67,9 @@ This feature introduces the **`MultiLocationStockController`**—an adaptive UI 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Create `MultiLocationStockController.tsx` component in `client/src/components/parts/`.
-- [ ] Implement adaptive rendering logic (1 location vs multiple locations vs 0 unassigned locations).
-- [ ] Build SolidJS floating popover container with outdoor click dismiss and focus management.
-- [ ] Wire per-location `StockController` instances inside the popover with 500ms debouncing.
-- [ ] Integrate `MultiLocationStockController` into Part Lists (`035`), Parts Catalog table (`030`), and Part Details view.
+- [x] Create `MultiLocationStockController.tsx` component in `client/src/components/parts/`.
+- [x] Implement adaptive rendering logic (1 location vs multiple locations vs 0 unassigned locations).
+- [x] Build SolidJS floating popover container with outdoor click dismiss and focus management.
+- [x] Wire per-location `StockController` instances inside the popover with 500ms debouncing.
+- [x] Integrate `MultiLocationStockController` into Part Lists (`035`) and Parts Catalog table (`030`).
+
