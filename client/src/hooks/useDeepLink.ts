@@ -2,16 +2,15 @@ import { onMount, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import toast from "solid-toast";
 import { parseDeepLink, type ParsedDeepLink } from "../utils/deepLink";
-
 import { nfcService } from "../services/nfcService";
 
 export function useDeepLink() {
   let navigate: ReturnType<typeof useNavigate> | null = null;
   try {
     navigate = useNavigate();
-    console.log("[NFC-DEBUG] [useDeepLink] useNavigate initialized successfully.");
+    console.info("[DeepLink Engine] Router navigate hook initialized successfully.");
   } catch (err) {
-    console.warn("[NFC-DEBUG] [useDeepLink] useNavigate initialization warning:", err);
+    console.warn("[DeepLink Engine] Router navigate hook initialization warning:", err);
   }
 
   onMount(() => {
@@ -25,76 +24,79 @@ export function useDeepLink() {
     const routeToDeepLink = (parsed: ParsedDeepLink, source: string) => {
       const now = Date.now();
       if (parsed.rawUrl === lastHandledUrl && now - lastHandledTime < 1500) {
-        console.log(`[NFC-DEBUG] [${source}] Suppressing duplicate scan within 1.5s:`, parsed.rawUrl);
+        console.info(`[DeepLink Engine] [${source}] Suppressing duplicate scan within 1.5s: "${parsed.rawUrl}"`);
         return;
       }
       lastHandledUrl = parsed.rawUrl;
       lastHandledTime = now;
 
-      console.log(`[NFC-DEBUG] [${source}] Dispatching sidekick:nfc-scanned event:`, parsed);
+      console.info(`[DeepLink Engine] [${source}] Parsed deep link payload: action="${parsed.action}", targetRoute="${parsed.targetRoute}", id="${parsed.id || ""}"`, parsed);
+
       const evt = new CustomEvent("sidekick:nfc-scanned", { detail: parsed, cancelable: true });
       const handled = !window.dispatchEvent(evt);
-      console.log(`[NFC-DEBUG] [${source}] Event handled status:`, handled, `navigate function present:`, !!navigate);
+      console.info(`[DeepLink Engine] [${source}] Custom Event "sidekick:nfc-scanned" dispatch result: handledInModal=${handled}`);
+
       if (!handled) {
         toast(`${source}: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
         if (navigate) {
-          console.log(`[NFC-DEBUG] [${source}] Calling SolidJS navigate("${parsed.targetRoute}")`);
+          console.info(`[DeepLink Engine] [${source}] Navigating to target route: "${parsed.targetRoute}"`);
           navigate(parsed.targetRoute);
         } else {
-          console.warn(`[NFC-DEBUG] [${source}] navigate is null! Falling back to window.location.href = "${parsed.targetRoute}"`);
+          console.warn(`[DeepLink Engine] [${source}] Router navigate function unavailable. Window fallback redirect to "${parsed.targetRoute}"`);
           window.location.href = parsed.targetRoute;
         }
       }
     };
 
     const setupListeners = async () => {
-      if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
-        console.log("[NFC-DEBUG] Not running inside Tauri window, skipping native listeners.");
+      const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      if (!isTauri) {
+        console.info("[DeepLink Engine] Running in Web environment (non-Tauri). Skipping native OS scheme and NFC listeners.");
         return;
       }
-      console.log("[NFC-DEBUG] [setupListeners] Initializing Tauri deep link and NFC listeners...");
+      console.info("[DeepLink Engine] Setting up native Tauri OS deep link scheme and NFC listeners...");
 
       // 1. Deep Link Plugin Listener (OS URIs like fuse://...)
       try {
         const { onOpenUrl, getCurrent } = await import("@tauri-apps/plugin-deep-link");
 
         const currentUrls = await getCurrent();
-        console.log("[NFC-DEBUG] [DeepLink getCurrent] Initial URLs:", currentUrls);
+        console.info("[DeepLink Engine] Initial deep link URLs on startup:", currentUrls);
         if (currentUrls && currentUrls.length > 0) {
           for (const rawUrl of currentUrls) {
             const parsed = parseDeepLink(rawUrl);
-            console.log("[NFC-DEBUG] [DeepLink getCurrent] Parsed initial URL:", rawUrl, "->", parsed);
+            console.info("[DeepLink Engine] Processing initial startup URL:", rawUrl, "->", parsed);
             if (parsed) {
-              routeToDeepLink(parsed, "Deep link");
+              routeToDeepLink(parsed, "OS Deep Link");
               break;
             }
           }
         }
 
         unlistenDeepLink = await onOpenUrl((urls: string[]) => {
-          console.log("[NFC-DEBUG] [DeepLink onOpenUrl] Received URLs:", urls);
+          console.info("[DeepLink Engine] Received runtime OS deep link URLs:", urls);
           for (const rawUrl of urls) {
             const parsed = parseDeepLink(rawUrl);
-            console.log("[NFC-DEBUG] [DeepLink onOpenUrl] Parsed URL:", rawUrl, "->", parsed);
+            console.info("[DeepLink Engine] Processing runtime OS deep link URL:", rawUrl, "->", parsed);
             if (parsed) {
-              routeToDeepLink(parsed, "Deep link");
+              routeToDeepLink(parsed, "OS Deep Link");
               break;
             }
           }
         });
-        console.log("[NFC-DEBUG] [DeepLink] Listener registered.");
+        console.info("[DeepLink Engine] OS Deep Link plugin listener registered.");
       } catch (err) {
-        console.warn("[NFC-DEBUG] [DeepLink] Plugin setup warning:", err);
+        console.warn("[DeepLink Engine] OS Deep Link plugin setup warning:", err);
       }
 
       // 2. Mobile Native NFC Reader Scan Loop (@tauri-apps/plugin-nfc)
       try {
         const { isAvailable, scan } = await import("@tauri-apps/plugin-nfc");
         const available = await isAvailable();
-        console.log("[NFC-DEBUG] [Mobile NFC] isAvailable:", available);
+        console.info("[DeepLink Engine] Mobile Native NFC plugin availability:", available);
         if (available) {
           (async () => {
-            console.log("[NFC-DEBUG] [Mobile NFC] Starting continuous scan loop...");
+            console.info("[DeepLink Engine] Starting Mobile NFC continuous scan loop...");
             while (isMounted) {
               if (nfcService.isWriting()) {
                 await new Promise((r) => setTimeout(r, 500));
@@ -102,10 +104,9 @@ export function useDeepLink() {
               }
               try {
                 const tag = await scan({ type: "tag" });
-                console.log("[NFC-DEBUG] [Mobile NFC scan()] Tag scanned:", tag);
+                console.info("[DeepLink Engine] Mobile NFC tag scanned:", tag);
                 if (tag && tag.records) {
                   for (const rec of tag.records) {
-                    console.log("[NFC-DEBUG] [Mobile NFC scan()] Tag record:", rec);
                     if (rec.payload && rec.payload.length > 0) {
                       const prefixCode = rec.payload[0];
                       const prefixes: Record<number, string> = {
@@ -118,12 +119,11 @@ export function useDeepLink() {
                       const prefix = prefixes[prefixCode] ?? "";
                       const body = new TextDecoder().decode(new Uint8Array(rec.payload.slice(1)));
                       const rawUrl = prefix + body;
-                      console.log("[NFC-DEBUG] [Mobile NFC scan()] Decoded payload:", { prefixCode, prefix, body, rawUrl });
+                      console.info("[DeepLink Engine] Decoded Mobile NFC payload:", { prefixCode, prefix, body, rawUrl });
                       if (rawUrl.startsWith("fuse://")) {
                         const parsed = parseDeepLink(rawUrl);
-                        console.log("[NFC-DEBUG] [Mobile NFC scan()] Parsed fuse URL:", parsed);
                         if (parsed) {
-                          routeToDeepLink(parsed, "NFC Tag");
+                          routeToDeepLink(parsed, "Mobile NFC Tag");
                           break;
                         }
                       }
@@ -132,7 +132,7 @@ export function useDeepLink() {
                 }
               } catch (scanErr: any) {
                 if (scanErr) {
-                  console.log("[NFC-DEBUG] [Mobile NFC scan()] Scan result/error:", scanErr);
+                  console.info("[DeepLink Engine] Mobile NFC scan iteration event:", scanErr?.message || scanErr);
                 }
                 await new Promise((r) => setTimeout(r, 800));
               }
@@ -140,7 +140,7 @@ export function useDeepLink() {
           })();
         }
       } catch (err) {
-        console.warn("[NFC-DEBUG] [Mobile NFC] Scanner loop setup warning:", err);
+        console.warn("[DeepLink Engine] Mobile NFC scanner loop setup warning:", err);
       }
 
       // 3. PC/SC Desktop NFC Hardware Scanner Listener ("nfc://tag-scanned")
@@ -149,18 +149,19 @@ export function useDeepLink() {
         unlistenNfcEvent = await listen<{ payload?: string | null; tag_uid?: string | null }>(
           "nfc://tag-scanned",
           (event) => {
-            console.log("[NFC-DEBUG] [Desktop NFC Event]:", event);
+            console.info("[DeepLink Engine] Desktop PC/SC NFC hardware event received:", event);
             const rawPayload = event.payload?.payload;
             if (rawPayload && rawPayload.startsWith("fuse://")) {
               const parsed = parseDeepLink(rawPayload);
               if (parsed) {
-                routeToDeepLink(parsed, "NFC Reader");
+                routeToDeepLink(parsed, "Desktop NFC Reader");
               }
             }
           }
         );
+        console.info("[DeepLink Engine] Desktop PC/SC NFC event listener registered.");
       } catch (err) {
-        console.warn("[NFC-DEBUG] [Desktop NFC Event] Listener setup warning:", err);
+        console.warn("[DeepLink Engine] Desktop NFC event listener setup warning:", err);
       }
     };
 
@@ -170,6 +171,7 @@ export function useDeepLink() {
       isMounted = false;
       if (unlistenDeepLink) unlistenDeepLink();
       if (unlistenNfcEvent) unlistenNfcEvent();
+      console.info("[DeepLink Engine] Cleanup completed. Event listeners unhooked.");
     });
   });
 }

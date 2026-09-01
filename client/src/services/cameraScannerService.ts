@@ -37,11 +37,15 @@ export const cameraScannerService = {
    * Checks runtime camera permissions for mobile / browser environment.
    */
   async checkPermissions(): Promise<CameraPermissionState> {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    console.info("[Camera Scanner] Checking runtime camera permissions...");
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+    if (isTauri) {
       try {
         const { checkPermissions } = await import("@tauri-apps/plugin-barcode-scanner");
         const res: any = await checkPermissions();
         const status = typeof res === "string" ? res : (res?.camera || "prompt");
+        console.info(`[Camera Scanner] Tauri camera permission status: "${status}"`);
         return {
           granted: status === "granted",
           canAskAgain: status !== "denied",
@@ -55,6 +59,7 @@ export const cameraScannerService = {
     try {
       if (navigator.permissions && navigator.permissions.query) {
         const res = await navigator.permissions.query({ name: "camera" as any });
+        console.info(`[Camera Scanner] Browser navigator.permissions status: "${res.state}"`);
         return {
           granted: res.state === "granted",
           canAskAgain: res.state !== "denied",
@@ -69,11 +74,15 @@ export const cameraScannerService = {
    * Requests runtime camera permission from the operating system.
    */
   async requestPermissions(): Promise<CameraPermissionState> {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    console.info("[Camera Scanner] Requesting camera permission from OS...");
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+    if (isTauri) {
       try {
         const { requestPermissions } = await import("@tauri-apps/plugin-barcode-scanner");
         const res: any = await requestPermissions();
         const status = typeof res === "string" ? res : (res?.camera || "denied");
+        console.info(`[Camera Scanner] Tauri camera permission request result: "${status}"`);
         return {
           granted: status === "granted",
           canAskAgain: status !== "denied",
@@ -86,8 +95,10 @@ export const cameraScannerService = {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
       stream.getTracks().forEach((track) => track.stop());
+      console.info("[Camera Scanner] Browser getUserMedia permission granted.");
       return { granted: true, canAskAgain: true };
-    } catch (_) {
+    } catch (err: any) {
+      console.warn("[Camera Scanner] Browser getUserMedia permission denied or failed:", err?.message || err);
       return { granted: false, canAskAgain: false };
     }
   },
@@ -96,25 +107,30 @@ export const cameraScannerService = {
    * Launches native Tauri Android barcode scanner plugin.
    */
   async startNativeScan(onResult: ScanResultCallback): Promise<boolean> {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (isTauri) {
       try {
+        console.info("[Camera Scanner] Starting native Tauri barcode scanner session (DataMatrix, Code128, QRCode)...");
         const { scan, Format } = await import("@tauri-apps/plugin-barcode-scanner");
         isScanning = true;
 
         const res = await scan({
-          formats: [Format.DataMatrix, Format.Code128, Format.QrCode],
+          formats: [Format.DataMatrix, Format.Code128, Format.QRCode],
           windowed: true,
         });
 
         isScanning = false;
         if (res && res.content) {
+          console.info(`[Camera Scanner] Native scan result received: "${res.content}" (format: ${res.format || "unknown"})`);
           playSuccessBeep();
           onResult(res.content);
           return true;
+        } else {
+          console.info("[Camera Scanner] Native scan completed with empty result or user cancelled.");
         }
       } catch (err: any) {
         isScanning = false;
-        console.warn("[Camera Scanner] Native scan failed or cancelled:", err);
+        console.warn("[Camera Scanner] Native barcode scan error/cancellation:", err?.message || err);
       }
     }
     return false;
@@ -127,6 +143,7 @@ export const cameraScannerService = {
     videoElement: HTMLVideoElement,
     onResult: ScanResultCallback
   ): Promise<boolean> {
+    console.info("[Camera Scanner] Initializing HTML5 ZXing camera scanner...");
     try {
       await this.stopScan(videoElement);
       isScanning = true;
@@ -146,6 +163,7 @@ export const cameraScannerService = {
 
       // Attempt rear environment camera first
       try {
+        console.info("[Camera Scanner] Attempting rear environment camera facingMode...");
         await reader.decodeFromConstraints(
           { video: { facingMode: { ideal: "environment" } } },
           videoElement,
@@ -153,6 +171,7 @@ export const cameraScannerService = {
             if (result && isScanning) {
               const text = result.getText();
               if (text) {
+                console.info(`[Camera Scanner] HTML5 camera scan decoded barcode: "${text}" (format: ${result.getBarcodeFormat()})`);
                 playSuccessBeep();
                 isScanning = false;
                 this.stopScan(videoElement);
@@ -164,16 +183,19 @@ export const cameraScannerService = {
         if (videoElement.srcObject) {
           activeStream = videoElement.srcObject as MediaStream;
         }
+        console.info("[Camera Scanner] HTML5 ZXing camera stream active.");
         return true;
-      } catch (constraintErr) {
+      } catch (constraintErr: any) {
+        console.warn("[Camera Scanner] Rear camera constraint failed, falling back to default video device:", constraintErr?.message || constraintErr);
         // Fallback to default device camera if environment constraint fails
         await reader.decodeFromVideoDevice(
-          undefined,
+          null,
           videoElement,
           (result, err) => {
             if (result && isScanning) {
               const text = result.getText();
               if (text) {
+                console.info(`[Camera Scanner] HTML5 fallback camera scan decoded barcode: "${text}"`);
                 playSuccessBeep();
                 isScanning = false;
                 this.stopScan(videoElement);
@@ -185,11 +207,12 @@ export const cameraScannerService = {
         if (videoElement.srcObject) {
           activeStream = videoElement.srcObject as MediaStream;
         }
+        console.info("[Camera Scanner] HTML5 ZXing fallback camera stream active.");
         return true;
       }
     } catch (err: any) {
       isScanning = false;
-      console.error("[Camera Scanner] Camera initialization error:", err);
+      console.error("[Camera Scanner] HTML5 camera initialization error:", err?.message || err);
       return false;
     }
   },
@@ -198,6 +221,7 @@ export const cameraScannerService = {
    * Toggles flashlight / torch if supported by active hardware stream.
    */
   async toggleTorch(videoElement?: HTMLVideoElement | null): Promise<boolean> {
+    console.info("[Camera Scanner] Toggling hardware torch/flashlight...");
     // 1. Try active HTML5 video track first
     const stream = activeStream || (videoElement?.srcObject as MediaStream | null);
     if (stream && stream.getVideoTracks) {
@@ -210,9 +234,10 @@ export const cameraScannerService = {
           await track.applyConstraints({
             advanced: [{ torch: target } as any],
           });
+          console.info(`[Camera Scanner] HTML5 video track torch set to: ${target}`);
           return target;
-        } catch (e) {
-          console.warn("[Camera Scanner] HTML5 torch constraint warning:", e);
+        } catch (e: any) {
+          console.warn("[Camera Scanner] HTML5 torch constraint error:", e?.message || e);
         }
       }
     }
@@ -222,8 +247,11 @@ export const cameraScannerService = {
       try {
         const { toggleTorch } = await import("@tauri-apps/plugin-barcode-scanner");
         await toggleTorch();
+        console.info("[Camera Scanner] Tauri native toggleTorch invoked.");
         return true;
-      } catch (_) { }
+      } catch (err: any) {
+        console.warn("[Camera Scanner] Tauri native toggleTorch warning:", err?.message || err);
+      }
     }
 
     return false;
@@ -233,6 +261,8 @@ export const cameraScannerService = {
    * Cancels active camera scan session and releases hardware camera lock.
    */
   async stopScan(videoElement?: HTMLVideoElement | null) {
+    if (!isScanning && !activeBrowserReader && !activeStream) return;
+    console.info("[Camera Scanner] Stopping camera scan session and releasing media stream tracks...");
     isScanning = false;
 
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
@@ -274,6 +304,7 @@ export const cameraScannerService = {
       });
       activeStream = null;
     }
+    console.info("[Camera Scanner] Camera hardware lock released.");
   },
 
   /**
@@ -281,23 +312,32 @@ export const cameraScannerService = {
    */
   async handleScanPayload(payload: string, navigate: (route: string) => void) {
     if (!payload) return;
+    console.info(`[Camera Scanner] Processing barcode payload: "${payload}"...`);
 
     // 1. Dispatch custom event for in-page views (e.g. Storage.tsx)
     const parsed = parseDeepLink(payload);
     if (parsed) {
+      console.info(`[Camera Scanner] Scanned payload parsed as deep link:`, parsed);
       const evt = new CustomEvent("sidekick:nfc-scanned", { detail: parsed, cancelable: true });
       const handled = !window.dispatchEvent(evt);
-      if (handled) return;
+      if (handled) {
+        console.info("[Camera Scanner] Deep link payload handled by active page event listener.");
+        return;
+      }
     }
 
     // 2. Fallback: Query FastAPI entity resolver
     try {
+      console.info(`[Camera Scanner] Resolving barcode payload via backend API (/resolve/${encodeURIComponent(payload)})...`);
       const entity = await apiFetch(`/resolve/${encodeURIComponent(payload)}`);
       if (entity && entity.target_route) {
+        console.info(`[Camera Scanner] Backend resolved entity to route: "${entity.target_route}"`, entity);
         navigate(entity.target_route);
+      } else {
+        console.warn("[Camera Scanner] Backend entity resolution returned no target route:", entity);
       }
-    } catch (err) {
-      console.error("[Camera Scanner] Failed to resolve payload:", payload, err);
+    } catch (err: any) {
+      console.error(`[Camera Scanner] Failed to resolve barcode payload "${payload}":`, err?.message || err);
     }
   },
 };

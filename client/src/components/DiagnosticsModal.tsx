@@ -1,7 +1,7 @@
 import { createSignal, createMemo, Show, For } from "solid-js";
-import { diagnosticsService, type LogEntry } from "../services/diagnosticsService";
+import { diagnosticsService } from "../services/diagnosticsService";
 import toast from "solid-toast";
-import { Terminal, X, Trash2, Copy, Search, Bug, Filter } from "lucide-solid";
+import { Terminal, X, Trash2, Copy, Search, Bug } from "lucide-solid";
 
 interface DiagnosticsModalProps {
   isOpen: boolean;
@@ -9,7 +9,7 @@ interface DiagnosticsModalProps {
 }
 
 export function DiagnosticsModal(props: DiagnosticsModalProps) {
-  const [filter, setFilter] = createSignal<"all" | "nfc" | "error">("all");
+  const [filter, setFilter] = createSignal<"all" | "printer" | "scanner" | "deeplink" | "error">("all");
   const [searchQuery, setSearchQuery] = createSignal("");
   const [expandedLogId, setExpandedLogId] = createSignal<string | null>(null);
 
@@ -20,8 +20,24 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
     const currentFilter = filter();
     const query = searchQuery().toLowerCase().trim();
 
-    if (currentFilter === "nfc") {
-      result = result.filter((l) => l.message.includes("[NFC") || l.details?.includes("[NFC"));
+    if (currentFilter === "printer") {
+      result = result.filter((l) => l.message.includes("[Printer") || l.details?.includes("[Printer"));
+    } else if (currentFilter === "scanner") {
+      result = result.filter(
+        (l) =>
+          l.message.includes("[Camera") ||
+          l.message.includes("[USB") ||
+          l.details?.includes("[Camera") ||
+          l.details?.includes("[USB")
+      );
+    } else if (currentFilter === "deeplink") {
+      result = result.filter(
+        (l) =>
+          l.message.includes("[DeepLink") ||
+          l.message.includes("[NFC") ||
+          l.details?.includes("[DeepLink") ||
+          l.details?.includes("[NFC")
+      );
     } else if (currentFilter === "error") {
       result = result.filter((l) => l.level === "error" || l.level === "warn");
     }
@@ -66,7 +82,7 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
             <div class="flex items-center space-x-2">
               <button
                 onClick={handleCopyLogs}
-                class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-sans font-medium transition-colors flex items-center space-x-1"
+                class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-sans font-medium transition-colors flex items-center space-x-1 cursor-pointer"
                 title="Copy Logs"
               >
                 <Copy class="w-3.5 h-3.5" />
@@ -74,7 +90,7 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
               </button>
               <button
                 onClick={() => diagnosticsService.clearLogs()}
-                class="px-2.5 py-1.5 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-300 rounded-lg text-xs font-sans font-medium transition-colors flex items-center space-x-1"
+                class="px-2.5 py-1.5 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-300 rounded-lg text-xs font-sans font-medium transition-colors flex items-center space-x-1 cursor-pointer"
                 title="Clear Logs"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -82,7 +98,7 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
               </button>
               <button
                 onClick={props.onClose}
-                class="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors"
+                class="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 <X class="w-5 h-5" />
               </button>
@@ -102,26 +118,42 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
               />
             </div>
 
-            <div class="flex items-center space-x-1.5 bg-[#161928] p-1 rounded-lg border border-gray-800 text-[11px] font-sans">
+            <div class="flex flex-wrap items-center gap-1 bg-[#161928] p-1 rounded-lg border border-gray-800 text-[11px] font-sans">
               <button
                 onClick={() => setFilter("all")}
-                class={`px-2.5 py-1 rounded font-medium transition-colors ${
+                class={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                   filter() === "all" ? "bg-accentCyan/20 text-accentCyan font-bold" : "text-gray-400 hover:text-gray-200"
                 }`}
               >
                 All ({logs().length})
               </button>
               <button
-                onClick={() => setFilter("nfc")}
-                class={`px-2.5 py-1 rounded font-medium transition-colors ${
-                  filter() === "nfc" ? "bg-purple-500/20 text-purple-400 font-bold" : "text-gray-400 hover:text-gray-200"
+                onClick={() => setFilter("printer")}
+                class={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
+                  filter() === "printer" ? "bg-emerald-500/20 text-emerald-400 font-bold" : "text-gray-400 hover:text-gray-200"
                 }`}
               >
-                NFC-DEBUG
+                Printer
+              </button>
+              <button
+                onClick={() => setFilter("scanner")}
+                class={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
+                  filter() === "scanner" ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                Scanner
+              </button>
+              <button
+                onClick={() => setFilter("deeplink")}
+                class={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
+                  filter() === "deeplink" ? "bg-purple-500/20 text-purple-400 font-bold" : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                DeepLink / NFC
               </button>
               <button
                 onClick={() => setFilter("error")}
-                class={`px-2.5 py-1 rounded font-medium transition-colors ${
+                class={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                   filter() === "error" ? "bg-red-500/20 text-red-400 font-bold" : "text-gray-400 hover:text-gray-200"
                 }`}
               >
@@ -149,7 +181,11 @@ export function DiagnosticsModal(props: DiagnosticsModalProps) {
                       ? "bg-red-500/10 text-red-400 border-red-500/30"
                       : entry.level === "warn"
                       ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                      : entry.message.includes("[NFC")
+                      : entry.message.includes("[Printer")
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      : entry.message.includes("[Camera") || entry.message.includes("[USB")
+                      ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                      : entry.message.includes("[NFC") || entry.message.includes("[DeepLink")
                       ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
                       : "bg-blue-500/10 text-blue-400 border-blue-500/30";
 
