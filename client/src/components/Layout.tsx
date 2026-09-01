@@ -18,7 +18,8 @@ import {
   PackageCheck,
   History,
   ShoppingBag,
-  Camera
+  Camera,
+  ClipboardCheck
 } from "lucide-solid";
 import { user, logout, apiFetch } from "../hooks/useAuth";
 import { useDeepLink } from "../hooks/useDeepLink";
@@ -42,10 +43,11 @@ export default function Layout(props: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = createSignal(false);
   const [lowStockCount, setLowStockCount] = createSignal(0);
   const [homelessCount, setHomelessCount] = createSignal(0);
+  const [staleCount, setStaleCount] = createSignal(0);
   const [showCameraModal, setShowCameraModal] = createSignal(false);
   const [showDiagnostics, setShowDiagnostics] = createSignal(false);
 
-  // Poll for low stock alerts & homeless count periodically to show notifications
+  // Poll for low stock alerts, homeless count, and stale inventory count periodically
   const checkCounts = async () => {
     try {
       const items = await apiFetch("/parts?low_stock=true");
@@ -54,6 +56,10 @@ export default function Layout(props: LayoutProps) {
     try {
       const res = await apiFetch("/parts/homeless/count");
       setHomelessCount(res?.count || 0);
+    } catch (_) {}
+    try {
+      const res = await apiFetch("/locations/stale-count?days_stale=180");
+      setStaleCount(res?.stale_count || 0);
     } catch (_) {}
   };
 
@@ -75,6 +81,7 @@ export default function Layout(props: LayoutProps) {
     { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "Parts Catalog", path: "/parts", icon: Package, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Homeless Parts", path: "/inventory/homeless-parts", icon: PackageCheck, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
+    { name: "Cycle Count", path: "/cycle-count", icon: ClipboardCheck, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
     { name: "Audit Log", path: "/audit", icon: History, roles: ["admin", "designer", "stocker", "puller", "analyst", "viewer"] },
     { name: "PCB Projects", path: "/projects", icon: FolderGit2, roles: ["admin", "designer", "analyst"] },
     { name: "Suppliers", path: "/suppliers", icon: Building2, roles: ["admin", "designer", "stocker", "puller", "analyst"] },
@@ -180,6 +187,11 @@ export default function Layout(props: LayoutProps) {
                 <Show when={item.name === "Homeless Parts" && homelessCount() > 0}>
                   <span class="ml-auto bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
                     {homelessCount()}
+                  </span>
+                </Show>
+                <Show when={item.name === "Cycle Count" && staleCount() > 0}>
+                  <span class="ml-auto bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    {staleCount()}
                   </span>
                 </Show>
               </A>
@@ -291,6 +303,11 @@ export default function Layout(props: LayoutProps) {
                     <Show when={item.name === "Homeless Parts" && homelessCount() > 0}>
                       <span class="ml-auto bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
                         {homelessCount()}
+                      </span>
+                    </Show>
+                    <Show when={item.name === "Cycle Count" && staleCount() > 0}>
+                      <span class="ml-auto bg-accentCyan/10 border border-accentCyan/20 text-accentCyan text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {staleCount()}
                       </span>
                     </Show>
                   </A>

@@ -1,6 +1,6 @@
 ---
 title: Cycle Counting & Inventory Audit
-status: Draft
+status: Complete
 target: 
   - Web
   - Windows
@@ -42,9 +42,9 @@ This feature provides an automated, physically optimized workflow for verifying 
 ---
 
 ## 5. Implementation Tasks
-- [ ] Write SQLite Recursive CTE query in FastAPI to fetch and path-sort stale storage locations.
-- [ ] Build FastAPI `PUT` route for updating the count and timestamp.
-- [ ] Create SolidJS full-screen Audit Wizard component.
-- [ ] Build the mobile-friendly Quick Tap (`+/- 25`, `+/- 100`) incrementer UI.
-- [ ] Wire the scale integration, including the conditional redirect to the Calibration Wizard (`017`).
-- [ ] Wire frontend progression logic ("Confirm & Next").
+- [x] Write SQLite Recursive CTE query in FastAPI to fetch and path-sort stale storage locations.
+- [x] Build FastAPI `PUT` route for updating the count and timestamp.
+- [x] Create SolidJS full-screen Audit Wizard component.
+- [x] Build the mobile-friendly Quick Tap (`+/- 25`, `+/- 100`) incrementer UI.
+- [x] Wire the scale integration, including the conditional redirect to the Calibration Wizard (`017`).
+- [x] Wire frontend progression logic ("Confirm & Next").

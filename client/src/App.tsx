@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
+import CycleCount from "./pages/CycleCount";
 import PartLists from "./pages/PartLists";
 import Layout from "./components/Layout";
 import { Toaster } from "solid-toast";
@@ -185,6 +186,16 @@ export default function App() {
                         <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
                           <Layout>
                             <AuditLog />
+                          </Layout>
+                        </Show>
+                      )} 
+                    />
+                    <Route 
+                      path="/cycle-count" 
+                      component={() => (
+                        <Show when={isAuthenticated()} fallback={<Navigate href="/login" />}>
+                          <Layout>
+                            <CycleCount />
                           </Layout>
                         </Show>
                       )} 
