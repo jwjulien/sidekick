@@ -56,6 +56,6 @@ To prevent ambiguous structural states, Sidekick enforces a strict **Node Exclus
 - [x] Create SolidJS Miller Columns / hierarchy UI for managing the location hierarchy (`StorageColumns.tsx`, `UniversalLocationSelector.tsx`).
 - [x] Create SolidJS stock adjustment UI for the Part detail view.
 - [x] Wire frontend to backend API.
-- [ ] Add lifecycle timestamp columns (`first_added`, `last_stocked`, `last_used`) to the `Storage` model and database migrations.
-- [ ] Update location adjustment and assignment endpoints to stamp lifecycle timestamps.
+- [x] Add lifecycle timestamp columns (`first_added`, `last_stocked`, `last_used`) to the `Storage` model and database migrations.
+- [x] Update location adjustment and assignment endpoints to stamp lifecycle timestamps.
 - [ ] Enforce the Node Exclusivity Rule in location creation and update endpoints.

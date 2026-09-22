@@ -261,6 +261,9 @@ class StorageBase(BaseModel):
     quantity: int = 0
     description: Optional[str] = None
     last_counted: Optional[datetime] = None
+    first_added: Optional[datetime] = None
+    last_stocked: Optional[datetime] = None
+    last_used: Optional[datetime] = None
     pos_x: float = 0.0
     pos_y: float = 0.0
     pos_z: float = 0.0

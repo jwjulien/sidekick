@@ -64,5 +64,5 @@ To minimize the friction of physical inventory auditing, Sidekick utilizes a con
 - [x] Wire the `[✓ Confirm]` button to the `/touch` endpoint.
 - [x] Integrate global Scale Context to project counts based on live weight.
 - [x] Audit all existing UI views (Triage, Part Detail, Scanner Result) to replace static quantity text with this new component.
-- [ ] Update `PUT /api/storage/{id}/count` to conditionally stamp `last_stocked` (if delta > 0) or `last_used` (if delta < 0) alongside `last_counted`.
+- [x] Update `PUT /api/storage/{id}/count` to conditionally stamp `last_stocked` (if delta > 0) or `last_used` (if delta < 0) alongside `last_counted`.
 - [ ] Add lifecycle popover to `<StockController />` showing relative and formatted ISO timestamps for `first_added`, `last_counted`, `last_stocked`, and `last_used`.

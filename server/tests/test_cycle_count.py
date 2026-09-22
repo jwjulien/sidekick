@@ -62,11 +62,19 @@ def test_cycle_count_route_and_stale_count():
         idx_b = items.index(bin_b_item)
         assert idx_a < idx_b
 
-        # 5. Confirm count on Bin A via PUT /locations/{id}/count
+        # 5. Confirm count on Bin A via PUT /locations/{id}/count (Quantity increase: 100 -> 105)
         count_res = client.put(f"/locations/{bin_a_id}/count", json={"quantity": 105, "reason_code": "cycle_count_adjustment", "notes": "Audit count"}, headers=stocker_headers)
         assert count_res.status_code == 200
         assert count_res.json()["quantity"] == 105
         assert count_res.json()["last_counted"] is not None
+        assert count_res.json()["last_stocked"] is not None
+        assert count_res.json()["first_added"] is not None
+
+        # Confirm count on Bin A with quantity decrease (105 -> 95)
+        count_down_res = client.put(f"/locations/{bin_a_id}/count", json={"quantity": 95, "reason_code": "cycle_count_adjustment", "notes": "Audit count down"}, headers=stocker_headers)
+        assert count_down_res.status_code == 200
+        assert count_down_res.json()["quantity"] == 95
+        assert count_down_res.json()["last_used"] is not None
 
         # Confirm touch on Bin B via PUT /locations/{id}/touch
         touch_res = client.put(f"/locations/{bin_b_id}/touch", headers=admin_headers)

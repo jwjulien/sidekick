@@ -50,6 +50,11 @@ def create_location(
                 detail=f"Parent storage location with ID {payload.parent_id} does not exist."
             )
             
+    now = datetime.utcnow()
+    first_added = now if payload.part_id else None
+    last_stocked = now if (payload.part_id and payload.quantity > 0) else None
+    last_counted = None
+
     db_storage = models.Storage(
         name=payload.name,
         parent_id=payload.parent_id,
@@ -59,7 +64,10 @@ def create_location(
         label_scheme=payload.label_scheme,
         part_id=payload.part_id,
         quantity=payload.quantity,
-        description=payload.description
+        description=payload.description,
+        first_added=first_added,
+        last_stocked=last_stocked,
+        last_counted=last_counted
     )
     db.add(db_storage)
     db.commit()
@@ -531,7 +539,15 @@ def count_location(
     
     prev_qty = float(storage.quantity or 0)
     storage.quantity = payload.quantity
-    storage.last_counted = datetime.utcnow()
+    now = datetime.utcnow()
+    storage.last_counted = now
+    delta = payload.quantity - prev_qty
+    if delta > 0:
+        storage.last_stocked = now
+    elif delta < 0:
+        storage.last_used = now
+    if storage.part_id and storage.first_added is None:
+        storage.first_added = now
 
     if payload.set_last_tare or "last_tare_id" in payload.model_dump(exclude_unset=True):
         if payload.last_tare_id is not None:
@@ -645,6 +661,13 @@ def assign_part_location(
         db.refresh(new_sub_bin)
         target_storage = new_sub_bin
 
+    now = datetime.utcnow()
+    if target_storage.first_added is None:
+        target_storage.first_added = now
+    if (target_storage.quantity or 0) > 0:
+        target_storage.last_stocked = now
+        target_storage.last_counted = now
+
     db_tx = models.Transaction(
         part_id=part.id,
         user_id=current_user.id,
@@ -694,11 +717,16 @@ def bulk_assign_parts_location(
         if not part:
             continue
 
+        now = datetime.utcnow()
+        qty = payload.quantity or (part.threshold or 0)
         sub_bin = models.Storage(
             name=f"{part.value}",
             parent_id=location.id,
             part_id=part.id,
-            quantity=payload.quantity or (part.threshold or 0),
+            quantity=qty,
+            first_added=now,
+            last_stocked=now if qty > 0 else None,
+            last_counted=now if qty > 0 else None,
             description=f"Batch assigned to '{location.name}'"
         )
         db.add(sub_bin)

@@ -26,7 +26,8 @@ import app.models  # ensure models are imported
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url with the app's database URL if not already explicitly specified
-if not config.get_main_option("sqlalchemy.url"):
+current_url = config.get_main_option("sqlalchemy.url")
+if not current_url or "driver://" in current_url:
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # other values from the config, defined by the needs of env.py,

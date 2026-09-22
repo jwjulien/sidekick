@@ -4,6 +4,7 @@ from app.main import app
 
 client = TestClient(app)
 admin_headers = {"Authorization": "Bearer dev-admin"}
+stocker_headers = {"Authorization": "Bearer dev-stocker"}
 viewer_headers = {"Authorization": "Bearer dev-viewer"}
 
 def test_2d_storage_grid_direct_children():
@@ -163,5 +164,40 @@ def test_assign_part_to_occupied_location_splits_into_leaves():
     new_child = next(c for c in children if c["part_id"] == part2_id)
     assert new_child["name"] == "220uF Cap"
     assert new_child["quantity"] == 15
+
+
+def test_storage_lifecycle_timestamps():
+    # 1. Setup category & part
+    cat = client.post("/categories", json={"title": "Timestamp Test Cat", "designator": "TTC"}, headers=admin_headers).json()
+    part = client.post("/parts", json={"category_id": cat["id"], "value": "1k Resistor", "number": "RES-1K"}, headers=stocker_headers).json()
+
+    # 2. Create location with part and stock
+    loc_res = client.post("/locations", json={"name": "Lifecycle Bin", "part_id": part["id"], "quantity": 50}, headers=admin_headers)
+    assert loc_res.status_code == 201
+    loc_data = loc_res.json()
+    loc_id = loc_data["id"]
+
+    assert loc_data["first_added"] is not None
+    assert loc_data["last_stocked"] is not None
+    assert loc_data["last_used"] is None
+    assert loc_data["last_counted"] is None
+
+    # 3. Touch location: updates last_counted only
+    touch_res = client.put(f"/locations/{loc_id}/touch", headers=admin_headers)
+    assert touch_res.status_code == 200
+    touch_data = touch_res.json()
+    assert touch_data["last_counted"] is not None
+    assert touch_data["last_used"] is None
+
+    # 4. Count up (positive delta: 50 -> 75): updates last_stocked & last_counted
+    count_up = client.put(f"/locations/{loc_id}/count", json={"quantity": 75}, headers=stocker_headers).json()
+    assert count_up["quantity"] == 75
+    assert count_up["last_stocked"] is not None
+
+    # 5. Count down (negative delta: 75 -> 60): updates last_used & last_counted
+    count_down = client.put(f"/locations/{loc_id}/count", json={"quantity": 60}, headers=stocker_headers).json()
+    assert count_down["quantity"] == 60
+    assert count_down["last_used"] is not None
+
 
 
