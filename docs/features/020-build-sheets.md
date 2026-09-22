@@ -40,7 +40,7 @@ The sheet features deep-linking DataMatrix codes and supports a strict "Locked/U
     * `POST /api/sheets` - Create a new draft sheet.
     * `PUT /api/sheets/{id}/lock` - Finalizes the sheet, generating the permanent `fuse://` deep-link UUID payload for the DataMatrix.
     * `POST /api/sheets/{id}/assignments` - Saves the physical bin mappings for an unlocked sheet.
-* **Database Schema (SQLite / Peewee):** * Model: `BuildSheet`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `BuildSheet`
         * Columns: `id` (PK), `revision_id` (FK), `version` (INTEGER), `is_locked` (BOOLEAN), `datamatrix_uuid` (VARCHAR 36).
     * Model: `SheetAssignment`
         * Columns: `id` (PK), `sheet_id` (FK), `part_id` (FK), `bin_index` (INTEGER), `aggregated_designator` (VARCHAR 255), `quantity` (INTEGER).
@@ -52,7 +52,7 @@ The sheet features deep-linking DataMatrix codes and supports a strict "Locked/U
 ---
 
 ## 5. Implementation Tasks
-- [ ] Define `BuildSheet` and `SheetAssignment` Peewee models.
+- [ ] Define `BuildSheet` and `SheetAssignment` SQLAlchemy models.
 - [ ] Build FastAPI routes for sheet lifecycle.
 - [ ] Implement designator compression algorithm in frontend Javascript.
 - [ ] Create SolidJS drag-and-drop tray designer UI (Page 1).

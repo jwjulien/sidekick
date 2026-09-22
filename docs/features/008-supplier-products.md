@@ -32,7 +32,7 @@ This feature bridges the gap between internal inventory (`Parts`) and the outsid
     * `POST /api/products` - Creates a new part-to-supplier mapping (validates both `part_id` and `supplier_id` exist).
     * `PUT /api/products/{id}` - Updates the SKU or URL.
     * `DELETE /api/products/{id}` - Removes the sourcing link.
-* **Database Schema (SQLite / Peewee):** * Model: `Product`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Product`
     * Columns: `id` (PK), `created_on`, `modified_on`, `part_id` (FK to Parts), `supplier_id` (FK to Suppliers), `sku` (VARCHAR 100), `url` (VARCHAR 255).
 
 ## 4. Out of Scope
@@ -42,7 +42,7 @@ This feature bridges the gap between internal inventory (`Parts`) and the outsid
 ---
 
 ## 5. Implementation Tasks
-- [x] Define `Product` Peewee model with dual foreign keys (`part_id`, `supplier_id`).
+- [x] Define `Product` SQLAlchemy model with dual foreign keys (`part_id`, `supplier_id`).
 - [x] Build FastAPI CRUD routes.
 - [x] Create SolidJS UI for listing supplier sources on the Part detail page.
 - [x] Create SolidJS form for adding a new source, wiring up the Supplier dropdown.

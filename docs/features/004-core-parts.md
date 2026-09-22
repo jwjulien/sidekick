@@ -29,7 +29,7 @@ This feature represents the absolute center of the Sidekick architecture. It def
 * **Frontend (SolidJS / Tauri):** * A robust data grid/table component for the master list.
     * An advanced query builder UI that constructs a structured filter object to send via the API (e.g., `?attr_Voltage=50V` or a URL-encoded JSON query).
     * State management to handle a dynamic array of `{key: string, value: string}` objects for the creation form, serialized into JSON before submission.
-* **Backend (FastAPI):** * `GET /api/parts` - Returns a list of parts. **Crucially, it must parse dynamic query parameters and utilize SQLite's `json_extract()` function (via Peewee's `fn.json_extract` or playhouse extensions) to filter against the `attributes` column natively in the database.**
+* **Backend (FastAPI):** * `GET /api/parts` - Returns a list of parts. **Crucially, it must parse dynamic query parameters and utilize SQLite's `json_extract()` function (via SQLAlchemy's `func.json_extract`) to filter against the `attributes` column natively in the database.**
     * `GET /api/parts/{id}` - Returns specific details, deserializing the `attributes` BLOB back into JSON.
     * `POST /api/parts` - Creates a new part, serializing the incoming JSON attributes into bytes for the SQLite BLOB.
     * `PUT /api/parts/{id}` - Updates a part's details.

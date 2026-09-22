@@ -31,7 +31,7 @@ This feature allows users to attach visual references (photos, pinout diagrams, 
     * `GET /api/images/{id}/render` - Returns the actual binary BLOB using FastAPI's `Response(content=blob_data, media_type="image/jpeg")` so the browser can paint it directly.
     * `POST /api/parts/{part_id}/images` - Accepts `multipart/form-data`, extracting the binary and saving it to SQLite.
     * `DELETE /api/images/{id}` - Removes the image.
-* **Database Schema (SQLite / Peewee):** * Model: `Image`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Image`
     * Columns: `id` (PK), `created_on`, `modified_on`, `part_id` (FK to Parts), `label` (VARCHAR 40), `filename` (VARCHAR 30), `content` (BLOB).
 
 ## 4. Out of Scope

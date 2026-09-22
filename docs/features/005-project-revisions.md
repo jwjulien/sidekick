@@ -33,7 +33,7 @@ This feature introduces version control into Sidekick. A "Revision" represents a
     * `POST /api/revisions` - Creates a new revision (validates `project_id` exists).
     * `PUT /api/revisions/{id}` - Updates the version string or date.
     * `DELETE /api/revisions/{id}` - Removes a revision. *(Must handle cascade deletion of attached materials later).*
-* **Database Schema (SQLite / Peewee):** * Model: `Revision`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Revision`
     * Columns: `id` (PK), `created_on`, `modified_on`, `project_id` (FK to Projects), `version` (VARCHAR 32), `date` (DATE).
 
 ## 4. Out of Scope
@@ -43,7 +43,7 @@ This feature introduces version control into Sidekick. A "Revision" represents a
 ---
 
 ## 5. Implementation Tasks
-- [x] Define `Revision` Peewee model with `project_id` foreign key.
+- [x] Define `Revision` SQLAlchemy model with `project_id` foreign key.
 - [x] Build FastAPI CRUD routes (nested under projects for the `GET` list).
 - [x] Create SolidJS UI timeline/list component inside the Project detail view.
 - [x] Create SolidJS form for creating/editing revisions.

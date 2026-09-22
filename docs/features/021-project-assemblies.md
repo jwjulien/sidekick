@@ -24,7 +24,7 @@ This feature refines the organizational hierarchy by introducing an `Assembly` l
 ## 3. Technical Implementation
 * **Frontend (SolidJS / Tauri):** * Update routing to reflect the new hierarchy: `/projects/:id/assemblies/:id/revisions/:id`.
 * **Backend (FastAPI):** * `POST /api/revisions/{id}/clone` - A dedicated endpoint that executes a database transaction to duplicate the revision record and perform a bulk insert duplicating all associated `Material` rows.
-* **Database Schema Updates (SQLite / Peewee):** * **New Model `Assembly`:** `id` (PK), `project_id` (FK), `name`, `description`.
+* **Database Schema Updates (SQLite / SQLAlchemy):** * **New Model `Assembly`:** `id` (PK), `project_id` (FK), `name`, `description`.
     * **Modified Model `Revision`:** Drop `project_id`, replace with `assembly_id` (FK).
 
 ## 4. Out of Scope
@@ -33,7 +33,7 @@ This feature refines the organizational hierarchy by introducing an `Assembly` l
 ---
 
 ## 5. Implementation Tasks
-- [ ] Create `Assembly` Peewee model and update `Revision` foreign keys.
+- [ ] Create `Assembly` SQLAlchemy model and update `Revision` foreign keys.
 - [ ] Build FastAPI CRUD routes for Assemblies.
 - [ ] Build FastAPI transactional `/clone` route for Revisions.
 - [ ] Update SolidJS UI hierarchy and breadcrumbs.

@@ -30,7 +30,7 @@ This feature establishes the foundational `Suppliers` entity. It allows users to
     * `POST /api/suppliers` - Creates a new supplier.
     * `PUT /api/suppliers/{id}` - Updates a supplier's details.
     * `DELETE /api/suppliers/{id}` - Removes a supplier. *(Note: Must handle cascade logic or block deletion if the supplier is actively linked to existing products).*
-* **Database Schema (SQLite / Peewee):** * Model: `Supplier`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Supplier`
     * Columns: `id` (PK), `created_on`, `modified_on`, `name` (VARCHAR 40), `website` (VARCHAR 100), `search` (VARCHAR 200).
 
 ## 4. Out of Scope

@@ -31,7 +31,7 @@ This feature allows users to attach reference files (primarily PDF datasheets, m
     * `GET /api/documents/{id}/download` - Returns the actual file BLOB with the appropriate `Content-Disposition` headers to trigger a download or browser preview.
     * `POST /api/parts/{part_id}/documents` - Accepts `multipart/form-data`, extracting the file binary and saving it to the database.
     * `DELETE /api/documents/{id}` - Removes the document.
-* **Database Schema (SQLite / Peewee):** * Model: `Document`
+* **Database Schema (SQLite / SQLAlchemy):** * Model: `Document`
     * Columns: `id` (PK), `created_on`, `modified_on`, `part_id` (FK to Parts), `label` (VARCHAR 40), `filename` (VARCHAR 30), `content` (BLOB).
 
 ## 4. Out of Scope
@@ -41,7 +41,7 @@ This feature allows users to attach reference files (primarily PDF datasheets, m
 ---
 
 ## 5. Implementation Tasks
-- [x] Define `Document` Peewee model with `part_id` foreign key.
+- [x] Define `Document` SQLAlchemy model with `part_id` foreign key.
 - [x] Build FastAPI `POST` route to handle `multipart/form-data` uploads.
 - [x] Build FastAPI `GET` download route returning `FileResponse` or streaming response.
 - [x] Create SolidJS UI for listing documents.

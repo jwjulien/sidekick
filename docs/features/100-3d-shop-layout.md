@@ -29,7 +29,7 @@ This feature provides a procedurally generated, 3D wireframe visualization of th
     * `OrbitControls` will be used for camera navigation[cite: 284].
     * A `THREE.Raycaster` will detect clicks/taps and translate normalized device coordinates to fetch the unique ID of the selected bin[cite: 286].
 * **Backend (FastAPI):** * API routes must serve the spatial data (dimensions and coordinates) as a JSON tree structure to the frontend[cite: 283].
-* **Database Schema (SQLite / Peewee):** * Storage container models must include coordinate parameters so the frontend knows where to mathematically draw the boxes[cite: 172].
+* **Database Schema (SQLite / SQLAlchemy):** * Storage container models must include coordinate parameters so the frontend knows where to mathematically draw the boxes[cite: 172].
     * Required fields include dimensions (`size_x`, `size_y`, `size_z`) and location coordinates (`pos_x`, `pos_y`, `pos_z`)[cite: 174].
 
 ## 4. Out of Scope
@@ -39,7 +39,7 @@ This feature provides a procedurally generated, 3D wireframe visualization of th
 ---
 
 ## 5. Implementation Tasks
-- [ ] Update Peewee SQLite schema to include dimension and coordinate fields for storage units.
+- [ ] Update SQLAlchemy SQLite schema to include dimension and coordinate fields for storage units.
 - [ ] Build FastAPI route to serve layout tree structure.
 - [ ] Create a 2D HTML configuration form to accept structural dimensions.
 - [ ] Create SolidJS UI component with an `onMount` hook to initialize the Three.js canvas.

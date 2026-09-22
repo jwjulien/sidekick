@@ -50,7 +50,7 @@ This feature provides a robust visual navigation and editing system for the phys
 * **Backend (FastAPI):** * `PUT /api/storage/{id}/layout` - Updates the `dimensions` JSON array. Validates that the new bounds encompass all existing child indices + spans.
     * `PUT /api/storage/reorder` - A transactional endpoint that accepts an array of `{ id: str, index: int }` to bulk-update sibling indices after a flat-list drag-sort.
     * `PUT /api/storage/{id}/slot` - Updates a specific child's `index` and `span` JSON after being dropped into a new geometric slot.
-* **Database Schema (SQLite / Peewee):** * Utilizes the existing `Storage` model (`dimensions`, `span`, `index`, `parent_id`).
+* **Database Schema (SQLite / SQLAlchemy):** * Utilizes the existing `Storage` model (`dimensions`, `span`, `index`, `parent_id`).
 
 ## 4. Out of Scope
 * `label_scheme` implementation (rendering dynamic text based on the scheme will be deferred).

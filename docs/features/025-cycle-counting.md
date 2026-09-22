@@ -33,7 +33,7 @@ This feature provides an automated, physically optimized workflow for verifying 
 * **Backend (FastAPI):** * `GET /api/storage/audit?days_stale=180` - Queries the `Storage` table for records where `last_counted < (CURRENT_DATE - days_stale)`. 
     * **Routing Algorithm:** The backend utilizes a Recursive CTE (Common Table Expression) in SQLite to dynamically build the full hierarchical path string for each location (e.g., `Rack_A/Drawer_2/Bin_5`), and then simply applies an `ORDER BY path ASC` to physically group sibling containers.
     * `PUT /api/storage/{id}/count` - Updates the `quantity` and hard-sets `last_counted = CURRENT_TIMESTAMP`.
-* **Database Schema (SQLite / Peewee):** * Assumes the `Storage` model already possesses the `last_counted` (DATETIME) column. No schema changes strictly required.
+* **Database Schema (SQLite / SQLAlchemy):** * Assumes the `Storage` model already possesses the `last_counted` (DATETIME) column. No schema changes strictly required.
 
 ## 4. Out of Scope
 * Calculating true 3D spatial distances for the routing (hierarchical alphabetical sorting is O(n log n) and provides 95% of the physical efficiency with 1% of the math).
