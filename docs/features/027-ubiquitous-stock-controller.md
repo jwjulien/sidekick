@@ -1,6 +1,6 @@
 ---
 title: Ubiquitous Stock Controller Component
-status: Complete
+status: In Progress
 target: 
   - Web
   - Windows
@@ -20,25 +20,38 @@ To minimize the friction of physical inventory auditing, Sidekick utilizes a con
 
 ## 2. User Experience & UI
 * **Trigger:** Appears implicitly wherever a `Storage.quantity` is displayed in the UI.
-* **Interaction (Confirming):** 1. The component displays the current expected quantity (e.g., "Qty: 150").
+* **Lifecycle Timestamps & Info Popover:**
+    * Hovering or tapping a subtle timestamp indicator next to the quantity reveals an info popover showing the location's chronological lifecycle:
+        * **First Added:** Date/time when this part was first placed into this location (`first_added`).
+        * **Last Counted:** Date/time of last physical verification or confirmation (`last_counted`).
+        * **Last Stocked:** Date/time of last quantity increase (`last_stocked`).
+        * **Last Used:** Date/time of last quantity decrement or consumption (`last_used`).
+* **Interaction (Confirming):** 
+    1. The component displays the current expected quantity (e.g., "Qty: 150").
     2. Beside it is a low-friction `[✓ Confirm]` button. 
     3. Clicking it triggers a subtle green flash and updates the `last_counted` timestamp in the database to the current exact time, leaving the quantity unchanged.
 * **Interaction (Adjusting - Manual):**
     1. The user taps the number itself, turning it into an active input field, or uses adjacent `+` and `-` buttons.
-    2. Upon changing the value, a `[Save]` button appears. Clicking it updates the quantity and sets `last_counted` to `NOW`.
+    2. Upon changing the value, a `[Save]` button appears. 
+    3. Clicking `[Save]` calculates the delta:
+        * If `new_quantity > old_quantity`: Sets `last_stocked = NOW` and `last_counted = NOW`.
+        * If `new_quantity < old_quantity`: Sets `last_used = NOW` and `last_counted = NOW`.
 * **Interaction (Adjusting - Scale):**
     1. If a Bluetooth scale is actively connected, a small "Scale" icon appears in the component.
     2. The user puts the parts on the scale. 
     3. The component reads the live weight, divides it by the known `Part.weight`, and displays the projected count (e.g., "⚖️ 152 projected").
-    4. The user clicks `[Accept Scale Count]`, updating the quantity and setting `last_counted` to `NOW`.
+    4. The user clicks `[Accept Scale Count]`, updating the quantity and updating `last_stocked` or `last_used` (based on delta) and setting `last_counted` to `NOW`.
     5. *(Note: If the `Part.weight` is NULL, clicking the scale icon temporarily opens the Calibration Wizard from Feature 017).*
 
 ## 3. Technical Implementation
-* **Frontend (SolidJS / Tauri):** * A globally shared component: `<StockController storageId={location.id} currentQty={location.quantity} partWeight={part.weight} />`.
+* **Frontend (SolidJS / Tauri):** 
+    * A globally shared component: `<StockController storageId={location.id} currentQty={location.quantity} partWeight={part.weight} firstAdded={location.first_added} lastCounted={location.last_counted} lastStocked={location.last_stocked} lastUsed={location.last_used} />`.
+    * Lifecycle popover showing relative and formatted ISO timestamps.
     * Local debouncing to prevent spamming the backend if the user clicks the `+` button 10 times in a row.
     * Hooks into the global `ScaleProvider` context to passively listen for stable weight readings.
-* **Backend (FastAPI):** * `PUT /api/storage/{id}/touch` - A lightning-fast, dedicated endpoint that *only* updates the `last_counted` timestamp to `CURRENT_TIMESTAMP`.
-    * `PUT /api/storage/{id}/count` - Updates both the `quantity` and sets `last_counted` to `CURRENT_TIMESTAMP`.
+* **Backend (FastAPI):** 
+    * `PUT /api/storage/{id}/touch` - A lightning-fast, dedicated endpoint that *only* updates the `last_counted` timestamp to `CURRENT_TIMESTAMP`.
+    * `PUT /api/storage/{id}/count` - Updates the `quantity`, sets `last_counted = CURRENT_TIMESTAMP`, and conditionally updates `last_stocked` (if delta > 0) or `last_used` (if delta < 0).
 
 ## 4. Out of Scope
 * Forcing the user to enter a "Reason for Adjustment" (e.g., Shrinkage, Damaged) when changing the count. Friction must remain absolute zero.
@@ -51,3 +64,5 @@ To minimize the friction of physical inventory auditing, Sidekick utilizes a con
 - [x] Wire the `[✓ Confirm]` button to the `/touch` endpoint.
 - [x] Integrate global Scale Context to project counts based on live weight.
 - [x] Audit all existing UI views (Triage, Part Detail, Scanner Result) to replace static quantity text with this new component.
+- [ ] Update `PUT /api/storage/{id}/count` to conditionally stamp `last_stocked` (if delta > 0) or `last_used` (if delta < 0) alongside `last_counted`.
+- [ ] Add lifecycle popover to `<StockController />` showing relative and formatted ISO timestamps for `first_added`, `last_counted`, `last_stocked`, and `last_used`.

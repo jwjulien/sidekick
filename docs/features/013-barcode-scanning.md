@@ -1,6 +1,6 @@
 ---
 title: Universal Barcode Scanning Core
-status: Complete
+status: In Progress
 target: 
   - Web
   - Windows
@@ -26,19 +26,35 @@ Platform-specific hardware barcode capturing mechanisms are specified in dedicat
   1. Barcode payload is received (from USB HID background thread, camera scanner preview, or deep link handler).
   2. Success audio chime plays (`AudioContext` C6 1046.5Hz tone).
   3. Active modal scanner listeners (e.g. `MovePartModal` / location picker) take precedence if registered.
-  4. If unhandled by a modal, the payload is resolved via FastAPI `GET /resolve/{payload}` or parsed directly if formatted as `fuse://location/{id}` or `fuse://part/{id}`.
+  4. If unhandled by a modal, the payload is resolved via FastAPI `GET /resolve/{payload}` or parsed directly if formatted as `fuse://location/{id_or_path}` or `fuse://part/{id}`.
   5. SolidJS router navigates to target entity view (`/storage?location={id}` or `/parts/{id}`), or dispatches `sidekick:nfc-scanned` for live in-page Miller Column updates.
-* **Toast Feedback:** Confirmation toast appears confirming entity resolution (`USB Scanner: Navigating to location`).
+  6. **Ancestor Fallback Notification:** If the payload was a location path whose leaf was not found, the resolver returns the nearest surviving ancestor. The UI navigates to that ancestor and displays an informational toast: *"Location not found; redirected to nearest ancestor: [Ancestor Name]"*.
+* **Toast Feedback:** Confirmation toast appears confirming entity resolution (`USB Scanner: Navigating to location` or fallback notice).
 
 ## 3. Technical Implementation
 * **FastAPI Backend (`server/app/routers/resolve.py`):**
-  * `GET /resolve/{payload:path}` and `GET /resolve?q={payload}` endpoints parse `fuse://` URIs or raw UUID strings.
+  * `GET /resolve/{payload:path}` and `GET /resolve?q={payload}` endpoints parse `fuse://` URIs, raw UUID strings, or hierarchical location paths.
   * Performs case-insensitive SQL queries (`func.lower(Storage.id) == target_id.lower()`) against `Storage` and `Parts` tables.
-  * Generates hierarchical location breadcrumbs (e.g. `SMD Boxes > 0603`) and target route strings.
+  * **Hierarchical Path Resolution & Ancestor Fallback:**
+    * Matches paths against storage node breadcrumbs (e.g., `Rack_A/Shelf_1/Bin_2`).
+    * If exact leaf match is missing, recursively trims path segments from right to left until the closest existing parent node is matched.
+    * Returns payload response:
+      ```json
+      {
+        "entity_type": "location",
+        "id": "018f3a5e-...",
+        "breadcrumb": "Rack A > Shelf 1",
+        "route": "/storage?location=018f3a5e-...",
+        "match_type": "exact" | "ancestor_fallback",
+        "requested_query": "Rack_A/Shelf_1/Bin_Old",
+        "fallback_ancestor": "Shelf 1"
+      }
+      ```
 * **Client Service Infrastructure (`client/src/services/usbScannerService.ts`):**
   * Modal listener registration system (`registerModalListener`).
   * Deep link parsing integration via `parseDeepLink()`.
   * Custom event dispatching (`sidekick:nfc-scanned`) for zero-reload in-page Miller Column navigation.
+  * Dispatches alert toast when `match_type === "ancestor_fallback"`.
 * **Audio Feedback:** Synthesizes instant audio beep via Web Audio API (`AudioContext`).
 
 ## 4. Out of Scope
@@ -55,3 +71,5 @@ Platform-specific hardware barcode capturing mechanisms are specified in dedicat
 - [x] Build Web Audio API success chime synthesizer (`playSuccessBeep`).
 - [x] Implement modal scan interceptor registration (`registerModalListener`).
 - [x] Wire in-page custom event dispatch (`sidekick:nfc-scanned`) for zero-reload Miller Column navigation in `Storage.tsx`.
+- [ ] Add hierarchical path resolution and recursive ancestor fallback search to FastAPI `/resolve`.
+- [ ] Add client toast handling for `ancestor_fallback` scan events.

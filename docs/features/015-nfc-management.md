@@ -31,7 +31,15 @@ In addition to direct navigation, NFC scanning integrates directly into modal wo
 * Background NFC scans trigger Android OS intent dispatch (`fuse://` scheme registered in Feature 014), launching/foregrounding Sidekick and navigating directly to `/storage?location={id}` or `/parts/{id}`.
 
 ### 2.3 Modal Workflows (Move & Location Onboarding)
-* **In-Modal NFC Target Selection:** When `MovePartModal` or `LocationMoveModal` is open, scanning an NFC tag intercepts `fuse://location/{id}`, resolves the location, and automatically navigates the Miller columns to select that location.
+* **In-Modal NFC Target Selection & Leaf Creation:** 
+  * When `MovePartModal` or `LocationMoveModal` is open (displaying Miller column roots), scanning an existing NFC tag intercepts the `fuse://location/{id_or_path}` deep link and navigates the Miller columns directly to that destination.
+  * **Add Child Leaf Node Flow:** The user can instantly create and append a new child leaf node under the scanned location specifically tailored for the parts being relocated.
+  * **Node Exclusivity & Automatic Conflict Migration:** 
+    * Per the Node Exclusivity Rule (`010-inventory-storage.md`), a storage location may contain either child locations OR parts, but never both.
+    * If the scanned target location already has parts assigned, the system detects this structural conflict and provides an automatic migration path:
+      1. A modal dialog prompts: *"This location currently holds [Part Name] (Qty: [N]). To add child locations, the existing parts will be moved to a new sub-bin."*
+      2. Upon confirmation, the backend transactionally creates a new child leaf node under the target location, migrates the existing parts and quantity into it, and clears the parent's `part_id`.
+      3. The parent location is now a valid branch node, and the incoming moved parts are placed into their new sibling leaf node.
 * **Onboarding NFC Programming during Location Creation:** 
   - When creating a new storage location, `POST /api/locations` returns the created `id` (UUIDv7) immediately.
   - Upon successful creation, the modal presents a prompt: *"Location Created! Tap phone to NFC tag to program tag now."*
