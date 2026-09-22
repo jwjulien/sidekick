@@ -200,4 +200,50 @@ def test_storage_lifecycle_timestamps():
     assert count_down["last_used"] is not None
 
 
+def test_node_exclusivity_rule():
+    # Setup test part
+    cat = client.post("/categories", json={"title": "Exclusivity Cat", "designator": "EXC"}, headers=admin_headers).json()
+    part_res = client.post("/parts", json={"category_id": cat["id"], "value": "10k Resistor", "number": "EXC-RES-10K"}, headers=admin_headers)
+    assert part_res.status_code == 201
+    part = part_res.json()
+    part2_res = client.post("/parts", json={"category_id": cat["id"], "value": "20k Resistor", "number": "EXC-RES-20K"}, headers=admin_headers)
+    assert part2_res.status_code == 201
+    part2 = part2_res.json()
+
+    # 1. Create a parent container with no part (Valid branch)
+    cabinet_res = client.post("/locations", json={"name": "Exclusivity Cabinet"}, headers=admin_headers)
+    assert cabinet_res.status_code == 201
+    cabinet_id = cabinet_res.json()["id"]
+
+    # 2. Create a leaf bin with an assigned part
+    leaf_bin_res = client.post("/locations", json={"name": "Leaf Bin 1", "parent_id": cabinet_id, "part_id": part["id"], "quantity": 10}, headers=admin_headers)
+    assert leaf_bin_res.status_code == 201
+    leaf_bin_id = leaf_bin_res.json()["id"]
+
+    # 3. VIOLATION 1: Attempt to create a child location under leaf_bin_id (which holds a part)
+    invalid_child_res = client.post("/locations", json={"name": "Sub Bin under Part Node", "parent_id": leaf_bin_id}, headers=admin_headers)
+    assert invalid_child_res.status_code == 409
+    assert "Node Exclusivity Rule" in invalid_child_res.json()["detail"]
+
+    # 4. VIOLATION 2: Attempt to assign a part to cabinet_id (which has child leaf_bin_id) via PATCH
+    invalid_patch_res = client.patch(f"/locations/{cabinet_id}", json={"part_id": part2["id"]}, headers=stocker_headers)
+    assert invalid_patch_res.status_code == 409
+    assert "Node Exclusivity Rule" in invalid_patch_res.json()["detail"]
+
+    # 5. VIOLATION 3: Attempt to assign a part to cabinet_id via POST /locations/assign
+    invalid_assign_res = client.post("/locations/assign", json={"location_id": cabinet_id, "part_id": part2["id"], "quantity": 25}, headers=stocker_headers)
+    assert invalid_assign_res.status_code == 409
+    assert "Node Exclusivity Rule" in invalid_assign_res.json()["detail"]
+
+    # 6. VALID: Create an empty child under cabinet_id (container can have multiple children)
+    valid_sub_container = client.post("/locations", json={"name": "Drawer A", "parent_id": cabinet_id}, headers=admin_headers)
+    assert valid_sub_container.status_code == 201
+    drawer_id = valid_sub_container.json()["id"]
+
+    # 7. VALID: Assign part to the empty drawer (drawer currently has no children, so it becomes a leaf)
+    valid_assign = client.post("/locations/assign", json={"location_id": drawer_id, "part_id": part2["id"], "quantity": 30}, headers=stocker_headers)
+    assert valid_assign.status_code == 200
+    assert valid_assign.json()["part_id"] == part2["id"]
+
+
 

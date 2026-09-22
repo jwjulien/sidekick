@@ -1,6 +1,6 @@
 ---
 title: Inventory Storage & Stock
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -58,4 +58,4 @@ To prevent ambiguous structural states, Sidekick enforces a strict **Node Exclus
 - [x] Wire frontend to backend API.
 - [x] Add lifecycle timestamp columns (`first_added`, `last_stocked`, `last_used`) to the `Storage` model and database migrations.
 - [x] Update location adjustment and assignment endpoints to stamp lifecycle timestamps.
-- [ ] Enforce the Node Exclusivity Rule in location creation and update endpoints.
+- [x] Enforce the Node Exclusivity Rule in location creation and update endpoints.

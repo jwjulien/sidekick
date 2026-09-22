@@ -49,6 +49,11 @@ def create_location(
                 status_code=400,
                 detail=f"Parent storage location with ID {payload.parent_id} does not exist."
             )
+        if parent.part_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot add child location: parent location '{parent.name}' already holds an assigned part. Under the Node Exclusivity Rule, a location may contain either child locations or assigned parts, but never both."
+            )
             
     now = datetime.utcnow()
     first_added = now if payload.part_id else None
@@ -319,6 +324,14 @@ def patch_location(
         part = db.query(models.Part).filter(models.Part.id == payload.part_id).first()
         if not part:
             raise HTTPException(status_code=404, detail="Part not found.")
+
+        # Check Node Exclusivity: cannot assign part to a node that has child locations
+        child_count = db.query(models.Storage).filter(models.Storage.parent_id == location_id).count()
+        if child_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot assign part: location '{storage.name}' has {child_count} child sub-location(s). Under the Node Exclusivity Rule, a location may contain either child locations or assigned parts, but never both."
+            )
 
         if storage.part_id is None or storage.part_id == payload.part_id:
             storage.part_id = payload.part_id
@@ -622,6 +635,13 @@ def assign_part_location(
     storage = db.query(models.Storage).filter(models.Storage.id == payload.location_id).first()
     if not storage:
         raise HTTPException(status_code=404, detail="Target storage location not found.")
+
+    child_count = db.query(models.Storage).filter(models.Storage.parent_id == storage.id).count()
+    if child_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot assign part: target location '{storage.name}' has {child_count} child sub-location(s). Under the Node Exclusivity Rule, a location may contain either child locations or assigned parts, but never both."
+        )
 
     if storage.part_id is None or storage.part_id == part.id:
         storage.part_id = part.id
