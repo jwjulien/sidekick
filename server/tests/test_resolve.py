@@ -61,3 +61,52 @@ def test_resolve_part_by_uuid_and_deeplink():
 def test_resolve_missing_entity_returns_404():
     res = client.get("/resolve/fuse://location/non-existent-uuid-9999", headers=admin_headers)
     assert res.status_code == 404
+
+def test_resolve_hierarchical_path_and_ancestor_fallback():
+    # 1. Create hierarchy: Rack ResolvTree -> Shelf One -> Bin 42
+    rack_res = client.post("/locations", json={"name": "Rack ResolvTree", "description": "Top rack"}, headers=admin_headers)
+    assert rack_res.status_code == 201
+    rack = rack_res.json()
+
+    shelf_res = client.post("/locations", json={"name": "Shelf One", "parent_id": rack["id"]}, headers=admin_headers)
+    assert shelf_res.status_code == 201
+    shelf = shelf_res.json()
+
+    bin_res = client.post("/locations", json={"name": "Bin 42", "parent_id": shelf["id"]}, headers=admin_headers)
+    assert bin_res.status_code == 201
+    bin_node = bin_res.json()
+
+    # 2. Test exact hierarchical path matching with underscores
+    res_exact = client.get("/resolve/fuse://location/Rack_ResolvTree/Shelf_One/Bin_42", headers=admin_headers)
+    assert res_exact.status_code == 200
+    d_exact = res_exact.json()
+    assert d_exact["entity_type"] == "location"
+    assert d_exact["entity_id"] == bin_node["id"]
+    assert d_exact["match_type"] == "exact"
+    assert d_exact["fallback_ancestor"] is None
+    assert d_exact["breadcrumb"] == "Rack ResolvTree > Shelf One > Bin 42"
+
+    # 3. Test leaf missing -> fallback to immediate ancestor (Shelf One)
+    res_fallback_leaf = client.get("/resolve/fuse://location/Rack_ResolvTree/Shelf_One/Bin_Deleted", headers=admin_headers)
+    assert res_fallback_leaf.status_code == 200
+    d_fallback_leaf = res_fallback_leaf.json()
+    assert d_fallback_leaf["entity_type"] == "location"
+    assert d_fallback_leaf["entity_id"] == shelf["id"]
+    assert d_fallback_leaf["match_type"] == "ancestor_fallback"
+    assert d_fallback_leaf["fallback_ancestor"] == "Shelf One"
+    assert d_fallback_leaf["breadcrumb"] == "Rack ResolvTree > Shelf One"
+
+    # 4. Test intermediate missing -> fallback to root (Rack ResolvTree)
+    res_fallback_root = client.get("/resolve/location/Rack_ResolvTree/NonExistent_Shelf/Any_Bin", headers=admin_headers)
+    assert res_fallback_root.status_code == 200
+    d_fallback_root = res_fallback_root.json()
+    assert d_fallback_root["entity_type"] == "location"
+    assert d_fallback_root["entity_id"] == rack["id"]
+    assert d_fallback_root["match_type"] == "ancestor_fallback"
+    assert d_fallback_root["fallback_ancestor"] == "Rack ResolvTree"
+    assert d_fallback_root["breadcrumb"] == "Rack ResolvTree"
+
+    # 5. Test completely unknown path -> 404
+    res_unknown = client.get("/resolve/location/Ghost_Rack/Shelf_1", headers=admin_headers)
+    assert res_unknown.status_code == 404
+

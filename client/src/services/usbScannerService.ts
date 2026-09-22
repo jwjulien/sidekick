@@ -28,9 +28,14 @@ export interface UsbScanEventPayload {
 export interface ResolvedEntity {
   entity_type: "location" | "part";
   entity_id: string;
+  id?: string;
   display_name: string;
   breadcrumb: string;
   target_route: string;
+  route?: string;
+  match_type?: "exact" | "ancestor_fallback";
+  requested_query?: string | null;
+  fallback_ancestor?: string | null;
 }
 
 type ScanCallback = (payload: string) => boolean;
@@ -208,9 +213,22 @@ export const usbScannerService = {
           try {
             console.info(`[USB Scanner] Resolving scan payload via backend API (/resolve/${encodeURIComponent(rawPayload)})...`);
             const entity: ResolvedEntity = await apiFetch(`/resolve/${encodeURIComponent(rawPayload)}`);
-            if (entity && entity.target_route) {
-              console.info(`[USB Scanner] Navigating to backend target route: "${entity.target_route}"`, entity);
-              navigate(entity.target_route);
+            const targetRoute = entity?.target_route || entity?.route;
+            if (entity && targetRoute) {
+              console.info(`[USB Scanner] Navigating to backend target route: "${targetRoute}"`, entity);
+              if (entity.match_type === "ancestor_fallback") {
+                toast(`Location not found; redirected to nearest ancestor: ${entity.fallback_ancestor || entity.display_name}`, {
+                  id: "ancestor-fallback-toast",
+                  icon: "⚠️",
+                  duration: 5000,
+                });
+              } else {
+                toast(`Scanned: ${entity.display_name}`, {
+                  id: "usb-scan-success-toast",
+                  icon: "🏷️",
+                });
+              }
+              navigate(targetRoute);
             } else {
               console.warn("[USB Scanner] Backend entity resolution returned no route:", entity);
             }

@@ -459,4 +459,19 @@ class PartListDetailsOut(PartListOut):
 
     model_config = ConfigDict(from_attributes=True)
 
+# ----------------- Resolution Schemas -----------------
+class ResolveResponse(BaseModel):
+    entity_type: str  # "location" | "part"
+    entity_id: str
+    display_name: str
+    breadcrumb: str
+    target_route: str
+    id: Optional[str] = None
+    route: Optional[str] = None
+    match_type: str = "exact"  # "exact" | "ancestor_fallback"
+    requested_query: Optional[str] = None
+    fallback_ancestor: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 

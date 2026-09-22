@@ -1,6 +1,6 @@
 ---
 title: Universal Barcode Scanning Core
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -71,5 +71,5 @@ Platform-specific hardware barcode capturing mechanisms are specified in dedicat
 - [x] Build Web Audio API success chime synthesizer (`playSuccessBeep`).
 - [x] Implement modal scan interceptor registration (`registerModalListener`).
 - [x] Wire in-page custom event dispatch (`sidekick:nfc-scanned`) for zero-reload Miller Column navigation in `Storage.tsx`.
-- [ ] Add hierarchical path resolution and recursive ancestor fallback search to FastAPI `/resolve`.
-- [ ] Add client toast handling for `ancestor_fallback` scan events.
+- [x] Add hierarchical path resolution and recursive ancestor fallback search to FastAPI `/resolve`.
+- [x] Add client toast handling for `ancestor_fallback` scan events.

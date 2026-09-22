@@ -1,5 +1,6 @@
 import { parseDeepLink } from "../utils/deepLink";
 import { apiFetch } from "../hooks/useAuth";
+import toast from "solid-toast";
 
 export interface CameraPermissionState {
   granted: boolean;
@@ -353,9 +354,17 @@ export const cameraScannerService = {
     try {
       console.info(`[Camera Scanner] Resolving barcode payload via backend API (/resolve/${encodeURIComponent(payload)})...`);
       const entity = await apiFetch(`/resolve/${encodeURIComponent(payload)}`);
-      if (entity && entity.target_route) {
-        console.info(`[Camera Scanner] Backend resolved entity to route: "${entity.target_route}"`, entity);
-        navigate(entity.target_route);
+      const targetRoute = entity?.target_route || entity?.route;
+      if (entity && targetRoute) {
+        console.info(`[Camera Scanner] Backend resolved entity to route: "${targetRoute}"`, entity);
+        if (entity.match_type === "ancestor_fallback") {
+          toast(`Location not found; redirected to nearest ancestor: ${entity.fallback_ancestor || entity.display_name}`, {
+            id: "camera-ancestor-fallback-toast",
+            icon: "⚠️",
+            duration: 5000,
+          });
+        }
+        navigate(targetRoute);
       } else {
         console.warn("[Camera Scanner] Backend entity resolution returned no target route:", entity);
       }
