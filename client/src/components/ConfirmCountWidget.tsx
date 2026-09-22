@@ -7,6 +7,7 @@ interface ConfirmCountWidgetProps {
   storageId: string;
   lastCounted?: string | null;
   onConfirmed?: (newLastCounted: string) => void;
+  onToggleLifecycle?: () => void;
 }
 
 export default function ConfirmCountWidget(props: ConfirmCountWidgetProps) {
@@ -67,12 +68,28 @@ export default function ConfirmCountWidget(props: ConfirmCountWidgetProps) {
         {confirmed() ? "Count Confirmed!" : "Confirm Count"}
       </button>
 
-      <div
-        class="flex items-center justify-center gap-1 text-[10px] text-gray-400 cursor-help"
-        title={getTooltip()}
-      >
-        <Clock size={10} />
-        <span>{formatLastCounted()}</span>
+      <div class="flex items-center justify-center gap-1.5 text-[10px] text-gray-400">
+        <div
+          class="flex items-center gap-1 cursor-help hover:text-gray-300 transition-colors"
+          title={getTooltip()}
+        >
+          <Clock size={10} />
+          <span>{formatLastCounted()}</span>
+        </div>
+        <Show when={props.onToggleLifecycle}>
+          <span class="text-white/20">•</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onToggleLifecycle?.();
+            }}
+            class="flex items-center gap-0.5 text-accentCyan hover:text-accentCyan/80 hover:underline cursor-pointer transition-colors"
+            title="View location chronological lifecycle history"
+          >
+            <span>Lifecycle</span>
+          </button>
+        </Show>
       </div>
     </div>
   );

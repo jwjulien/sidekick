@@ -122,10 +122,14 @@ export default function LocationCard(props: LocationCardProps) {
       {/* StockController */}
       <StockController
         storageId={String(props.location.id)}
+        storageName={props.location.name}
         currentQty={props.location.quantity}
+        firstAdded={props.location.first_added}
         lastCounted={props.location.last_counted}
+        lastStocked={props.location.last_stocked}
+        lastUsed={props.location.last_used}
         compact={props.compact}
-        onChanged={(qty, ts) => props.onChanged?.(qty, ts)}
+        onChanged={(qty, ts) => props.onChanged?.(qty, ts || "")}
       />
     </div>
   );

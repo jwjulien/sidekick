@@ -11,6 +11,9 @@ export interface LocationStockInfo {
   breadcrumb?: string;
   quantity: number;
   last_counted?: string | null;
+  first_added?: string | null;
+  last_stocked?: string | null;
+  last_used?: string | null;
 }
 
 export interface MultiLocationStockControllerProps {
@@ -61,7 +64,10 @@ export default function MultiLocationStockController(props: MultiLocationStockCo
             name: s.name,
             breadcrumb: s.name,
             quantity: s.quantity || 0,
-            last_counted: s.last_counted
+            last_counted: s.last_counted,
+            first_added: s.first_added,
+            last_stocked: s.last_stocked,
+            last_used: s.last_used
           }));
           setFetchedLocations(locs);
         })
@@ -136,8 +142,12 @@ export default function MultiLocationStockController(props: MultiLocationStockCo
       <Show when={locationCount() === 1}>
         <StockController
           storageId={locationsList()[0].id}
+          storageName={locationsList()[0].name}
           currentQty={locationsList()[0].quantity}
           lastCounted={locationsList()[0].last_counted}
+          first_added={locationsList()[0].first_added}
+          last_stocked={locationsList()[0].last_stocked}
+          last_used={locationsList()[0].last_used}
           compact={props.compact}
           onChanged={() => props.onChanged?.()}
         />
@@ -214,8 +224,12 @@ export default function MultiLocationStockController(props: MultiLocationStockCo
                     </div>
                     <StockController
                       storageId={loc.id}
+                      storageName={loc.name}
                       currentQty={loc.quantity}
                       lastCounted={loc.last_counted}
+                      first_added={loc.first_added}
+                      last_stocked={loc.last_stocked}
+                      last_used={loc.last_used}
                       compact={true}
                       onChanged={() => props.onChanged?.()}
                     />
