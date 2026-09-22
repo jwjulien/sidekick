@@ -3,11 +3,12 @@ export interface ParsedDeepLink {
   scheme: string;
   action: string; // e.g. 'location', 'part', 'scan', 'resolve'
   id?: string;
+  path?: string;
   targetRoute: string;
 }
 
 /**
- * Parses a custom URI deep link (e.g. fuse://location/{id}) into an internal app route.
+ * Parses a custom URI deep link (e.g. fuse://location/{id_or_path}) into an internal app route.
  */
 export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
   if (!rawUrl || typeof rawUrl !== "string") {
@@ -32,14 +33,14 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
     };
   }
 
-  // Split path parts (e.g. "location/12345" -> ["location", "12345"])
+  // Split path parts (e.g. "location/Rack_A/Shelf_1/Bin_2" -> ["location", "Rack_A", "Shelf_1", "Bin_2"])
   const parts = pathWithoutScheme.split("?")[0].split("/").filter(Boolean);
   const queryString = pathWithoutScheme.includes("?") 
     ? pathWithoutScheme.substring(pathWithoutScheme.indexOf("?")) 
     : "";
 
   const primaryAction = parts[0]?.toLowerCase() || "";
-  let secondaryId = parts[1] || "";
+  let secondaryId = parts.slice(1).join("/");
 
   if (!secondaryId && queryString) {
     try {
@@ -55,6 +56,7 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
         scheme: "fuse",
         action: "location",
         id: secondaryId,
+        path: secondaryId,
         targetRoute: secondaryId ? `/storage?location=${encodeURIComponent(secondaryId)}` : "/storage",
       };
 
@@ -65,6 +67,7 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
         scheme: "fuse",
         action: "part",
         id: secondaryId,
+        path: secondaryId,
         targetRoute: secondaryId ? `/parts/${encodeURIComponent(secondaryId)}` : "/parts",
       };
 

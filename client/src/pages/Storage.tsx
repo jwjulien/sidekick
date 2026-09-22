@@ -139,6 +139,28 @@ export default function Storage() {
       if (chain.length > 0) {
         setActivePath(chain);
         updateUrlHistory(chain, true);
+      } else {
+        // targetLocId might be a hierarchical path or name that needs resolution
+        apiFetch(`/resolve/${encodeURIComponent(targetLocId)}`)
+          .then((resolved: any) => {
+            if (resolved && (resolved.entity_type === "location" || resolved.entity_id)) {
+              const resId = resolved.entity_id || resolved.id;
+              const resChain = getAncestorChain(resId, allLocs);
+              if (resChain.length > 0) {
+                setActivePath(resChain);
+                updateUrlHistory(resChain, true);
+                if (resolved.match_type === "ancestor_fallback") {
+                  const lostLeaf = targetLocId.split("/").pop() || "target";
+                  toast(`Location '${lostLeaf}' was not found. Navigated to nearest ancestor: ${resolved.fallback_ancestor || resolved.display_name}`, {
+                    id: "storage-fallback-toast",
+                    icon: "⚠️",
+                    duration: 6000
+                  });
+                }
+              }
+            }
+          })
+          .catch((err) => console.warn("Failed to resolve location param:", err));
       }
     } else if (locPathStr) {
       const initialPath = locPathStr.split(",").filter(Boolean);
@@ -158,25 +180,56 @@ export default function Storage() {
       }
     };
 
-    const handleNfcEvent = (e: Event) => {
+    const handleNfcEvent = async (e: Event) => {
       const customEvt = e as CustomEvent;
       const parsed = customEvt.detail;
-      if (parsed && (parsed.action === "location" || parsed.action === "storage") && parsed.id) {
+      if (parsed && (parsed.action === "location" || parsed.action === "storage") && (parsed.id || parsed.path)) {
+        const query = parsed.path || parsed.id;
         const allLocs = locations();
-        if (allLocs && allLocs.length > 0) {
-          const chain = getAncestorChain(parsed.id, allLocs);
+        if (!allLocs || allLocs.length === 0) return;
+
+        let targetLoc = allLocs.find((l) => l.id.toLowerCase() === query.toLowerCase());
+        let isFallback = false;
+        let fallbackName = "";
+
+        if (!targetLoc) {
+          try {
+            const resolved = await apiFetch(`/resolve/${encodeURIComponent(parsed.rawUrl || query)}`);
+            if (resolved && (resolved.entity_type === "location" || resolved.entity_id)) {
+              const resId = resolved.entity_id || resolved.id;
+              targetLoc = allLocs.find((l) => l.id.toLowerCase() === resId.toLowerCase());
+              if (resolved.match_type === "ancestor_fallback") {
+                isFallback = true;
+                fallbackName = resolved.fallback_ancestor || resolved.display_name;
+              }
+            }
+          } catch (err) {
+            console.warn("[Storage] Could not resolve deep link location:", err);
+          }
+        }
+
+        if (targetLoc) {
+          const chain = getAncestorChain(targetLoc.id, allLocs);
           if (chain.length > 0) {
             e.preventDefault(); // Prevent default fallback route navigation in useDeepLink
             setActivePath(chain);
             updateUrlHistory(chain);
             setShowCreateForm(false);
             setInlinePartId(null);
-            const targetLoc = allLocs.find((l) => l.id === parsed.id);
-            toast.success(`Scanned location: ${targetLoc?.name || parsed.id}`, { id: "nfc-scanned-location", icon: "🏷️" });
-          } else {
-            toast.error(`Location tag scanned, but location ID '${parsed.id}' was not found in storage.`, { id: "nfc-scanned-missing" });
+            if (isFallback) {
+              const lostLeaf = query.split("/").pop() || "target";
+              toast(`Location '${lostLeaf}' was not found. Navigated to nearest ancestor: ${fallbackName || targetLoc.name}`, {
+                id: "nfc-ancestor-fallback",
+                icon: "⚠️",
+                duration: 6000
+              });
+            } else {
+              toast.success(`Scanned location: ${targetLoc.name}`, { id: "nfc-scanned-location", icon: "🏷️" });
+            }
+            return;
           }
         }
+        toast.error(`Location tag scanned, but location '${query}' was not found in storage.`, { id: "nfc-scanned-missing" });
       }
     };
 

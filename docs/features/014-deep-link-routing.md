@@ -1,6 +1,6 @@
 ---
 title: Deep Link Routing
-status: In Progress
+status: Complete
 target: 
   - Web
   - Windows
@@ -54,5 +54,5 @@ To mitigate broken path links, the routing engine incorporates a **Resilient Anc
 - [x] Update `tauri.conf.json` and Android Manifest to declare the `fuse` scheme.
 - [x] Create SolidJS global listener to intercept deep links and bridge them to the internal router.
 - [x] **Retroactive Update:** Update `011-storage-labels.md` to ensure the generated DataMatrix encodes the `fuse://location/{id}` format instead of just the raw UUID.
-- [ ] Implement path-based deep link resolution in client deep-link handler.
-- [ ] Implement ancestor fallback traversal for broken path deep links with user alert toast.
+- [x] Implement path-based deep link resolution in client deep-link handler.
+- [x] Implement ancestor fallback traversal for broken path deep links with user alert toast.

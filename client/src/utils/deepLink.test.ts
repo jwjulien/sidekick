@@ -16,6 +16,15 @@ describe("parseDeepLink", () => {
     expect(result?.targetRoute).toBe("/storage?location=018f8a32-1234-7000-8000-000000000001");
   });
 
+  it("parses multi-segment hierarchical path fuse://location/{path} links", () => {
+    const result = parseDeepLink("fuse://location/Rack_A/Shelf_1/Bin_2");
+    expect(result).not.toBeNull();
+    expect(result?.action).toBe("location");
+    expect(result?.id).toBe("Rack_A/Shelf_1/Bin_2");
+    expect(result?.path).toBe("Rack_A/Shelf_1/Bin_2");
+    expect(result?.targetRoute).toBe("/storage?location=Rack_A%2FShelf_1%2FBin_2");
+  });
+
   it("parses fuse://part/{id} links", () => {
     const result = parseDeepLink("fuse://part/018f8a32-9999-7000-8000-000000000002");
     expect(result).not.toBeNull();

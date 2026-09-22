@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import toast from "solid-toast";
 import { parseDeepLink, type ParsedDeepLink } from "../utils/deepLink";
 import { nfcService } from "../services/nfcService";
+import { apiFetch } from "./useAuth";
 
 export function useDeepLink() {
   let navigate: ReturnType<typeof useNavigate> | null = null;
@@ -21,7 +22,7 @@ export function useDeepLink() {
     let lastHandledUrl = "";
     let lastHandledTime = 0;
 
-    const routeToDeepLink = (parsed: ParsedDeepLink, source: string) => {
+    const routeToDeepLink = async (parsed: ParsedDeepLink, source: string) => {
       const now = Date.now();
       if (parsed.rawUrl === lastHandledUrl && now - lastHandledTime < 1500) {
         console.info(`[DeepLink Engine] [${source}] Suppressing duplicate scan within 1.5s: "${parsed.rawUrl}"`);
@@ -36,15 +37,52 @@ export function useDeepLink() {
       const handled = !window.dispatchEvent(evt);
       console.info(`[DeepLink Engine] [${source}] Custom Event "sidekick:nfc-scanned" dispatch result: handledInModal=${handled}`);
 
-      if (!handled) {
-        toast(`${source}: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
-        if (navigate) {
-          console.info(`[DeepLink Engine] [${source}] Navigating to target route: "${parsed.targetRoute}"`);
-          navigate(parsed.targetRoute);
-        } else {
-          console.warn(`[DeepLink Engine] [${source}] Router navigate function unavailable. Window fallback redirect to "${parsed.targetRoute}"`);
-          window.location.href = parsed.targetRoute;
+      if (handled) {
+        return;
+      }
+
+      // If location deep link has a path or non-UUID query, resolve via backend /resolve
+      if (parsed.action === "location" && parsed.id) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.id);
+        if (!isUuid || parsed.id.includes("/")) {
+          try {
+            console.info(`[DeepLink Engine] [${source}] Resolving path-based location via backend: "${parsed.rawUrl}"`);
+            const resolved = await apiFetch(`/resolve/${encodeURIComponent(parsed.rawUrl)}`);
+            if (resolved && (resolved.entity_type === "location" || resolved.entity_id)) {
+              const targetId = resolved.entity_id || resolved.id;
+              const resolvedRoute = `/storage?location=${encodeURIComponent(targetId)}`;
+              if (resolved.match_type === "ancestor_fallback") {
+                const lostLeaf = (parsed.path || parsed.id || "").split("/").pop() || "target";
+                toast(`Location '${lostLeaf}' was not found. Navigated to nearest ancestor: ${resolved.fallback_ancestor || resolved.display_name}`, {
+                  id: "deep-link-fallback-toast",
+                  icon: "⚠️",
+                  duration: 6000
+                });
+              } else {
+                toast(`${source}: Navigating to ${resolved.display_name || parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
+              }
+              if (navigate) {
+                navigate(resolvedRoute);
+              } else {
+                window.location.href = resolvedRoute;
+              }
+              return;
+            }
+          } catch (err: any) {
+            console.warn(`[DeepLink Engine] [${source}] Path resolution warning:`, err?.message || err);
+            toast.error(`Location deep link could not be resolved: ${err?.message || "Not found"}`);
+            return;
+          }
         }
+      }
+
+      toast(`${source}: Navigating to ${parsed.action}`, { id: "deep-link-toast", icon: "🔗" });
+      if (navigate) {
+        console.info(`[DeepLink Engine] [${source}] Navigating to target route: "${parsed.targetRoute}"`);
+        navigate(parsed.targetRoute);
+      } else {
+        console.warn(`[DeepLink Engine] [${source}] Router navigate function unavailable. Window fallback redirect to "${parsed.targetRoute}"`);
+        window.location.href = parsed.targetRoute;
       }
     };
 
