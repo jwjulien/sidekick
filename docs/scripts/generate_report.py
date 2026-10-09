@@ -27,11 +27,8 @@ SCAN_DIRS = [
     ("requirements", "requirement"),
 ]
 
-# Additional root docs to include if present
-EXTRA_DOCS = [
-    ("inventory_database_schema.md", "general"),
-    ("scratchpad.md", "general"),
-]
+# Additional root docs to include if present (empty so root docs are excluded)
+EXTRA_DOCS = []
 
 
 def parse_frontmatter(content: str) -> tuple[Dict[str, Any], str]:
@@ -534,6 +531,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: var(--text-dim);
         }
 
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+
         .filter-pills {
             display: flex;
             gap: 6px;
@@ -634,6 +645,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .status-complete { background: var(--status-complete-bg); color: #34d399; border: 1px solid var(--status-complete-border); }
         .status-inprogress { background: var(--status-inprogress-bg); color: #fbbf24; border: 1px solid var(--status-inprogress-border); }
         .status-draft { background: var(--status-draft-bg); color: #818cf8; border: 1px solid var(--status-draft-border); }
+        .status-active { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid var(--accent-blue); }
         .status-pending { background: var(--status-pending-bg); color: #94a3b8; border: 1px solid var(--status-pending-border); }
         .status-scrapped { background: var(--status-scrapped-bg); color: #fb7185; border: 1px solid var(--status-scrapped-border); text-decoration: line-through; }
 
@@ -1038,10 +1050,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </svg>
                     <input type="text" id="search-input" class="search-input" placeholder="Search features & specs..." oninput="applyFilters()">
                 </div>
-                <div class="filter-pills">
-                    <button class="pill active" data-type="all" onclick="filterType('all', this)">All</button>
-                    <button class="pill" data-type="feature" onclick="filterType('feature', this)">Features</button>
-                    <button class="pill" data-type="requirement" onclick="filterType('requirement', this)">Requirements</button>
+                <div class="filter-group">
+                    <div class="filter-label">Type</div>
+                    <div class="filter-pills filter-pills-type">
+                        <button class="pill active" data-type="all" onclick="filterType('all', this)">All</button>
+                        <button class="pill" data-type="feature" onclick="filterType('feature', this)">Features</button>
+                        <button class="pill" data-type="requirement" onclick="filterType('requirement', this)">Requirements</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Status</div>
+                    <div class="filter-pills filter-pills-status" id="status-pills">
+                        <!-- Dynamically populated status pills -->
+                    </div>
                 </div>
             </div>
 
@@ -1126,11 +1148,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         let currentActiveDocId = null;
         let activeTypeFilter = 'all';
+        let activeStatusFilter = 'all';
         let cyInstance = null;
 
         // Initialize application
         document.addEventListener('DOMContentLoaded', () => {
             calculateStats();
+            buildStatusPills();
             renderDocList(DOCS_DATA);
 
             // Handle hash routing
@@ -1156,9 +1180,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('stat-complete').innerText = DOCS_DATA.filter(d => d.status.toLowerCase() === 'complete').length;
         }
 
+        function buildStatusPills() {
+            const container = document.getElementById('status-pills');
+            if (!container) return;
+
+            const statuses = Array.from(new Set(DOCS_DATA.map(d => d.status))).filter(Boolean);
+            
+            const statusOrder = ['complete', 'in progress', 'active', 'draft', 'pending', 'scrapped'];
+            statuses.sort((a, b) => {
+                const idxA = statusOrder.indexOf(a.toLowerCase());
+                const idxB = statusOrder.indexOf(b.toLowerCase());
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            let html = `<button class="pill active" data-status="all" onclick="filterStatus('all', this)">All</button>`;
+            statuses.forEach(st => {
+                const key = st.toLowerCase().replace(/\\s+/g, '');
+                html += `<button class="pill" data-status="${key}" onclick="filterStatus('${key}', this)">${escapeHtml(st)}</button>`;
+            });
+            container.innerHTML = html;
+        }
+
         function filterType(type, element) {
             activeTypeFilter = type;
-            document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.filter-pills-type .pill').forEach(p => p.classList.remove('active'));
+            element.classList.add('active');
+            applyFilters();
+        }
+
+        function filterStatus(status, element) {
+            activeStatusFilter = status;
+            document.querySelectorAll('.filter-pills-status .pill').forEach(p => p.classList.remove('active'));
             element.classList.add('active');
             applyFilters();
         }
@@ -1167,10 +1222,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const query = document.getElementById('search-input').value.toLowerCase();
             const filtered = DOCS_DATA.filter(doc => {
                 const matchesType = activeTypeFilter === 'all' || doc.type === activeTypeFilter;
+                const docStatusKey = doc.status.toLowerCase().replace(/\\s+/g, '');
+                const matchesStatus = activeStatusFilter === 'all' || docStatusKey === activeStatusFilter;
                 const matchesSearch = doc.title.toLowerCase().includes(query) || 
                                       doc.id.toLowerCase().includes(query) || 
                                       doc.raw_markdown.toLowerCase().includes(query);
-                return matchesType && matchesSearch;
+                return matchesType && matchesStatus && matchesSearch;
             });
             renderDocList(filtered);
         }
